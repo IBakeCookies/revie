@@ -1,0 +1,459 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+@import 'tailwindcss';
+
+@custom-variant solid (&:is(.solid *));
+@custom-variant solid-light (&:is(.solid-light *));
+@custom-variant solid-dark (&:is(.solid-dark *));
+
+@custom-variant glass (&:is(.glass *));
+@custom-variant glass-dark (&:is(.glass-dark *));
+@custom-variant glass-light (&:is(.glass-light *));
+
+@custom-variant cyber-punk (&:is(.cyber-punk *));
+
+/* here go tailwindcss things to generate css classes */
+@theme inline {
+	--font-primary: var(--font-inter) system-ui;
+
+	--spacing-page: var(--spacer-page);
+
+	--spacing-box-xs: var(--spacer-box-xs);
+	--spacing-box-md: var(--spacer-box-md);
+	--spacing-box-lg: var(--spacer-box-lg);
+	--spacing-box-xl: var(--spacer-box-xl);
+
+	--spacing-grid-2xs: var(--spacer-grid-2xs);
+	--spacing-grid-xs: var(--spacer-grid-xs);
+	--spacing-grid-md: var(--spacer-grid-md);
+	--spacing-grid-lg: var(--spacer-grid-lg);
+
+	--spacing-ty-headline-xs: var(--spacer-ty-headline-xs);
+	--spacing-ty-headline-sm: var(--spacer-ty-headline-sm);
+	--spacing-ty-headline-md: var(--spacer-ty-headline-md);
+	--spacing-ty-headline-lg: var(--spacer-ty-headline-lg);
+	--spacing-ty-body: var(--spacer-ty-body);
+	--spacing-ty-list-2xs: var(--spacer-ty-list-2xs);
+	--spacing-ty-list-xs: var(--spacer-ty-list-xs);
+	--spacing-ty-list-md: var(--spacer-ty-list-md);
+	--spacing-ty-list-lg: var(--spacer-ty-list-lg);
+
+	--spacing-icon: var(--spacer-icon);
+
+	/* DO NOT use for spacing */
+	--spacing-form: var(--width-form);
+
+	--text-xs: var(--font-size-xs);
+	--text-md: var(--font-size-md);
+	--text-lg: var(--font-size-lg);
+	--text-xl: var(--font-size-xl);
+	--text-2xl: var(--font-size-2xl);
+
+	--radius: var(--radius-box);
+	--radius-xs: var(--radius-box-xs);
+	--radius-button: var(--radius-button);
+	--radius-select: var(--radius-select);
+
+	--shadow-glow: var(--shadow-glow);
+	--border-glass-color: var(--border-glass-color);
+	--border-glass-size: var(--border-glass-size);
+
+	--blur: var(--blur);
+
+	--color-ty-primary: var(--color-ty-primary);
+	--color-ty-secondary: var(--color-ty-secondary);
+
+	--color-box-primary: var(--color-background-secondary);
+	--color-box-secondary: var(--color-background-tertiary);
+
+	--color-solid-background: var(--color-solid-background);
+
+	--color-danger: var(--color-danger-background);
+	--color-danger-foreground: var(--color-danger-foreground);
+	--color-warning: var(--color-warning-background);
+	--color-warning-foreground: var(--color-warning-foreground);
+	--color-success: var(--color-success-background);
+	--color-success-foreground: var(--color-success-foreground);
+	--color-info: var(--color-info-background);
+	--color-info-foreground: var(--color-info-foreground);
+
+	/* shadcn start */
+	--color-background: var(--color-solid-background);
+	--color-foreground: var(--color-ty-primary);
+	--color-card: var(--color-box-primary);
+	--color-card-foreground: var(--color-ty-primary);
+	--color-popover: var(--color-box-primary);
+	--color-popover-foreground: var(--color-ty-primary);
+
+	/* used for buttons */
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+	/* shadcn end */
+}
+
+/* Inside here are default values */
+:root {
+	--font-inter: 'Inter';
+
+	--spacer-2xs: 0.375rem; /* 6px */
+	--spacer-xs: 0.625rem; /* 10px */
+	--spacer-sm: 0.75rem; /* 12px */
+	--spacer-md: 1rem; /* 16px */
+	--spacer-lg: 1.25rem; /* 20px */
+	--spacer-xl: 1.5rem; /* 24px */
+	--spacer-2xl: 2rem; /* 32px */
+
+	--spacer-box-xs: var(--spacer-xs);
+	--spacer-box-md: var(--spacer-md);
+	--spacer-box-lg: var(--spacer-lg);
+	--spacer-box-xl: var(--spacer-xl);
+
+	--spacer-page: var(--spacer-2xl);
+
+	--spacer-grid-2xs: var(--spacer-2xs);
+	--spacer-grid-xs: var(--spacer-xs);
+	--spacer-grid-md: var(--spacer-md);
+	--spacer-grid-lg: var(--spacer-lg);
+
+	--spacer-icon: var(--spacer-2xs);
+
+	--spacer-ty-headline-xs: var(--spacer-xs);
+	--spacer-ty-headline-sm: var(--spacer-sm);
+	--spacer-ty-headline-md: var(--spacer-md);
+	--spacer-ty-headline-lg: var(--spacer-lg);
+	--spacer-ty-body: var(--spacer-sm);
+	--spacer-ty-list-2xs: var(--spacer-2xs);
+	--spacer-ty-list-xs: var(--spacer-xs);
+	--spacer-ty-list-md: var(--spacer-md);
+	--spacer-ty-list-lg: var(--spacer-lg);
+
+	--font-size-xs: 0.75rem; /* 12px */
+	--font-size-sm: 0.875rem; /* 14px */
+	--font-size-md: 1rem; /* 16px */
+	--font-size-lg: 1.125rem; /* 18px */
+	--font-size-xl: 1.25rem; /* 20px */
+	--font-size-2xl: 1.5rem; /* 24px */
+	--font-size-3xl: 2rem; /* 32px */
+
+	--width-form: 34rem;
+
+	--radius-2xl: 100rem;
+
+	--radius-box: 1.25rem;
+	--radius-box-xs: 0.5rem;
+	--radius-button: var(--radius-2xl);
+	--radius-select: var(--radius-2xl);
+
+	--shadow-glow: 0 0 1rem currentColor;
+
+	--blur: 2rem;
+
+	--color-danger-background: var(--color-red-500);
+	--color-danger-foreground: var(--color-white);
+	--color-warning-background: var(--color-yellow-500);
+	--color-warning-foreground: var(--color-white);
+	--color-success-background: var(--color-green-500);
+	--color-success-foreground: var(--color-white);
+	--color-info-background: var(--color-blue-500);
+	--color-info-foreground: var(--color-white);
+}
+
+.solid-light {
+	--color-solid-background: oklch(1 0 0);
+	--color-background-secondary: oklch(0.98 0 0);
+	--color-background-tertiary: oklch(1 0 0);
+
+	--primary: rgba(122, 223, 140, 0.75);
+	--primary-foreground: var(--color-black);
+}
+
+.glass-light {
+	--background-image: url('https://img.freepik.com/free-photo/pastel-pink-bokeh-lights_53876-88706.jpg?t=st=1764109273~exp=1764112873~hmac=961461b0a0351fc6701c8d6e845b5abd61132b1ce1b4781f6b14063e1c9a8206&w=1480');
+
+	--color-solid-background: oklch(1 0 0);
+	--color-background-secondary: oklch(1 0 0 / 0.25);
+	--color-background-tertiary: oklch(0 0 0 / 0.03);
+
+	/* --color-background-secondary: oklch(0 0 0 / 0.04);
+	--color-background-tertiary: oklch(1 0 0 / 0.25); */
+
+	--primary: rgba(4, 118, 217, 0.75);
+	--primary-foreground: var(--color-white);
+}
+
+.solid-light,
+.glass-light {
+	--color-ty-primary: oklch(0 0 0);
+	--color-ty-secondary: oklch(0 0 0 / 0.7);
+
+	/* shadcn start */
+	/* --primary: rgba(4, 118, 217, 0.75);
+    --primary-foreground: var(--color-white); */
+	--secondary: oklch(0.97 0.001 106.424);
+	--secondary-foreground: var(--color-ty-primary);
+	--muted: oklch(0.97 0.001 106.424);
+	--muted-foreground: oklch(0.553 0.013 58.071);
+	--accent: oklch(0.97 0.001 106.424);
+	--accent-foreground: var(--color-ty-primary);
+	--destructive: oklch(0.577 0.245 27.325);
+	--destructive-foreground: oklch(0.577 0.245 27.325);
+
+	--border: oklch(0 0 0 / 0.25);
+	--input: oklch(0.923 0.003 48.717);
+	--ring: oklch(0.709 0.01 56.259);
+
+	--chart-1: oklch(0.646 0.222 41.116);
+	--chart-2: oklch(0.6 0.118 184.704);
+	--chart-3: oklch(0.398 0.07 227.392);
+	--chart-4: oklch(0.828 0.189 84.429);
+	--chart-5: oklch(0.769 0.188 70.08);
+
+	--sidebar: oklch(0.985 0.001 106.423);
+	--sidebar-foreground: oklch(0.147 0.004 49.25);
+	--sidebar-primary: oklch(0.216 0.006 56.043);
+	--sidebar-primary-foreground: oklch(0.985 0.001 106.423);
+	--sidebar-accent: oklch(0.97 0.001 106.424);
+	--sidebar-accent-foreground: oklch(0.216 0.006 56.043);
+	--sidebar-border: oklch(0.923 0.003 48.717);
+	--sidebar-ring: oklch(0.709 0.01 56.259);
+	/* shadcn end */
+}
+
+.solid-dark {
+	--color-solid-background: oklch(0 0 0);
+	--color-background-secondary: oklch(0.2 0 0);
+	--color-background-tertiary: oklch(0 0 0);
+
+	--primary: rgba(94, 91, 176, 0.75);
+	--primary-foreground: var(--color-white);
+}
+
+.glass-dark {
+	--background-image: url('https://img.freepik.com/free-vector/blue-green-patterned-background-vector_53876-77848.jpg?t=st=1764109478~exp=1764113078~hmac=2df1dca34e24d91b9b6f84d5e4ae05a54e0567ab616c8a7a3cc1212b273be994&w=1480');
+
+	--color-solid-background: oklch(0 0 0);
+	--color-background-secondary: oklch(1 0 0 / 0.05);
+	--color-background-tertiary: oklch(0 0 0 / 0.15);
+
+	--primary: rgba(4, 118, 217, 0.75);
+	--primary-foreground: var(--color-white);
+}
+
+.solid-dark,
+.glass-dark {
+	--color-ty-primary: oklch(1 0 0);
+	--color-ty-secondary: oklch(1 0 0 / 0.7);
+
+	/* shadcn start */
+	/* --primary: oklch(0.985 0.001 106.423);
+    --primary-foreground: oklch(0.216 0.006 56.043); */
+	--secondary: oklch(0.268 0.007 34.298);
+	--secondary-foreground: var(--color-ty-primary);
+	--muted: oklch(0.268 0.007 34.298);
+	--muted-foreground: var(--color-ty-secondary);
+	--accent: oklch(0.268 0.007 34.298);
+	--accent-foreground: var(--color-ty-primary);
+	--destructive: oklch(64.735% 0.17675 22.623);
+	--destructive-foreground: oklch(73.337% 0.1297 17.73);
+
+	--border: oklch(1 0 0 / 0.25);
+	--input: oklch(0.268 0.007 34.298);
+	--ring: oklch(0.553 0.013 58.071);
+
+	--chart-1: oklch(0.488 0.243 264.376);
+	--chart-2: oklch(0.696 0.17 162.48);
+	--chart-3: oklch(0.769 0.188 70.08);
+	--chart-4: oklch(0.627 0.265 303.9);
+	--chart-5: oklch(0.645 0.246 16.439);
+
+	--sidebar: oklch(0.216 0.006 56.043);
+	--sidebar-foreground: oklch(0.985 0.001 106.423);
+	--sidebar-primary: oklch(0.488 0.243 264.376);
+	--sidebar-primary-foreground: oklch(0.985 0.001 106.423);
+	--sidebar-accent: oklch(0.268 0.007 34.298);
+	--sidebar-accent-foreground: oklch(0.985 0.001 106.423);
+	--sidebar-border: oklch(0.268 0.007 34.298);
+	--sidebar-ring: oklch(0.553 0.013 58.071);
+	/* shadcn end */
+}
+
+.cyber-punk {
+	--radius-box: 0;
+	--radius-box-xs: 0;
+	--radius-select: 0;
+	--radius-button: 0;
+	--blur: 0;
+
+	--border: oklch(95.471% 0.21554 114.604);
+
+	--color-ty-primary: oklch(100% 0.00011 271.152);
+	--color-ty-secondary: oklch(0.7 0.2 150);
+
+	--color-solid-background: oklch(0.1 0.3 320);
+	--color-background-secondary: oklch(0.1 0.3 320);
+	--color-background-tertiary: oklch(0.15 0.3 320);
+
+	--background: oklch(0.2 0.3 320);
+
+	--primary: oklch(56.57% 0.25407 328.3);
+	--primary-foreground: oklch(100% 0.00011 271.152);
+	--secondary: oklch(0.3 0.3 200);
+	--secondary-foreground: oklch(0.9 0.2 100);
+	--muted: oklch(0.3 0.3 200);
+	--muted-foreground: oklch(0.7 0.2 150);
+	--accent: oklch(0.3 0.3 200);
+	--accent-foreground: oklch(0.9 0.2 100);
+	--destructive: oklch(0.6 0.4 30);
+	--destructive-foreground: oklch(0.9 0.3 30);
+}
+
+.glass {
+	--border-glass-color: var(--color-ty-primary);
+	--border-glass-size: 1px;
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+
+	body,
+	.innerZoomElementWrapper {
+		@apply bg-solid-background bg-cover bg-fixed bg-center bg-no-repeat font-primary text-md font-medium text-ty-primary;
+
+		background-image: var(--background-image);
+	}
+}
+
+@utility border-glass-bg {
+	border: 1px solid transparent;
+	background-image:
+		linear-gradient(var(--color-solid-background)),
+		linear-gradient(
+			90deg,
+			color-mix(in oklch, var(--border-glass-color) 50%, transparent) 0%,
+			color-mix(in oklch, var(--color-foreground) 5%, transparent) 50%,
+			color-mix(in oklch, var(--border-glass-color) 50%, transparent) 100%
+		);
+	background-origin: border-box;
+	background-clip: padding-box, border-box;
+
+	/* border: 1px solid transparent;
+        border-image: linear-gradient(
+            90deg,
+            color-mix(in oklch, var(--border-glass-color) 50%, transparent) 0%,
+            color-mix(in oklch, var(--color-foreground) 5%, transparent) 50%,
+            color-mix(in oklch, var(--border-glass-color) 50%, transparent) 100%
+        );
+        border-image-slice: 1; */
+}
+
+@utility border-glass {
+	--start: 0%;
+	--end: 50%;
+	--conic-before: 145deg;
+	--conic-after: -35deg;
+
+	@apply relative;
+
+	&::before {
+		--conic: var(--conic-before);
+	}
+
+	&::after {
+		--conic: var(--conic-after);
+	}
+
+	&::before,
+	&::after {
+		@apply absolute top-1/2 left-1/2 -translate-1/2 opacity-60;
+
+		width: calc(100% + var(--border-glass-size) * 2);
+		height: calc(100% + var(--border-glass-size) * 2);
+		content: '';
+		pointer-events: none;
+		border-radius: inherit;
+		border: var(--border-glass-size) solid transparent;
+		background: conic-gradient(
+				from var(--conic) at center in oklch,
+				transparent var(--start),
+				var(--border-glass-color),
+				transparent var(--end)
+			)
+			border-box;
+		mask: linear-gradient(transparent), linear-gradient(var(--border-glass-color));
+		mask-repeat: no-repeat;
+		mask-clip: padding-box, border-box;
+		mask-composite: subtract;
+	}
+
+	/* Alternative approach - with 1 before only */
+	/* --angle: 125deg;
+
+    &::before {
+        content: '';
+        position: absolute;
+        inset: calc(var(--border-glass-size) * -1);
+        pointer-events: none;
+        border-radius: inherit;
+
+        background: conic-gradient(
+                from var(--angle) at center in oklch,
+
+                transparent 0% 5%,
+                var(--border-glass-color) 25%,
+                transparent 50% 55%,
+
+                var(--border-glass-color) 75%,
+                transparent 100%
+            )
+            border-box;
+
+        border: var(--border-glass-size) solid transparent;
+
+        mask:
+            linear-gradient(transparent) padding-box,
+            linear-gradient(var(--border-glass-color));
+        mask-clip: padding-box, border-box;
+        mask-composite: subtract;
+    } */
+
+	&.glass-y {
+		--conic-before: 90deg;
+		--conic-after: -90deg;
+	}
+
+	&.glass-x {
+		--conic-before: 0deg;
+		--conic-after: 180deg;
+	}
+}

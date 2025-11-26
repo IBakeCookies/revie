@@ -1,0 +1,238 @@
+{
+    "defaults": {},
+    "containers": [
+        {
+            "name": "BoxDate"
+        },
+        {
+            "name": "BoxAdguard",
+            "props": {
+                "href": "http://192.168.178.195"
+            }
+        },
+        {
+            "name": "Grid",
+            "props": {
+                "title": "Services",
+                "items": [
+                    {
+                        "name": "BoxService",
+                        "props": {
+                            "title": "Proxmox",
+                            "href": "https://192.168.178.180:8006",
+                            "img": {
+                                "src": "https://cdn.simpleicons.org/proxmox"
+                            },
+                            "class": "xl:col-span-6"
+                        }
+                    },
+                    {
+                        "name": "BoxService",
+                        "props": {
+                            "title": "tteck",
+                            "href": "https://community-scripts.github.io/ProxmoxVE/",
+                            "img": {
+                                "src": "https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/images/logo-81x112.png"
+                            },
+                            "class": "xl:col-span-6"
+                        }
+                    },
+                    {
+                        "name": "Grid",
+                        "props": {
+                            "subTitle": "Smart Home",
+                            "class": "xl:col-span-4",
+                            "items": [
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Home Assistant",
+                                        "href": "http://192.168.178.74:8123",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/home-assistant.svg"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "ESP Home",
+                                        "href": "http://192.168.178.117:6052",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/esphome.svg"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "WLED",
+                                        "href": "http://192.168.178.125",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/wled.png"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Grid",
+                        "props": {
+                            "subTitle": "Network",
+                            "class": "xl:col-span-4",
+                            "items": [
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Adguard",
+                                        "href": "http://192.168.178.195",
+                                        "img": {
+                                            "src": "https://cdn.simpleicons.org/adguard"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "EMQX",
+                                        "href": "http://192.168.178.42:18083",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/emqx.svg"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Grid",
+                        "props": {
+                            "subTitle": "Automation",
+                            "class": "xl:col-span-4",
+                            "items": [
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Huginn",
+                                        "href": "http://192.168.178.174/",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/huginn.svg"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "NodeRed",
+                                        "href": "http://192.168.178.58:1880/",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/loganmarchione/homelab-svg-assets@latest/assets/nodered.svg"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Cronicle",
+                                        "href": "http://192.168.178.54:3012/",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/cronicle.svg"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Grid",
+                        "props": {
+                            "subTitle": "Monitoring",
+                            "class": "xl:col-span-4",
+                            "items": [
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Change Detection",
+                                        "href": "http://192.168.178.99:5000/",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/changedetection.svg"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Uptime Kuma",
+                                        "href": "http://192.168.178.67:3001",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/uptime-kuma.svg"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Grid",
+                        "props": {
+                            "subTitle": "Finance",
+                            "class": "xl:col-span-4",
+                            "items": [
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Wallos",
+                                        "href": "http://192.168.178.100",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/wallos.svg"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Ghostfolio",
+                                        "href": "http://192.168.178.21:3333/",
+                                        "img": {
+                                            "src": "http://192.168.178.21:3333/assets/ghost.svg"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Grid",
+                        "props": {
+                            "subTitle": "Tools",
+                            "class": "xl:col-span-4",
+                            "items": [
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "It tools",
+                                        "href": "http://192.168.178.39",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/it-tools.svg"
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "BoxService",
+                                    "props": {
+                                        "title": "Whoogle",
+                                        "href": "http://192.168.178.192:5000/",
+                                        "img": {
+                                            "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/whoogle.png"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}
