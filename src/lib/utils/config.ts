@@ -2,13 +2,15 @@ import type { ComponentProps } from 'svelte';
 import BoxServiceWrapper from '$lib/components/box-service-wrapper.svelte';
 import BoxDate from '$lib/components/box-date.svelte';
 import Grid from '$lib/components/grid.svelte';
+import SubGrid from '$lib/components/sub-grid.svelte';
 import BoxAdguard from '$lib/components/box-adguard.svelte';
 
 export const componentRegistry = {
 	BoxService: BoxServiceWrapper,
 	BoxAdguard,
 	BoxDate,
-	Grid
+	Grid,
+	SubGrid
 };
 
 type ComponentRegistry = typeof componentRegistry;
@@ -24,9 +26,16 @@ type ConfigDefault = Partial<{
 	[key in ComponentName]: ConfigContainer['props'];
 }>;
 
+type ConfigPage = {
+	title?: string;
+	containers?: ConfigContainer[];
+};
+
 export type Config = {
 	defaults?: ConfigDefault;
-	containers?: ConfigContainer[];
+	pages?: {
+		[path: string]: ConfigPage;
+	};
 };
 
 export type TransformConfigOutput<N extends ComponentName = ComponentName> = {
@@ -53,19 +62,39 @@ function transformConfigContainer(
 ): TransformConfigOutput {
 	return mapContainer(
 		item,
-		(it) => ({
-			name: it.name,
-			component: componentRegistry[it.name],
-			props: { ...defaults[it.name], ...it.props }
-		}),
+		(it) => {
+			const merged = (() => {
+				if (isGrid(it)) {
+					return {
+						class: `${defaults[it.name]?.class || ''} ${it.props?.class}`,
+						gridClass: `${defaults[it.name]?.class || ''} ${it.props?.gridClass}`
+					};
+				}
+
+				return {
+					class: `${it.props?.class} ${defaults[it.name]?.class || ''}`
+				};
+			})();
+
+			return {
+				name: it.name,
+				component: componentRegistry[it.name],
+				props: {
+					...defaults[it.name],
+					...it.props,
+					...merged
+				}
+			};
+		},
 		defaults
 	);
 }
 
-export function getContainers(config: Config): TransformConfigOutput[] {
-	const containers = config.containers || [];
-
-	return containers.map((item) => transformConfigContainer(item, config.defaults));
+export function getContainers(
+	containers: ConfigContainer[] = [],
+	defaults: Config['defaults']
+): TransformConfigOutput[] {
+	return containers.map((item) => transformConfigContainer(item, defaults));
 }
 
 function scanContainer(item: ConfigContainer, target: string): ConfigContainer | void {
@@ -82,8 +111,8 @@ function scanContainer(item: ConfigContainer, target: string): ConfigContainer |
 	}
 }
 
-export function recursiveScan(config: Config, target: string): ConfigContainer | void {
-	for (const container of config.containers || []) {
+export function recursiveScan(page: ConfigPage, target: string): ConfigContainer | void {
+	for (const container of page.containers || []) {
 		if (scanContainer(container, target)) {
 			return container;
 		}
@@ -94,8 +123,10 @@ export function isBoxService(item: ConfigContainer): item is ConfigContainer<'Bo
 	return item.name === 'BoxService';
 }
 
-export function isGrid(item: ConfigContainer): item is ConfigContainer<'Grid'> {
-	return item.name === 'Grid';
+export function isGrid(
+	item: ConfigContainer
+): item is ConfigContainer<'Grid'> | ConfigContainer<'SubGrid'> {
+	return item.name === 'Grid' || item.name === 'SubGrid';
 }
 
 export function isBoxAdguard(item: ConfigContainer): item is ConfigContainer<'BoxAdguard'> {

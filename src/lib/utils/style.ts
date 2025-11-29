@@ -6,19 +6,18 @@ import { extendTailwindMerge } from 'tailwind-merge';
 // https://github.com/dcastil/tailwind-merge/blob/v2.2.1/src/lib/default-config.ts
 const customTwMerge = extendTailwindMerge({
 	extend: {
-		// theme: {
-		//     spacing: [
-		//         'box-xs',
-		//         'box-sm',
-		//         'box',
-		//         'box-md',
-		//         'box-lg',
-		//         'box-xl',
-		//         'section',
-		//         'section-md',
-		//         'section-lg',
-		//     ],
-		// },
+		theme: {
+			spacing: [
+				'box-xs',
+				'box-md',
+				'box-lg',
+				'box-xl',
+				'grid-2xs',
+				'grid-xs',
+				'grid-md',
+				'grid-lg'
+			]
+		},
 		// classGroups: {
 		//     w: [
 		//         {

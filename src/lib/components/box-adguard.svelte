@@ -5,7 +5,7 @@
 	import { getAdguardStore } from '$lib/store/adguard-store.svelte';
 
 	type Props = {
-        href: string;
+		href: string;
 		username?: string;
 		password?: string;
 		class?: ClassValue;
@@ -15,7 +15,7 @@
 	const adguardStore = getAdguardStore();
 </script>
 
-{#if adguardStore.stats}
+{#if adguardStore && adguardStore.stats}
 	<div
 		{...restProps}
 		class={cn(

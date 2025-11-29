@@ -55,6 +55,7 @@
 	--radius-xs: var(--radius-box-xs);
 	--radius-button: var(--radius-button);
 	--radius-select: var(--radius-select);
+	--radius-input: var(--radius-input);
 
 	--shadow-glow: var(--shadow-glow);
 	--border-glass-color: var(--border-glass-color);
@@ -164,16 +165,15 @@
 	--font-size-2xl: 1.5rem; /* 24px */
 	--font-size-3xl: 2rem; /* 32px */
 
-	--width-form: 34rem;
-
 	--radius-2xl: 100rem;
 
 	--radius-box: 1.25rem;
 	--radius-box-xs: 0.5rem;
 	--radius-button: var(--radius-2xl);
 	--radius-select: var(--radius-2xl);
+	--radius-input: var(--radius-2xl);
 
-	--shadow-glow: 0 0 1rem currentColor;
+	--shadow-glow: 0 0 1rem rgb(from currentColor r g b / 0.3);
 
 	--blur: 2rem;
 

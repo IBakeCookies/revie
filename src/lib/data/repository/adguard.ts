@@ -17,7 +17,7 @@ export interface GetAdguardStatsOutput {
 	top_blocked_domains: Record<string, number>[];
 }
 
-export async function $getAdguardStats({
+export async function getAdguardStats({
 	username,
 	password,
 	href

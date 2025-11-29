@@ -21,7 +21,7 @@
 	{href}
 	target="_blank"
 	class={cn(
-		'@container/box-service col-span-12 border border-transparent cursor-pointer rounded-xs bg-box-secondary p-box-md relative hover:border-border transition-colors',
+		'@container/box-service border border-transparent cursor-pointer rounded-xs bg-box-secondary p-box-md relative hover:border-border transition-colors col-span-12',
 		restProps.class
 	)}
 >

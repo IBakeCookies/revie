@@ -4,7 +4,7 @@
 	import type { TransformConfigOutput } from '$lib/utils/config';
 	import { cn } from '$lib/utils/style';
 
-	type Props = {
+	export type Props = {
 		title?: string;
 		subTitle?: string;
 		items: TransformConfigOutput[];
@@ -30,9 +30,9 @@
 		<h5 class="text-lg text-ty-secondary">{subTitle}</h5>
 	{/if}
 
-	<div class="grid grid-cols-12 gap-grid-lg mt-ty-headline-md {gridClass}">
+	<div class={cn('grid grid-cols-12 gap-grid-lg mt-ty-headline-md', gridClass)}>
 		{#each items as item}
-			{@const Component = item.component}
+			{@const Component = item.component as any}
 
 			{#if Component}
 				<Component {...item.props} />

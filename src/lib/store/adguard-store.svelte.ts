@@ -6,19 +6,19 @@ import { transformAdguardStats } from '$lib/business/transform/adguard-transform
 const CONTEXT_KEY = Symbol();
 
 export class AdguardStore {
-	#stats: AdguardStats | undefined = $state();
+	#stats = $state<AdguardStats | undefined>();
+
+	constructor(stats: GetAdguardStatsOutput) {
+		this.#stats = transformAdguardStats(stats);
+	}
 
 	get stats() {
 		return this.#stats;
 	}
-
-	setStats(stats: GetAdguardStatsOutput) {
-		this.#stats = transformAdguardStats(stats);
-	}
 }
 
-export function setAdguardStore(eventStore = new AdguardStore()): AdguardStore {
-	return setContext<AdguardStore>(CONTEXT_KEY, eventStore);
+export function setAdguardStore(stats: GetAdguardStatsOutput): AdguardStore {
+	return setContext<AdguardStore>(CONTEXT_KEY, new AdguardStore(stats));
 }
 
 export function getAdguardStore(): AdguardStore {

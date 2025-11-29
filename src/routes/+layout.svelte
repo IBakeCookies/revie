@@ -1,18 +1,23 @@
 <script lang="ts">
+	import type { LayoutProps } from './$types';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
-	import { useTheme } from '$lib/composable/useTheme.svelte';
 	import { cn } from '$lib/utils/style';
-	import { setAdguardStore } from '$lib/store/adguard-store.svelte';
+	import { setServicesStore } from '$lib/store/service-store.svelte';
+	import { setThemeStore } from '$lib/store/theme-store.svelte';
 
-	let { children } = $props();
+	let { children, data }: LayoutProps = $props();
 	let sentinel = $state<HTMLElement | undefined>();
 	let isNavAtTheTop = $state(false);
 
-	const { themes, onToggleTheme } = useTheme();
+	const themeStore = setThemeStore(data.theme || 'solid-light');
+	const pages = Object.entries(data?.config?.pages || {}).map(([path, page]) => ({
+		path,
+		title: page.title || path
+	}));
 
-	setAdguardStore();
+	setServicesStore();
 
 	onMount(() => {
 		if (!sentinel) {
@@ -44,11 +49,25 @@
 			}
 		)}
 	>
-		<h1 class="font-bold text-2xl mr-auto">Revie Dashboard</h1>
+		<h1 class="font-bold text-2xl">Revie Dashboard</h1>
 
-		<div class="flex items-center gap-ty-list-md">
-			{#each themes as theme}
-				<button onclick={() => onToggleTheme(theme.name)}>{theme.name}</button>
+		{#each pages as page}
+			<a
+				href={page.path}
+				class="ml-ty-list-md rounded px-box-md py-box-xs bg-primary text-primary-foreground"
+			>
+				{page.title}
+			</a>
+		{/each}
+
+		<div class="ml-auto flex items-center gap-ty-list-md">
+			{#each themeStore.themes as theme}
+				<button
+					class={`${themeStore.theme === theme.name ? 'underline' : ''}`}
+					onclick={() => themeStore.switchTheme(theme.name)}
+				>
+					{theme.name}
+				</button>
 			{/each}
 		</div>
 	</header>
