@@ -18,7 +18,7 @@
 <div
 	{...restProps}
 	class={cn(
-		'p-box-xl col-span-12 bg-box-primary  rounded solid:border cyber-punk:border',
+		'cyber-punk:border p-box-xl col-span-12 bg-box-primary rounded solid:border',
 		restProps.class
 	)}
 >

@@ -50,15 +50,15 @@ export class ThemeStore {
 		return themes.map((t) => t.css).flat();
 	});
 
-	constructor(initialTheme: ThemeName) {
-		this.#theme = initialTheme;
-
+	constructor(initialTheme?: ThemeName) {
 		$effect(() => {
 			document.documentElement.classList.remove(...this.#classesToRemove);
 			document.documentElement.classList.add(...this.#classesToAdd);
 		});
 
 		if (initialTheme) {
+			this.#theme = initialTheme;
+
 			return;
 		}
 
@@ -82,14 +82,6 @@ export class ThemeStore {
 		return this.#themes;
 	}
 
-	get classesToAdd() {
-		return this.#classesToAdd;
-	}
-
-	get classesToRemove() {
-		return this.#classesToRemove;
-	}
-
 	switchTheme(newTheme: ThemeName): void {
 		this.#theme = newTheme;
 
@@ -97,7 +89,7 @@ export class ThemeStore {
 	}
 }
 
-export function setThemeStore(initialTheme: ThemeName): ThemeStore {
+export function setThemeStore(initialTheme?: ThemeName): ThemeStore {
 	return setContext<ThemeStore>(CONTEXT_KEY, new ThemeStore(initialTheme));
 }
 

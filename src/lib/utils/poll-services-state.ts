@@ -5,7 +5,7 @@ export function pollServicesState(containers: TransformConfigOutput[]): () => vo
 	const servicesStore = getServicesStore();
 	const hrefs = servicesStore.getServicesHrefs(containers);
 
-	function poll() {
+	function poll(): void {
 		hrefs.forEach(servicesStore.getServiceStatus, servicesStore);
 	}
 

@@ -11,15 +11,7 @@ interface ServiceState {
 const CONTEXT_KEY = Symbol();
 
 export class ServicesStore {
-	#services = $state<ServiceState[]>([]);
-
-	set services(services: ServiceState[]) {
-		this.#services = services;
-	}
-
-	get services() {
-		return this.#services;
-	}
+	services = $state<ServiceState[]>([]);
 
 	async getServiceStatus(href: string): Promise<void> {
 		const [err, res] = await getServiceState(href);
@@ -30,7 +22,7 @@ export class ServicesStore {
 			return;
 		}
 
-		this.#services.push({
+		this.services.push({
 			href,
 			isAlive: res.isAlive
 		});

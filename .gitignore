@@ -26,5 +26,6 @@ vite.config.ts.timestamp-*
 # Paraglide
 src/lib/paraglide
 
+# Storybook 
 *storybook.log
 storybook-static

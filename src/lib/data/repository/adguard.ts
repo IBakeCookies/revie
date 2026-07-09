@@ -27,13 +27,13 @@ export async function getAdguardStats({
 	const base64 = Buffer.from(`${username}:${password}`).toString('base64');
 
 	return useAsyncErrorAsValue(async () => {
-		const response = await fetch(`${href}/control/stats`, {
+		const raw = await fetch(`${href}/control/stats`, {
 			headers: {
 				Authorization: `Basic ${base64}`,
 				'Content-type': 'application/json'
 			}
 		});
 
-		return response.json();
+		return raw.json();
 	});
 }

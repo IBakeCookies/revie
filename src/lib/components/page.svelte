@@ -2,10 +2,12 @@
 	import { type GetAdguardStatsOutput } from '$lib/data/repository/adguard';
 	import { type Config } from '$lib/utils/config';
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import { getContainers } from '$lib/utils/config';
 	import { pollServicesState } from '$lib/utils/poll-services-state';
 	import { setAdguardStore } from '$lib/store/adguard-store.svelte';
-	import { page } from '$app/state';
+    import { setServicesStore } from '$lib/store/service-store.svelte';
+	import { transformAdguardStats } from '$lib/business/transform/adguard-transform';
 
 	export type Props = {
 		adguard: GetAdguardStatsOutput | null;
@@ -13,6 +15,13 @@
 	};
 
 	let { adguard, config }: Props = $props();
+    const adguardStore = setAdguardStore();
+
+    setServicesStore();
+
+    if(adguard) {
+    	adguardStore.stats = transformAdguardStats(adguard)
+	}
 
 	const containers = $derived.by(() => {
 		if (!config?.pages) {
@@ -21,10 +30,6 @@
 
 		return getContainers(config?.pages[page.url.pathname].containers, config.defaults);
 	});
-
-	if (adguard) {
-		setAdguardStore(adguard);
-	}
 
 	onMount(() => {
 		const stopPolling = pollServicesState(containers);

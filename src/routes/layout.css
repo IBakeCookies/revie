@@ -4,6 +4,8 @@
 
 @import 'tailwindcss';
 
+@source inline("col-{1,{2..11..2},12}");
+
 @custom-variant solid (&:is(.solid *));
 @custom-variant solid-light (&:is(.solid-light *));
 @custom-variant solid-dark (&:is(.solid-dark *));
@@ -69,7 +71,7 @@
 	--color-box-primary: var(--color-background-secondary);
 	--color-box-secondary: var(--color-background-tertiary);
 
-	--color-solid-background: var(--color-solid-background);
+	--color-background-solid: var(--color-background-solid);
 
 	--color-danger: var(--color-danger-background);
 	--color-danger-foreground: var(--color-danger-foreground);
@@ -81,7 +83,7 @@
 	--color-info-foreground: var(--color-info-foreground);
 
 	/* shadcn start */
-	--color-background: var(--color-solid-background);
+	--color-background: var(--color-background-solid);
 	--color-foreground: var(--color-ty-primary);
 	--color-card: var(--color-box-primary);
 	--color-card-foreground: var(--color-ty-primary);
@@ -188,7 +190,7 @@
 }
 
 .solid-light {
-	--color-solid-background: oklch(1 0 0);
+	--color-background-solid: oklch(0.95 0 0);
 	--color-background-secondary: oklch(0.98 0 0);
 	--color-background-tertiary: oklch(1 0 0);
 
@@ -197,9 +199,9 @@
 }
 
 .glass-light {
-	--background-image: url('https://img.freepik.com/free-photo/pastel-pink-bokeh-lights_53876-88706.jpg?t=st=1764109273~exp=1764112873~hmac=961461b0a0351fc6701c8d6e845b5abd61132b1ce1b4781f6b14063e1c9a8206&w=1480');
+	--background-image: url('https://images.presentationgo.com/2025/08/gouache-style-abstract-painting.jpg');
 
-	--color-solid-background: oklch(1 0 0);
+	--color-background-solid: oklch(1 0 0);
 	--color-background-secondary: oklch(1 0 0 / 0.25);
 	--color-background-tertiary: oklch(0 0 0 / 0.03);
 
@@ -249,7 +251,7 @@
 }
 
 .solid-dark {
-	--color-solid-background: oklch(0 0 0);
+	--color-background-solid: oklch(0.25 0 0);
 	--color-background-secondary: oklch(0.2 0 0);
 	--color-background-tertiary: oklch(0 0 0);
 
@@ -258,9 +260,12 @@
 }
 
 .glass-dark {
-	--background-image: url('https://img.freepik.com/free-vector/blue-green-patterned-background-vector_53876-77848.jpg?t=st=1764109478~exp=1764113078~hmac=2df1dca34e24d91b9b6f84d5e4ae05a54e0567ab616c8a7a3cc1212b273be994&w=1480');
+	--background-image: url('https://images.presentationgo.com/2025/07/dark-textured-black-background-red-purple.jpg');
+	main {
+		background-color: rgba(0, 0, 0, 0.2);
+	}
 
-	--color-solid-background: oklch(0 0 0);
+	--color-background-solid: oklch(0 0 0);
 	--color-background-secondary: oklch(1 0 0 / 0.05);
 	--color-background-tertiary: oklch(0 0 0 / 0.15);
 
@@ -313,18 +318,16 @@
 	--radius-button: 0;
 	--blur: 0;
 
-	--border: oklch(95.471% 0.21554 114.604);
+	--border: oklch(96.489% 0.11619 118.762);
 
 	--color-ty-primary: oklch(100% 0.00011 271.152);
-	--color-ty-secondary: oklch(0.7 0.2 150);
+	--color-ty-secondary: oklch(0.93 0.21 122);
 
-	--color-solid-background: oklch(0.1 0.3 320);
-	--color-background-secondary: oklch(0.1 0.3 320);
-	--color-background-tertiary: oklch(0.15 0.3 320);
+	--color-background-solid: oklch(25.819% 0.01365 304.767);
+	--color-background-secondary: oklch(31.859% 0.01131 307.961);
+	--color-background-tertiary: oklch(25.912% 0.01719 300.378);
 
-	--background: oklch(0.2 0.3 320);
-
-	--primary: oklch(56.57% 0.25407 328.3);
+	--primary: oklch(0.93 0.21 122);
 	--primary-foreground: oklch(100% 0.00011 271.152);
 	--secondary: oklch(0.3 0.3 200);
 	--secondary-foreground: oklch(0.9 0.2 100);
@@ -348,7 +351,7 @@
 
 	body,
 	.innerZoomElementWrapper {
-		@apply bg-solid-background bg-cover bg-fixed bg-center bg-no-repeat font-primary text-md font-medium text-ty-primary;
+		@apply bg-background-solid bg-cover bg-fixed bg-center bg-no-repeat font-primary text-md font-medium text-ty-primary;
 
 		background-image: var(--background-image);
 	}
@@ -357,7 +360,7 @@
 @utility border-glass-bg {
 	border: 1px solid transparent;
 	background-image:
-		linear-gradient(var(--color-solid-background)),
+		linear-gradient(var(--color-background-solid)),
 		linear-gradient(
 			90deg,
 			color-mix(in oklch, var(--border-glass-color) 50%, transparent) 0%,
@@ -375,6 +378,14 @@
             color-mix(in oklch, var(--border-glass-color) 50%, transparent) 100%
         );
         border-image-slice: 1; */
+}
+
+@utility border-skewed {
+	@apply border-0 z-20 relative tracking-widest
+		before:top-0 before:left-0
+        before:content-[''] before:absolute before:inset-0 before:border-2 before:border-primary
+      	before:transform-[skewX(5deg)]
+        before:-z-20 before:shadow-[0_0_20px_var(--primary)];
 }
 
 @utility border-glass {

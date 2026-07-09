@@ -1,21 +1,6 @@
 import type { ComponentProps } from 'svelte';
-import BoxServiceWrapper from '$lib/components/box-service-wrapper.svelte';
-import BoxDate from '$lib/components/box-date.svelte';
-import Grid from '$lib/components/grid.svelte';
-import SubGrid from '$lib/components/sub-grid.svelte';
-import BoxAdguard from '$lib/components/box-adguard.svelte';
-
-export const componentRegistry = {
-	BoxService: BoxServiceWrapper,
-	BoxAdguard,
-	BoxDate,
-	Grid,
-	SubGrid
-};
-
-type ComponentRegistry = typeof componentRegistry;
-
-type ComponentName = keyof ComponentRegistry;
+import type { ComponentRegistry, ComponentName } from '$lib/utils/component-registry';
+import { componentRegistry } from '$lib/utils/component-registry';
 
 export interface ConfigContainer<N extends ComponentName = ComponentName> {
 	name: N;
@@ -27,12 +12,15 @@ type ConfigDefault = Partial<{
 }>;
 
 type ConfigPage = {
-	title?: string;
+	name?: string;
 	containers?: ConfigContainer[];
 };
 
 export type Config = {
 	defaults?: ConfigDefault;
+	layout?: {
+		gridClass?: string;
+	};
 	pages?: {
 		[path: string]: ConfigPage;
 	};
@@ -64,15 +52,18 @@ function transformConfigContainer(
 		item,
 		(it) => {
 			const merged = (() => {
+				const defaultClass = defaults[it.name]?.class || '';
+				const propsClass = it.props?.class || '';
+
 				if (isGrid(it)) {
 					return {
-						class: `${defaults[it.name]?.class || ''} ${it.props?.class}`,
-						gridClass: `${defaults[it.name]?.class || ''} ${it.props?.gridClass}`
+						class: `${defaultClass} ${propsClass}`,
+						gridClass: `${defaultClass} ${it.props?.gridClass || ''}`
 					};
 				}
 
 				return {
-					class: `${it.props?.class} ${defaults[it.name]?.class || ''}`
+					class: `${defaultClass} ${propsClass} `
 				};
 			})();
 
@@ -104,8 +95,10 @@ function scanContainer(item: ConfigContainer, target: string): ConfigContainer |
 
 	if (isGrid(item)) {
 		for (const child of item.props.items) {
-			if (scanContainer(child, target)) {
-				return item;
+			const result = scanContainer(child, target);
+
+			if (result) {
+				return result;
 			}
 		}
 	}

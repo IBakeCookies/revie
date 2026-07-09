@@ -1,24 +1,8 @@
 {
     "defaults": {},
     "pages": {
-        "/aaa": {
-            "title": "AAA",
-            "containers": [
-                {
-                    "name": "BoxService",
-                    "props": {
-                        "title": "Proxmox",
-                        "href": "https://192.168.178.180:8006",
-                        "img": {
-                            "src": "https://cdn.simpleicons.org/proxmox"
-                        },
-                        "class": "xl:col-span-6"
-                    }
-                }
-            ]
-        },
         "/": {
-            "title": "Home",
+            "name": "Home",
             "containers": [
                 {
                     "name": "BoxDate"
@@ -87,7 +71,7 @@
                                             "name": "BoxService",
                                             "props": {
                                                 "title": "WLED",
-                                                "href": "http://192.168.178.125",
+                                                "href": "http://192.168.178.25",
                                                 "img": {
                                                     "src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/wled.png"
                                                 }
@@ -252,6 +236,22 @@
                                 }
                             }
                         ]
+                    }
+                }
+            ]
+        },
+        "/aaa": {
+            "name": "Services",
+            "containers": [
+                {
+                    "name": "BoxService",
+                    "props": {
+                        "title": "Proxmox",
+                        "href": "https://192.168.178.180:8006",
+                        "img": {
+                            "src": "https://cdn.simpleicons.org/proxmox"
+                        },
+                        "class": "xl:col-span-6"
                     }
                 }
             ]

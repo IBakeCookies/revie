@@ -13,38 +13,44 @@
 
 	let { username, password, ...restProps }: Props = $props();
 	const adguardStore = getAdguardStore();
+
+	const adguardDataMap = $derived.by(()=> {
+		return adguardStore && adguardStore.stats ? [
+				{
+					text: `DNS Queries: ${adguardStore.stats.dnsQueries}`,
+					class: 'border-success'
+				}, 
+				{
+					text: `Blocked: ${adguardStore.stats.numBlockedFiltering}`,
+					class: 'border-danger'
+				}, 
+				{
+					text: `Delay: ${adguardStore.stats.avgProcessingTime}ms`,
+					class: 'border-info'
+				}, 
+				{
+					text: `Top Blocked Domain: ${adguardStore.stats.topBlockedDomain}`,
+					class: 'border-warning'
+				}, 
+			] : [];
+	})
 </script>
 
-{#if adguardStore && adguardStore.stats}
-	<div
-		{...restProps}
-		class={cn(
-			'@container/box-adguard col-span-12 rounded-xs bg-box-secondary p-box-md',
-			restProps.class
-		)}
-	>
-		<div class="grid gap-grid-md grid-cols-1 @2xl:grid-cols-2">
+<div
+	{...restProps}
+	class={cn(
+		'@container/box-adguard col-span-12 rounded-xs bg-box-secondary p-box-md',
+		restProps.class
+	)}
+>
+	<div class="grid gap-grid-xs grid-cols-1 @2xl:grid-cols-2">
+		{#each adguardDataMap as item}
 			<p
-				class="@2xl/box-adguard:p-box-md p-box-xs rounded-xs bg-success text-success-foreground"
+				class={["@2xl/box-adguard:p-box-md bg-box-primary p-box-xs rounded-xs border", item.class]}
 			>
-				DNS Queries: {adguardStore.stats.dnsQueries}
+				{item.text}
 			</p>
-
-			<p
-				class="@2xl/box-adguard:p-box-md p-box-xs rounded-xs bg-danger text-danger-foreground"
-			>
-				Blocked: {adguardStore.stats.numBlockedFiltering}
-			</p>
-
-			<p class="@2xl/box-adguard:p-box-md p-box-xs rounded-xs bg-info text-info-foreground">
-				Delay: {adguardStore.stats.avgProcessingTime}ms
-			</p>
-
-			<p
-				class="@2xl/box-adguard:p-box-md p-box-xs rounded-xs bg-warning text-warning-foreground"
-			>
-				Top Blocked Domain: {adguardStore.stats.topBlockedDomain}
-			</p>
-		</div>
+		{/each}
+		
 	</div>
-{/if}
+</div>
