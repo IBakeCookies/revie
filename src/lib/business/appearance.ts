@@ -41,6 +41,35 @@ export function readRequestAppearance(cookies: CookieSource): RequestAppearance 
 }
 
 /**
+ * The theme the browser's own cookie names, resolved against the catalogue.
+ *
+ * Browser-only. Returns undefined when nothing valid is stored, so the caller
+ * falls back to its defaults rather than rendering unstyled.
+ */
+export function readClientTheme(): ThemeName | undefined {
+	return resolveThemeName(appearanceRepository.$readAppearance().theme);
+}
+
+/*
+ * Writes. Thin over the repository on purpose, but not pass-throughs: they
+ * narrow to `ThemeName`, so presentation cannot persist a theme that is not in
+ * the catalogue. The repository takes a bare string because it also has to
+ * parse whatever an old cookie happens to hold.
+ */
+
+export function updateTheme(theme: ThemeName): void {
+	appearanceRepository.$updateTheme(theme);
+}
+
+export function updateScenerySeed(seed: number): void {
+	appearanceRepository.$updateScenerySeed(seed);
+}
+
+export function updateSceneryMotion(paused: boolean): void {
+	appearanceRepository.$updateSceneryMotion(paused);
+}
+
+/**
  * The per-user scenery seed, minted and persisted on first visit so the
  * animated themes vary per visitor. Called once per request, in the root
  * layout load — the server is the only place that can mint it before the

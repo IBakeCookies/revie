@@ -1,8 +1,14 @@
 import { getContext, setContext, onMount } from 'svelte';
 import { browser } from '$app/environment';
-// Namespace import: the $-prefixed controller methods can't be imported by
-// name inside .svelte.ts files ($ is reserved for runes).
-import * as appearanceRepository from '$lib/data/repository/appearance-repository';
+// Appearance goes through business, never straight to the cookie repository:
+// data -> business -> presentation. Business also narrows the write signatures
+// to ThemeName, so a theme outside the catalogue cannot be persisted from here.
+import {
+	readClientTheme,
+	updateScenerySeed,
+	updateSceneryMotion,
+	updateTheme
+} from '$lib/business/appearance';
 import {
 	DEFAULT_DARK_THEME,
 	DEFAULT_THEME,
@@ -80,7 +86,7 @@ export class ThemeStore {
 		// a cached or prerendered document carries a serialized theme that may be
 		// stale — the cookie is the source of truth, so it wins over initialTheme
 		if (browser) {
-			const cookieTheme = resolveThemeName(appearanceRepository.$readAppearance().theme);
+			const cookieTheme = readClientTheme();
 
 			if (cookieTheme) {
 				this.#theme = cookieTheme;
@@ -133,19 +139,19 @@ export class ThemeStore {
 	switchTheme(newTheme: ThemeName): void {
 		this.#theme = newTheme;
 
-		appearanceRepository.$updateTheme(newTheme);
+		updateTheme(newTheme);
 	}
 
 	rerollScenery(): void {
 		this.#scenerySeed = randomScenerySeed();
 
-		appearanceRepository.$updateScenerySeed(this.#scenerySeed);
+		updateScenerySeed(this.#scenerySeed);
 	}
 
 	toggleSceneryMotion(): void {
 		this.#sceneryPaused = !this.#sceneryPaused;
 
-		appearanceRepository.$updateSceneryMotion(this.#sceneryPaused);
+		updateSceneryMotion(this.#sceneryPaused);
 	}
 }
 

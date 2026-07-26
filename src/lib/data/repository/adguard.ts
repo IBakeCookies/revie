@@ -1,8 +1,4 @@
-import {
-	type UseErrorAsValueErrorReturn,
-	type UseErrorAsValueSuccessReturn,
-	useAsyncErrorAsValue
-} from '$lib/utils/useAsyncErrorAsValue';
+import { type Result, useAsyncErrorAsValue } from '$lib/utils/useAsyncErrorAsValue';
 
 interface GetAdguardStatsInput {
 	username: string;
@@ -21,9 +17,7 @@ export async function getAdguardStats({
 	username,
 	password,
 	href
-}: GetAdguardStatsInput): Promise<
-	UseErrorAsValueSuccessReturn<GetAdguardStatsOutput> | UseErrorAsValueErrorReturn
-> {
+}: GetAdguardStatsInput): Promise<Result<GetAdguardStatsOutput>> {
 	const base64 = Buffer.from(`${username}:${password}`).toString('base64');
 
 	return useAsyncErrorAsValue(async () => {
@@ -41,5 +35,5 @@ export async function getAdguardStats({
 		}
 
 		return raw.json();
-	});
+	}, `Could not read AdGuard stats from ${href}`);
 }

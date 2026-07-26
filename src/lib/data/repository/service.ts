@@ -1,8 +1,4 @@
-import {
-	type UseErrorAsValueErrorReturn,
-	type UseErrorAsValueSuccessReturn,
-	useAsyncErrorAsValue
-} from '$lib/utils/useAsyncErrorAsValue';
+import { type Result, useAsyncErrorAsValue } from '$lib/utils/useAsyncErrorAsValue';
 
 type GetServiceStateInput = string;
 
@@ -12,7 +8,7 @@ export interface GetServiceStateOutput {
 
 export async function getServiceState(
 	href: GetServiceStateInput
-): Promise<UseErrorAsValueSuccessReturn<GetServiceStateOutput> | UseErrorAsValueErrorReturn> {
+): Promise<Result<GetServiceStateOutput>> {
 	return useAsyncErrorAsValue(async () => {
 		const raw = await fetch('/api/ping', {
 			method: 'POST',
@@ -29,5 +25,5 @@ export async function getServiceState(
 		}
 
 		return await raw.json();
-	});
+	}, `Could not reach ${href}`);
 }

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getServiceState } from '$lib/data/repository/service';
+import { readServiceState } from '$lib/business/service';
 import { ServicesStore } from '$lib/store/service-store.svelte';
 
-vi.mock('$lib/data/repository/service', () => ({ getServiceState: vi.fn() }));
+// Mocked at the store's own boundary: business. Whether a failed probe means
+// "offline" or "undetermined" is business's call and is tested next to it.
+vi.mock('$lib/business/service', () => ({ readServiceState: vi.fn() }));
 
 const href = 'http://wled.local';
 
@@ -14,10 +16,10 @@ describe('ServicesStore', () => {
 	it('keeps the state of each service apart', async () => {
 		const store = new ServicesStore();
 
-		vi.mocked(getServiceState).mockResolvedValue([null, { isAlive: true }]);
+		vi.mocked(readServiceState).mockResolvedValue([null, true]);
 		await store.refresh(href);
 
-		vi.mocked(getServiceState).mockResolvedValue([null, { isAlive: false }]);
+		vi.mocked(readServiceState).mockResolvedValue([null, false]);
 		await store.refresh('http://emqx.local');
 
 		expect(store.isAlive(href)).toBe(true);
@@ -27,26 +29,48 @@ describe('ServicesStore', () => {
 	it('replaces the previous result instead of stacking up', async () => {
 		const store = new ServicesStore();
 
-		vi.mocked(getServiceState).mockResolvedValue([null, { isAlive: true }]);
+		vi.mocked(readServiceState).mockResolvedValue([null, true]);
 		await store.refresh(href);
 
-		vi.mocked(getServiceState).mockResolvedValue([null, { isAlive: false }]);
+		vi.mocked(readServiceState).mockResolvedValue([null, false]);
 		await store.refresh(href);
 
 		expect(store.isAlive(href)).toBe(false);
 	});
 
-	it('leaves the last known state alone when the ping fails', async () => {
-		const store = new ServicesStore();
-		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+	it('leaves the last known state alone when the probe fails', async () => {
+		const report = vi.fn();
+		const store = new ServicesStore(report);
 
-		vi.mocked(getServiceState).mockResolvedValue([null, { isAlive: true }]);
+		vi.mocked(readServiceState).mockResolvedValue([null, true]);
 		await store.refresh(href);
 
-		vi.mocked(getServiceState).mockResolvedValue([{ cause: new Error('offline') }, null]);
+		vi.mocked(readServiceState).mockResolvedValue([{ message: 'Could not reach' }, null]);
 		await store.refresh(href);
 
 		expect(store.isAlive(href)).toBe(true);
-		expect(error).toHaveBeenCalledOnce();
+	});
+
+	it('reports the failure instead of swallowing it, with a renderable message', async () => {
+		const report = vi.fn();
+		const store = new ServicesStore(report);
+		const error = { message: `Could not reach ${href}`, cause: new Error('fetch failed') };
+
+		vi.mocked(readServiceState).mockResolvedValue([error, null]);
+		await store.refresh(href);
+
+		expect(report).toHaveBeenCalledWith(error);
+		// what a toast would render — never undefined
+		expect(report.mock.calls[0][0].message).toBe(`Could not reach ${href}`);
+	});
+
+	it('logs to the console when no reporter is given', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const store = new ServicesStore();
+
+		vi.mocked(readServiceState).mockResolvedValue([{ message: 'boom' }, null]);
+		await store.refresh(href);
+
+		expect(consoleError).toHaveBeenCalledOnce();
 	});
 });

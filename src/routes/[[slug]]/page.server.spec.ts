@@ -91,7 +91,10 @@ describe('load', () => {
 	it('renders the page without stats when AdGuard is unreachable', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
-		vi.mocked(getAdguardStats).mockResolvedValue([{ cause: new Error('down') }, null]);
+		vi.mocked(getAdguardStats).mockResolvedValue([
+			{ message: 'Could not read AdGuard stats', cause: new Error('down') },
+			null
+		]);
 
 		expect(await load(event('/'))).toMatchObject({ adguard: null });
 	});
