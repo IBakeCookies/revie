@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"paths": {
+			"$lib": ["src/lib"],
+			"$lib/*": ["src/lib/*"]
+		},
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"allowJs": true,
+		"noEmit": true
+	},
+	"include": ["src/**/*"]
+}
