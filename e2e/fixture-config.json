@@ -1,0 +1,62 @@
+{
+	"defaults": {
+		"BoxService": { "span": 6 }
+	},
+	"pages": {
+		"/": {
+			"name": "Home",
+			"containers": [
+				{ "name": "BoxDate" },
+				{
+					"name": "BoxAdguard",
+					"props": { "href": "http://127.0.0.1:9999" }
+				},
+				{
+					"name": "Grid",
+					"props": {
+						"title": "Services",
+						"items": [
+							{
+								"name": "SubGrid",
+								"props": {
+									"subTitle": "Reachable",
+									"items": [
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Loopback",
+												"href": "http://127.0.0.1:8080",
+												"img": { "src": "/robots.txt" }
+											}
+										}
+									]
+								}
+							},
+							{
+								"name": "BoxService",
+								"props": {
+									"title": "Nowhere",
+									"href": "http://nowhere.invalid",
+									"img": { "src": "/robots.txt" }
+								}
+							}
+						]
+					}
+				}
+			]
+		},
+		"/services": {
+			"name": "Services",
+			"containers": [
+				{
+					"name": "BoxService",
+					"props": {
+						"title": "Loopback",
+						"href": "http://127.0.0.1:8080",
+						"img": { "src": "/robots.txt" }
+					}
+				}
+			]
+		}
+	}
+}
