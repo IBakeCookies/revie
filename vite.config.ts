@@ -15,6 +15,9 @@ export default defineConfig({
 	],
 	test: {
 		expect: { requireAssertions: true },
+		// Module mocks are shared across the tests of a file, so their call history has
+		// to be dropped between them.
+		clearMocks: true,
 		projects: [
 			{
 				extends: './vite.config.ts',
