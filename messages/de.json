@@ -1,4 +1,21 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hello, {name} from de!"
+	"app_title": "Revie Dashboard",
+	"theme_label": "Design",
+	"theme_solid_light": "Solid hell",
+	"theme_solid_dark": "Solid dunkel",
+	"theme_glass_light": "Glas hell",
+	"theme_glass_dark": "Glas dunkel",
+	"theme_cyber_punk": "Cyberpunk",
+	"language_label": "Sprache",
+	"language_en": "Englisch",
+	"language_de": "Deutsch",
+	"adguard_dns_queries": "DNS-Anfragen: {count}",
+	"adguard_blocked": "Blockiert: {count}",
+	"adguard_delay": "Verzögerung: {milliseconds} ms",
+	"adguard_top_blocked_domain": "Häufigste blockierte Domain: {domain}",
+	"service_status_online": "online",
+	"service_status_offline": "offline",
+	"service_status_unknown": "Status unbekannt",
+	"error_unknown": "Etwas ist schiefgelaufen"
 }
