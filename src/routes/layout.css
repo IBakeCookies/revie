@@ -2,10 +2,6 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
-@import 'tailwindcss';
-
-@source inline("col-{1,{2..11..2},12}");
-
 @custom-variant solid (&:is(.solid *));
 @custom-variant solid-light (&:is(.solid-light *));
 @custom-variant solid-dark (&:is(.solid-dark *));

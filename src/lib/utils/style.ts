@@ -18,78 +18,32 @@ const customTwMerge = extendTailwindMerge({
 				'grid-lg'
 			]
 		},
-		// classGroups: {
-		//     w: [
-		//         {
-		//             w: ['icon-xs', 'icon-sm', 'icon', 'icon-m', 'avatar', 'avatar-xxl'],
-		//         },
-		//     ],
-		//     'min-w': [
-		//         {
-		//             'min-w': ['icon-xs', 'icon-sm', 'icon', 'icon-m'],
-		//         },
-		//     ],
-		//     'max-w': [
-		//         {
-		//             'max-w': ['content', 'profile-avatar'],
-		//         },
-		//     ],
-		//     h: [
-		//         {
-		//             h: [
-		//                 'icon-xs',
-		//                 'icon-sm',
-		//                 'icon',
-		//                 'icon-m',
-		//                 'profile-avatar',
-		//                 'avatar-xxl',
-		//                 'avatar',
-		//                 'brand',
-		//             ],
-		//         },
-		//     ],
-		//     'min-h': [
-		//         {
-		//             'min-h': ['icon-xs', 'icon-sm', 'icon', 'icon-m'],
-		//         },
-		//     ],
-		//     z: [
-		//         {
-		//             z: ['loader'],
-		//         },
-		//     ],
-		//     'font-size': [
-		//         {
-		//             text: [
-		//                 'h1',
-		//                 'h2',
-		//                 'h3',
-		//                 'h4',
-		//                 'h5',
-		//                 'h1-tablet',
-		//                 'h2-tablet',
-		//                 'h3-tablet',
-		//                 'h4-tablet',
-		//                 'h5-tablet',
-		//                 'copy-xs',
-		//                 'copy',
-		//                 'copy-tablet',
-		//                 'label',
-		//                 'sm',
-		//             ],
-		//         },
-		//     ],
-		//     leading: [
-		//         {
-		//             leading: ['default', 'md', 'lg'],
-		//         },
-		//     ],
-		// },
 		conflictingClassGroups: {}
 	}
 });
 
-// @todo fix components class="cn()" issue. The correct return here is :ClassValue
-export function cn(...inputs: ClassValue[]): any {
+export function cn(...inputs: ClassValue[]): string {
 	return customTwMerge(clsx(inputs));
+}
+
+export const GRID_COLUMNS = 12;
+
+/**
+ * Tailwind compiles at build time, so a class name that only appears in runtime
+ * config would never exist in the generated CSS. Column width is therefore passed
+ * as a custom property and read by the static `xl:col-span-(--span)` utility.
+ *
+ * The property must always be emitted: an unset `--span` makes `grid-column`
+ * invalid at computed-value time, which drops the declaration entirely.
+ */
+export function spanStyle(span: number = GRID_COLUMNS): string {
+	return `--span:${span}`;
+}
+
+export function normalizeSpan(span: unknown): number | undefined {
+	if (typeof span !== 'number' || !Number.isInteger(span)) {
+		return undefined;
+	}
+
+	return Math.min(Math.max(span, 1), GRID_COLUMNS);
 }
