@@ -34,6 +34,12 @@ export async function getAdguardStats({
 			}
 		});
 
+		// fetch only rejects on network errors, so an auth failure would otherwise
+		// surface as an unrelated JSON parse error.
+		if (!raw.ok) {
+			throw new Error(`AdGuard responded with ${raw.status} ${raw.statusText}`);
+		}
+
 		return raw.json();
 	});
 }

@@ -1,6 +1,6 @@
 export interface AdguardStats {
 	dnsQueries: number;
 	numBlockedFiltering: number;
-	avgProcessingTime: string;
+	avgProcessingTimeMs: number;
 	topBlockedDomain: string;
 }
