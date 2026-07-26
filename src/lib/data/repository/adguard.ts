@@ -13,6 +13,15 @@ export interface GetAdguardStatsOutput {
 	top_blocked_domains: Record<string, number>[];
 }
 
+/**
+ * The page load awaits this, so without a bound of our own an unreachable AdGuard
+ * host stalls the whole render on undici's defaults: 10s to fail a connection to a
+ * box that is switched off, and 300s if something answers the SYN and then goes
+ * quiet (a repurposed IP, a firewall that DROPs after the handshake). It is one
+ * box on the page; it does not get to hold the other boxes hostage.
+ */
+const REQUEST_TIMEOUT_MS = 3000;
+
 export async function getAdguardStats({
 	username,
 	password,
@@ -25,7 +34,8 @@ export async function getAdguardStats({
 			headers: {
 				Authorization: `Basic ${base64}`,
 				'Content-type': 'application/json'
-			}
+			},
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
 		});
 
 		// fetch only rejects on network errors, so an auth failure would otherwise

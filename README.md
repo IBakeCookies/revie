@@ -57,10 +57,12 @@ props:
 
 - `defaults` holds per-component props applied to every instance of that component.
 - A path that is not listed under `pages` returns 404.
-- An unknown component name, or a container that isn't an object, is dropped with a
-  warning. Required props are **not** validated yet: a `Grid` with no `items`, or a
-  `BoxService` with no `img`, throws while rendering and takes the page to a 500. See
-  the roadmap in [AGENTS.md](AGENTS.md).
+- A malformed container is dropped with a warning instead of breaking the page: an
+  unknown component name, something that isn't an object, or a missing required prop
+  (`BoxService` needs `href` and `img.src`, `BoxAdguard` needs `href`). Its siblings and
+  its parent grid still render.
+- A `Grid` or `SubGrid` with no `items` renders as empty, so a grid written before its
+  children is safe to save.
 - `DASHBOARD_CONFIG` overrides the config path. The file is re-read whenever its
   mtime changes, so edits apply without a restart.
 
@@ -108,7 +110,7 @@ npm run test:unit  # vitest (node + browser)
 npm run test:e2e   # playwright
 ```
 
-`lint:deps` reports 5 known layer violations today; they are listed in
+`lint:deps` is part of `lint` and is at zero; the open work is listed in
 [AGENTS.md](AGENTS.md), which is also where the architecture, the invariants that break
 silently, and the roadmap live.
 

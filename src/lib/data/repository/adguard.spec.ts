@@ -44,6 +44,25 @@ describe('getAdguardStats', () => {
 		);
 	});
 
+	it('bounds the request, so an unreachable host cannot stall the page load', async () => {
+		const fetchMock = stubFetch({ ok: true, json: async () => stats });
+
+		await getAdguardStats(input);
+
+		const { signal } = fetchMock.mock.calls[0][1];
+
+		expect(signal).toBeInstanceOf(AbortSignal);
+		expect(signal.aborted).toBe(false);
+	});
+
+	it('surfaces a message that is safe to show a user', async () => {
+		stubFetch({ ok: false, status: 401, statusText: 'Unauthorized', json: async () => ({}) });
+
+		const [err] = await getAdguardStats(input);
+
+		expect(err?.message).toBe('AdGuard responded with 401 Unauthorized');
+	});
+
 	it('reports an unauthorized response as an error instead of parsing it', async () => {
 		stubFetch({
 			ok: false,

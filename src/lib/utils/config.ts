@@ -20,6 +20,14 @@ export type ConfigPage = {
 	containers: ConfigContainer[];
 };
 
+/**
+ * The NORMALIZED config, which is not the shape of the file.
+ *
+ * The file also carries a `defaults` object, but it is consumed during
+ * normalization — merged into each container's props — so nothing downstream ever
+ * sees it. That is why there is no `defaults` field here, and why the file format
+ * itself has no type: it arrives as `unknown` and only `normalizeConfig` reads it.
+ */
 export type Config = {
 	pages: {
 		[path: string]: ConfigPage;
@@ -52,6 +60,36 @@ const STYLE_KEYS = ['class', 'gridClass'] as const;
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+/**
+ * What each component cannot render without, returning the name of the first
+ * missing prop.
+ *
+ * A container missing one has to be dropped HERE. The props come from a
+ * hand-edited file and are otherwise unchecked, so letting one reach its
+ * component throws during SSR and takes the whole page to a 500 — losing every
+ * other box on it, for one typo in one entry.
+ *
+ * Keyed by `ComponentName`, so registering a component without deciding what it
+ * requires is a compile error rather than a gap.
+ */
+const requiredProps: Record<ComponentName, (props: Record<string, unknown>) => string | undefined> =
+	{
+		BoxService: (props) => {
+			if (typeof props.href !== 'string') return 'href';
+			if (!isRecord(props.img) || typeof props.img.src !== 'string') return 'img.src';
+
+			return undefined;
+		},
+		BoxAdguard: (props) => (typeof props.href !== 'string' ? 'href' : undefined),
+		BoxDate: () => undefined,
+		// Grid and SubGrid need `items`, but it is defaulted below rather than
+		// required, so a grid written before its children still renders as empty.
+		Grid: () => undefined,
+		SubGrid: () => undefined
+	};
+
+const CONTAINS_CHILDREN: ComponentName[] = ['Grid', 'SubGrid'];
 
 function normalizeContainer(
 	raw: unknown,
@@ -88,14 +126,26 @@ function normalizeContainer(
 		props.span = normalizeSpan(props.span);
 	}
 
-	if (props.items !== undefined) {
+	// Set unconditionally, not just when present: every traversal (findContainer,
+	// collectServiceHrefs) iterates `items`, so a grid whose children have not been
+	// written yet would throw on the first page load rather than render as empty.
+	if (CONTAINS_CHILDREN.includes(raw.name)) {
 		props.items = (Array.isArray(props.items) ? props.items : [])
 			.map((child) => normalizeContainer(child, defaults))
 			.filter((item): item is ConfigContainer => item !== undefined);
 	}
 
+	const missing = requiredProps[raw.name](props);
+
+	if (missing) {
+		console.warn(`Skipping container "${raw.name}", "${missing}" is missing or not a string`);
+
+		return undefined;
+	}
+
 	// The one unavoidable assertion in the whole pipeline: the props come from JSON,
-	// and only the name validated above says which component they belong to.
+	// and only the name validated above says which component they belong to. The
+	// guard above is what makes it safe rather than hopeful.
 	return { name: raw.name, props } as ConfigContainer;
 }
 

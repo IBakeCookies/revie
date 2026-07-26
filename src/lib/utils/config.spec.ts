@@ -1,5 +1,5 @@
 import type { ConfigContainer } from '$lib/utils/config';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
 	collectServiceHrefs,
 	findContainer,
@@ -35,7 +35,8 @@ const rawConfig = {
 											name: 'BoxService',
 											props: {
 												title: 'Proxmox',
-												href: 'https://proxmox.local:8006'
+												href: 'https://proxmox.local:8006',
+												img: { src: 'https://icons.local/proxmox.svg' }
 											}
 										}
 									]
@@ -90,6 +91,84 @@ describe('normalizeConfig', () => {
 	it('returns an empty config for anything that is not an object', () => {
 		expect(normalizeConfig('nope').pages).toEqual({});
 		expect(normalizeConfig(undefined).pages).toEqual({});
+	});
+});
+
+describe('containers that would throw while rendering', () => {
+	function pageWith(...containers: unknown[]) {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const page = normalizeConfig({ pages: { '/': { containers } } }).pages['/'];
+
+		return { page, warn };
+	}
+
+	it('gives a Grid written before its children an empty items array', () => {
+		// The most likely half-finished hand edit. `items` used to stay undefined,
+		// which threw in every traversal below and took the page to a 500.
+		const { page } = pageWith({ name: 'Grid', props: { title: 'Services' } });
+		const [grid] = page.containers;
+
+		expect(itemsOf(grid)).toEqual([]);
+	});
+
+	it('leaves the traversals safe on a Grid with no items', () => {
+		const { page } = pageWith({ name: 'Grid', props: { title: 'Services' } });
+
+		expect(() => findContainer(page, 'BoxAdguard')).not.toThrow();
+		expect(() => collectServiceHrefs(page.containers)).not.toThrow();
+	});
+
+	it('drops a BoxService with no img, which would throw during SSR', () => {
+		const { page, warn } = pageWith({
+			name: 'BoxService',
+			props: { title: 'Proxmox', href: 'https://proxmox.local:8006' }
+		});
+
+		expect(page.containers).toEqual([]);
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('img.src'));
+	});
+
+	it('drops a BoxService with no href', () => {
+		const { page, warn } = pageWith({
+			name: 'BoxService',
+			props: { title: 'Proxmox', img: { src: 'https://icons.local/p.svg' } }
+		});
+
+		expect(page.containers).toEqual([]);
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('href'));
+	});
+
+	it('drops a BoxService whose href is not a string', () => {
+		const { page } = pageWith({
+			name: 'BoxService',
+			props: { href: 42, img: { src: 'https://icons.local/p.svg' } }
+		});
+
+		expect(page.containers).toEqual([]);
+	});
+
+	it('drops a BoxAdguard with no href', () => {
+		const { page, warn } = pageWith({ name: 'BoxAdguard' });
+
+		expect(page.containers).toEqual([]);
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('href'));
+	});
+
+	it('keeps a BoxDate, which requires nothing', () => {
+		const { page } = pageWith({ name: 'BoxDate' });
+
+		expect(page.containers.map((c) => c.name)).toEqual(['BoxDate']);
+	});
+
+	it('drops a bad child without dropping its siblings or the grid', () => {
+		const { page } = pageWith({
+			name: 'Grid',
+			props: {
+				items: [{ name: 'BoxService', props: { title: 'no img' } }, { name: 'BoxDate' }]
+			}
+		});
+
+		expect(itemsOf(page.containers[0]).map((c) => c.name)).toEqual(['BoxDate']);
 	});
 });
 

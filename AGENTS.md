@@ -12,8 +12,8 @@ configure it — don't duplicate that here.
 ```sh
 npm run dev            # vite dev
 npm run check          # svelte-check (expect 0 errors)
-npm run lint           # prettier --check + eslint
-npm run lint:deps      # dependency-cruiser rules (see "The layer rule")
+npm run lint           # prettier + eslint + lint:deps (layer rules)
+npm run lint:deps      # just the layer rules (also run by `lint`)
 npm run depgraph       # regenerate dependency-graph.svg (needs graphviz `dot`)
 npm run test:unit      # vitest, two projects: node + real chromium
 npm run test:e2e       # playwright against a fixture config
@@ -86,9 +86,10 @@ handling differs per rule, on purpose:
 | `lower-layer-not-to-presentation`     | allowed       | lets a helper be typed against what it is handed                    |
 | `leaf-not-to-upper-layers`            | allowed       | same                                                                |
 
-> `lint:deps` reports **5 known errors** today, all of them the one registry leak in
-> Roadmap → Layer violations. It is deliberately _not_ part of `npm run lint` yet; wire it
-> in once it's at zero and it becomes a real gate.
+`lint:deps` is at **0 errors** and runs as part of `npm run lint`, so a layer violation
+fails the build. The two remaining warnings are the deliberate `config-container` ↔ `grid` ↔
+`sub-grid` render recursion. Keep it at zero: if a rule ever needs relaxing, change the rule
+and say why in its `comment`, rather than leaving a known-failing lint.
 
 Two cruiser config notes, both non-obvious:
 
@@ -255,64 +256,42 @@ what breaks soonest. **Nothing below is fixed** — see "Already done" at the en
 
 ### Correctness
 
-1. **`normalizeContainer` validates the component name and nothing else** — required props
-   are unchecked, so `{"name":"Grid","props":{"title":"x"}}` (no `items`) throws in
-   `findContainer` on every page load, and a `BoxService` without `img` throws during SSR →
-   **500 for the whole page**. Both contradict what README.md promises. Fix in
-   [config.ts](src/lib/utils/config.ts) only: default `items` unconditionally for
-   `Grid`/`SubGrid`, and drop a container with the existing `console.warn` when a required
-   prop is missing. Also add `defaults?:` to the `Config` type — `normalizeConfig` reads a
-   key the type doesn't declare.
-2. **The AdGuard fetch has no timeout and is awaited in the page load**
-   ([adguard.ts](src/lib/data/repository/adguard.ts)). A powered-off box costs undici's 10 s
-   connect timeout on _every render_; a host that answers SYN then goes silent costs 300 s.
-   Add `signal: AbortSignal.timeout(3000)`; optionally return the promise so the rest of the
-   page streams.
-3. **`config.json` is git-tracked and is also production's default read path.** A `git pull`
+1. **`config.json` is git-tracked and is also production's default read path.** A `git pull`
    or `checkout .` during an update silently reverts the live dashboard, and the file holds
    the internal network map. Gitignore it, commit `config.example.json`.
-4. **Status dots measure the wrong thing** — `/api/ping` discards the port and probes ICMP,
+2. **Status dots measure the wrong thing** — `/api/ping` discards the port and probes ICMP,
    so a dead service on a live host stays green, and two boxes on one host always agree.
    Replacing `ping.promise.probe` with `net.connect({host, port})` keyed on `host:port` fixes
    that _and_ drops the `ping` dependency, the fork+exec per unauthenticated POST, an
    unhandled rejection when the `ping` binary is missing from a slim image, and an IPv6 bug
    (`new URL('http://[fd00::5]/').hostname` keeps the brackets).
-5. **[app.html](src/app.html) destroys the server-stamped `scenery-paused` class** —
+3. **[app.html](src/app.html) destroys the server-stamped `scenery-paused` class** —
    `className = 'dark'` is a whole-attribute write, and the block that would re-add it is
    gated on the cookie being _absent_, which is false exactly when the server had reason to
    stamp it. Use `classList.remove(…)` / `add(…)`.
-6. **"Resume animations" is dead under `prefers-reduced-motion`** — the CSS pauses with
+4. **"Resume animations" is dead under `prefers-reduced-motion`** — the CSS pauses with
    `!important` and no opt-out, so the button flips its label and nothing moves. Don't render
    it when the query matches.
-7. **No keyboard path to any appearance control** — the dropdowns are hover-only, so
+5. **No keyboard path to any appearance control** — the dropdowns are hover-only, so
    `visibility: hidden` keeps all 27 theme buttons, both locales, reroll and the motion toggle
    out of the tab order. Two classes fix it: `group-focus-within:visible group-focus-within:opacity-100`.
    Note [e2e/dropdown.ts](e2e/dropdown.ts) hardcodes `.hover()`, so no current test can catch this.
-8. **box-date builds its `Intl` formatter at module scope from `getLocale()`**
+6. **box-date builds its `Intl` formatter at module scope from `getLocale()`**
    ([box-date.svelte](src/lib/components/box-date.svelte)) — the module body runs once per node
    process while the locale is per-request, so every SSR response is frozen to the first
    visitor's locale. Move it to instance scope.
 
-### Layer violations (the 5 remaining `lint:deps` errors)
-
-9. **`utils/component-registry.ts` value-imports five components** (5 errors, one fix) — the
-   map's only runtime use is `name in componentRegistry`, yet the value import drags the
-   component graph into `utils/config.ts`, and from there into `/api/ping`. Fix: `import type`
-   the components, back `isComponentName` with
-   `const COMPONENT_NAMES = [...] as const satisfies readonly (keyof ComponentRegistry)[]`.
-   This is the last error; clearing it lets `lint:deps` go into `npm run lint` as a gate.
-
 ### Storybook
 
-10. **Storybook is installed with zero stories** — 8 devDeps, `.storybook/main.ts` +
-    `preview.ts`, two npm scripts, and `main.ts` globs `../src/**/*.stories.@(js|ts|svelte)`
-    which currently matches nothing. Write the stories rather than deleting the install.
-    Good order, cheapest first: [box-date](src/lib/components/box-date.svelte) (no props) →
-    [box-service](src/lib/components/box-service.svelte) (one story per `isOnline` state:
-    `true` / `false` / `null`) → [box-adguard](src/lib/components/box-adguard.svelte) (with and
-    without `stats`) → [dropdown](src/lib/components/dropdown.svelte) →
-    [grid](src/lib/components/grid.svelte) / [sub-grid](src/lib/components/sub-grid.svelte)
-    (nested containers; the interesting one). Notes for whoever picks this up:
+7. **Storybook is installed with zero stories** — 8 devDeps, `.storybook/main.ts` +
+   `preview.ts`, two npm scripts, and `main.ts` globs `../src/**/*.stories.@(js|ts|svelte)`
+   which currently matches nothing. Write the stories rather than deleting the install.
+   Good order, cheapest first: [box-date](src/lib/components/box-date.svelte) (no props) →
+   [box-service](src/lib/components/box-service.svelte) (one story per `isOnline` state:
+   `true` / `false` / `null`) → [box-adguard](src/lib/components/box-adguard.svelte) (with and
+   without `stats`) → [dropdown](src/lib/components/dropdown.svelte) →
+   [grid](src/lib/components/grid.svelte) / [sub-grid](src/lib/components/sub-grid.svelte)
+   (nested containers; the interesting one). Notes for whoever picks this up:
     - Use the presentational components, **not** the wrappers — wrappers need a store in
       context, the components take plain props. This is the same split the unit tests already
       use, so the specs are the reference for prop shapes.
@@ -325,27 +304,27 @@ what breaks soonest. **Nothing below is fixed** — see "Already done" at the en
 
 ### Cleanup
 
-11. **Wire a toast store into the `ErrorReporter` seam.** `ServicesStore` already accepts one
-    and defaults to `console.error`, so a failed ping is reported rather than swallowed — but
-    nothing shows it to the user yet. A `ToastStore` in `lib/store/`, set in
-    [+layout.svelte](src/routes/+layout.svelte), then `setServicesStore(toasts.report)` in
-    [page.svelte](src/lib/components/page.svelte). `AppError.message` is guaranteed renderable,
-    so the toast body is `error.message` and nothing else. Do the same for the AdGuard failure
-    in [+page.server.ts](src/routes/[[slug]]/+page.server.ts), which still logs and returns
-    `null` — the error is available, it just isn't forwarded to the page yet.
-12. **Delete the browser cookie re-read in `ThemeStore`** (lines 88–96 + the `browser` import).
-    The same cookie was already resolved through the same `resolveThemeName` to produce
-    `data.theme` in the same request, so it can only ever equal what was handed in — while its
-    early `return` makes the blocks below look conditional when they aren't.
-13. **`git rm --cached dps.js`** — unrelated gacha-game DPS math at the repo root that
+8. **Wire a toast store into the `ErrorReporter` seam.** `ServicesStore` already accepts one
+   and defaults to `console.error`, so a failed ping is reported rather than swallowed — but
+   nothing shows it to the user yet. A `ToastStore` in `lib/store/`, set in
+   [+layout.svelte](src/routes/+layout.svelte), then `setServicesStore(toasts.report)` in
+   [page.svelte](src/lib/components/page.svelte). `AppError.message` is guaranteed renderable,
+   so the toast body is `error.message` and nothing else. Do the same for the AdGuard failure
+   in [+page.server.ts](src/routes/[[slug]]/+page.server.ts), which still logs and returns
+   `null` — the error is available, it just isn't forwarded to the page yet.
+9. **Delete the browser cookie re-read in `ThemeStore`** (lines 88–96 + the `browser` import).
+   The same cookie was already resolved through the same `resolveThemeName` to produce
+   `data.theme` in the same request, so it can only ever equal what was handed in — while its
+   early `return` makes the blocks below look conditional when they aren't.
+10. **`git rm --cached dps.js`** — unrelated gacha-game DPS math at the repo root that
     `npm run lint` currently walks.
-14. **Re-seed scenery per theme group** so variable order stops being global. That deletes the
+11. **Re-seed scenery per theme group** so variable order stops being global. That deletes the
     second PRNG stream, the "must stay last" guard, and the call-count preservation in
     `dunesRidgesUrl`. Don't pin current output with a golden test — that freezes the invariant
     instead of removing it.
-15. **Two missing config warnings**: a non-integer `span` is dropped silently and falls back to
+12. **Two missing config warnings**: a non-integer `span` is dropped silently and falls back to
     full width, and a `defaults` key naming an unknown component never matches and never warns.
-16. **[src/hooks.ts](src/hooks.ts) is inert** — `reroute` de-localizes for route _matching_, then
+13. **[src/hooks.ts](src/hooks.ts) is inert** — `reroute` de-localizes for route _matching_, then
     the load reads the still-localized path, so `GET /de/services` 404s. Unreachable today (the
     paraglide strategy has no `"url"`), but adding `"url"` for shareable language links makes
     _every_ page 404 in German. Delete it, or use `config.pages[deLocalizeUrl(url).pathname]`.
@@ -369,6 +348,21 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   148 violations, all false, and never resolved `.svelte` so most edges were missing from the
   graph). It now has the five layer rules plus
   [tsconfig.depcruise.json](tsconfig.depcruise.json).
-- **Config normalization is unchanged and still unguarded** — roadmap item 1 is real and open.
-  `Config` genuinely does not declare `defaults` (only `normalizeContainer`'s parameter is
-  typed), so don't assume the earlier note was already applied.
+- **`normalizeContainer` guards required props.** `requiredProps` is a
+  `Record<ComponentName, …>`, so registering a component without deciding what it needs is a
+  compile error. `items` is set unconditionally for `Grid`/`SubGrid` — a grid written before
+  its children renders empty instead of throwing in `findContainer` on the next page load.
+  A container missing a required prop is dropped with a warning; its siblings and its parent
+  grid survive.
+- **`Config` deliberately has no `defaults` field.** An earlier note said to add one; that was
+  wrong. `Config` is the NORMALIZED shape, and defaults are consumed during normalization
+  (merged into props), so nothing downstream ever sees them. The file format has no type at
+  all — it arrives as `unknown`. Adding `defaults` there would describe a shape that never
+  exists.
+- **The AdGuard fetch is bounded** at 3s via `AbortSignal.timeout`. Without it, the page load
+  awaited undici's defaults: 10s for a box that is switched off, 300s for one that answers the
+  SYN then goes quiet.
+- **The component registry is type-only.** `ComponentRegistry` is an interface over
+  `import type` components, and the runtime name check reads a
+  `Record<ComponentName, true>` — so it cannot drift from the interface, and the five Svelte
+  components no longer leak into `utils/config.ts` or the `/api/ping` server bundle.
