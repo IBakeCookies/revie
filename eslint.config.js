@@ -33,6 +33,11 @@ export default defineConfig(
 				parser: ts.parser,
 				svelteConfig
 			}
+		},
+		rules: {
+			// Links come from the config file and mostly point at other hosts, so they
+			// cannot be resolved against this app's routes.
+			'svelte/no-navigation-without-resolve': ['error', { ignoreLinks: true }]
 		}
 	}
 );
