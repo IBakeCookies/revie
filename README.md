@@ -57,9 +57,16 @@ props:
 
 - `defaults` holds per-component props applied to every instance of that component.
 - A path that is not listed under `pages` returns 404.
-- A malformed container is dropped instead of breaking the page.
+- An unknown component name, or a container that isn't an object, is dropped with a
+  warning. Required props are **not** validated yet: a `Grid` with no `items`, or a
+  `BoxService` with no `img`, throws while rendering and takes the page to a 500. See
+  the roadmap in [AGENTS.md](AGENTS.md).
 - `DASHBOARD_CONFIG` overrides the config path. The file is re-read whenever its
   mtime changes, so edits apply without a restart.
+
+Keep your own `config.json` out of git — it holds your internal hostnames and ports, and
+it is the same file `node build` reads, so a `git checkout` would revert the live
+dashboard. Point `DASHBOARD_CONFIG` at it, or gitignore it.
 
 ### Layout, and why there are no class names in the config
 
@@ -95,9 +102,15 @@ from `config.json` and are shown as written.
 ```sh
 npm run check      # svelte-check
 npm run lint       # prettier + eslint
+npm run lint:deps  # dependency-cruiser: the data -> business -> presentation rule
+npm run depgraph   # regenerate dependency-graph.svg (needs graphviz `dot`)
 npm run test:unit  # vitest (node + browser)
 npm run test:e2e   # playwright
 ```
+
+`lint:deps` reports 5 known layer violations today; they are listed in
+[AGENTS.md](AGENTS.md), which is also where the architecture, the invariants that break
+silently, and the roadmap live.
 
 ### Where a test belongs
 
