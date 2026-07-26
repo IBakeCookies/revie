@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { LayoutProps } from './$types';
-	import type { ThemeName } from '$lib/store/theme-store.svelte';
 	import type { Locale } from '$lib/paraglide/runtime';
-	import './layout.css';
+	import '$lib/style/app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
 	import { cn } from '$lib/utils/style';
 	import { setThemeStore } from '$lib/store/theme-store.svelte';
+	import { sceneryStyle } from '$lib/utils/scenery-seed';
+	import { dataSceneryStyle } from '$lib/utils/scenery-time';
 	import Dropdown from '$lib/components/dropdown.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale, locales, setLocale } from '$lib/paraglide/runtime';
@@ -15,22 +16,32 @@
 	let sentinel = $state<HTMLElement | undefined>();
 	let isNavAtTheTop = $state(false);
 
-	const themeStore = setThemeStore(() => data.theme);
+	// data.theme/scenerySeed/sceneryPaused are init seeds only — the store owns
+	// the appearance from here on and mirrors it into the cookies itself.
+	// svelte-ignore state_referenced_locally
+	const themeStore = setThemeStore(data.theme, data.scenerySeed, data.sceneryPaused);
 
-	// Keyed by the union types, so a new theme or locale fails to compile until it
-	// has a translated label.
-	const themeLabels: Record<ThemeName, () => string> = {
-		'solid-light': m.theme_solid_light,
-		'solid-dark': m.theme_solid_dark,
-		'glass-light': m.theme_glass_light,
-		'glass-dark': m.theme_glass_dark,
-		'cyber-punk': m.theme_cyber_punk
-	};
+	// Clock-driven scenery state (sundial, tide, city-windows). SSR renders
+	// the server's clock; hydration never re-patches
+	// the SSR'd style attribute, so re-derive from the client's clock once
+	// mounted, then keep it ticking — a dashboard tab stays open all day, and a
+	// minute is finer than any of these vars' visible rate.
+	let sceneryNow = $state(new Date());
 
+	// Keyed by the union type, so a new locale fails to compile until it has a
+	// translated label. Theme names are not translated: the label lives in the
+	// catalogue (business/model/theme.ts), as it does upstream in zenith.
 	const localeLabels: Record<Locale, () => string> = {
 		en: m.language_en,
 		de: m.language_de
 	};
+
+	onMount(() => {
+		sceneryNow = new Date();
+		const id = setInterval(() => (sceneryNow = new Date()), 60_000);
+
+		return () => clearInterval(id);
+	});
 
 	onMount(() => {
 		if (!sentinel) {
@@ -51,14 +62,31 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<main class="flex flex-col min-h-screen p-box-xl backdrop-blur">
+<!-- Theme scenery: fixed decorative layers behind the app. display:none by
+     default; a theme opts in by styling the helpers in style/scenery/. The
+     seeded vars vary each theme's arrangement per user (utils/scenery-seed.ts);
+     the data vars carry the clock-driven themes' state (utils/scenery-time.ts). -->
+<div
+	class="theme-scenery"
+	aria-hidden="true"
+	style="{sceneryStyle(themeStore.scenerySeed)}; {dataSceneryStyle(sceneryNow)}"
+>
+	<div class="theme-helper-1"></div>
+	<div class="theme-helper-2"></div>
+	<div class="theme-helper-3"></div>
+	<div class="theme-helper-4"></div>
+</div>
+
+<!-- No backdrop-blur here: it would blur the theme scenery behind the whole
+     page. Each translucent surface blurs what sits behind IT instead. -->
+<main class="flex flex-col min-h-screen p-box-xl">
 	<div bind:this={sentinel}></div>
 
 	<header
 		class={cn(
-			'bg-box-primary flex-wrap w-full sticky top-0 z-10 rounded-b solid:border border-glass px-box-lg py-box-md max-w-screen-2xl mx-auto flex items-center glass-y',
+			'bg-surface-card border-line-strong shadow-card backdrop-blur flex-wrap w-full sticky top-0 z-10 rounded-b-2xl border px-box-lg py-box-md max-w-screen-2xl mx-auto flex items-center',
 			{
-				'rounded-t': !isNavAtTheTop,
+				'rounded-t-2xl': !isNavAtTheTop,
 				'border-t-transparent': isNavAtTheTop
 			}
 		)}
@@ -66,27 +94,60 @@
 		<h1 class="font-bold text-2xl">{m.app_title()}</h1>
 
 		{#each data.pages as page (page.path)}
-			<a href={page.path} class="ml-ty-list-md">
+			<a href={page.path} class="ml-text-md">
 				{page.name}
 			</a>
 		{/each}
 
-		<div class="ml-auto flex items-center gap-ty-list-md">
-			<Dropdown>
+		<div class="ml-auto flex items-center gap-text-md">
+			<Dropdown panelClass="nice-scrollbar max-h-[min(80vh,32rem)] overflow-y-auto">
 				{#snippet trigger()}
 					{m.theme_label()}
 				{/snippet}
 
 				{#each themeStore.themes as theme (theme.name)}
 					<button
-						class={cn('py-ty-list-xs px-box-md cursor-pointer block w-full text-left', {
-							'font-bold': themeStore.theme === theme.name
-						})}
+						class={cn(
+							'py-text-xs px-box-md cursor-pointer flex w-full items-center gap-text-xs text-left',
+							{ 'font-bold': themeStore.theme === theme.name }
+						)}
 						onclick={() => themeStore.switchTheme(theme.name)}
 					>
-						{themeLabels[theme.name]()}
+						<!-- the theme's own classes scope its CSS vars to the swatch, so
+						     the two slices always match themes.css -->
+						<span
+							class="{theme.css.join(
+								' '
+							)} border-line-strong flex h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border"
+							aria-hidden="true"
+						>
+							<span class="h-full w-1/2" style="background: var(--surface-page)"
+							></span>
+							<span class="h-full w-1/2" style="background: var(--primary)"></span>
+						</span>
+						{theme.label}
 					</button>
 				{/each}
+
+				<hr class="border-line-soft my-text-2xs" />
+
+				<!-- the seed and the motion flag are appearance too, and the cookies
+				     behind them are what let the server stamp the right scenery -->
+				<button
+					class="py-text-xs px-box-md cursor-pointer block w-full text-left"
+					onclick={() => themeStore.rerollScenery()}
+				>
+					{m.theme_reroll_scenery()}
+				</button>
+
+				<button
+					class="py-text-xs px-box-md cursor-pointer block w-full text-left"
+					onclick={() => themeStore.toggleSceneryMotion()}
+				>
+					{themeStore.sceneryPaused
+						? m.theme_resume_animations()
+						: m.theme_pause_animations()}
+				</button>
 			</Dropdown>
 
 			<Dropdown>
@@ -96,7 +157,7 @@
 
 				{#each locales as locale (locale)}
 					<button
-						class={cn('py-ty-list-xs px-box-md cursor-pointer block w-full text-left', {
+						class={cn('py-text-xs px-box-md cursor-pointer block w-full text-left', {
 							'font-bold': getLocale() === locale
 						})}
 						onclick={() => setLocale(locale)}
@@ -109,7 +170,7 @@
 	</header>
 
 	<div
-		class="grid grid-cols-12 gap-grid-lg mt-grid-lg border-glass p-box-xl max-w-screen-2xl mx-auto w-full rounded solid:border"
+		class="grid grid-cols-12 gap-grid-lg mt-grid-lg border-line-strong p-box-xl max-w-screen-2xl mx-auto w-full rounded-2xl border"
 	>
 		{@render children()}
 	</div>

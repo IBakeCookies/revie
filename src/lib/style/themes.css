@@ -1,0 +1,901 @@
+/* The theme palettes — one class per theme in the catalogue
+   (business/model/theme.ts), each overriding the seeds set in base.css.
+   Loaded last: themes win over :root and .dark at equal specificity. */
+
+/* ---- themes --------------------------------------------------
+   solid-light shares the :root block above, solid-dark = .dark. */
+
+.glass-light {
+	--background-image: url('/themes/glass-light.jpg');
+
+	--surface-page: oklch(1 0 0);
+	/* readability over the busy backdrop needs a bit more card opacity */
+	--surface-card: oklch(1 0 0 / 0.4);
+	--surface-inset: oklch(0 0 0 / 0.05);
+
+	--input: oklch(1 0 0 / 0.55);
+
+	/* harmonize with the green-yellow gouache backdrop; dark enough for white label text */
+	--primary: oklch(0.55 0.15 155 / 0.95);
+	--primary-foreground: var(--color-white);
+}
+
+.glass-dark {
+	/* 50% black overlay tames the texture */
+	--background-image:
+		linear-gradient(oklch(0 0 0 / 0.5), oklch(0 0 0 / 0.5)), url('/themes/glass-dark.jpg');
+	main {
+		background-color: rgba(0, 0, 0, 0.2);
+	}
+
+	--surface-page: oklch(0 0 0);
+	--surface-card: oklch(1 0 0 / 0.05);
+	--surface-inset: oklch(0 0 0 / 0.15);
+
+	/* inputs sit on translucent cards — opaque black reads too heavy here */
+	--input: oklch(1 0 0 / 0.1);
+
+	/* harmonize with the red-purple textured backdrop */
+	--primary: oklch(0.52 0.2 310 / 0.9);
+	--primary-foreground: var(--color-white);
+}
+
+.aurora {
+	/* northern lights, no image dependency: teal + violet + green glows over deep navy */
+	--background-image:
+		radial-gradient(ellipse 90% 55% at 15% -10%, oklch(0.5 0.13 180 / 0.4), transparent 65%),
+		radial-gradient(ellipse 70% 45% at 85% -5%, oklch(0.5 0.19 300 / 0.35), transparent 65%),
+		radial-gradient(ellipse 60% 40% at 60% 15%, oklch(0.55 0.15 150 / 0.18), transparent 60%),
+		radial-gradient(ellipse 80% 60% at 50% 115%, oklch(0.35 0.1 230 / 0.5), transparent 65%),
+		linear-gradient(oklch(0.17 0.035 250), oklch(0.13 0.03 265));
+
+	--surface-page: oklch(0.15 0.03 255);
+	--surface-card: oklch(1 0 0 / 0.06);
+	--surface-inset: oklch(0 0 0 / 0.2);
+	--color-ty-primary: oklch(0.97 0.01 190);
+
+	--input: oklch(1 0 0 / 0.12);
+
+	--primary: oklch(0.78 0.15 175);
+	--primary-foreground: oklch(0.17 0.05 250);
+
+	--color-brand: oklch(0.78 0.13 180);
+	--color-brand-strong: oklch(0.86 0.11 180);
+	--color-mixed: oklch(0.72 0.17 305);
+}
+
+.daybreak {
+	/* sunrise: peach + rose + sky glows over warm white */
+	--background-image:
+		radial-gradient(ellipse 80% 55% at 20% -10%, oklch(0.88 0.09 55 / 0.55), transparent 65%),
+		radial-gradient(ellipse 70% 45% at 85% -5%, oklch(0.85 0.1 350 / 0.4), transparent 65%),
+		radial-gradient(ellipse 90% 60% at 50% 115%, oklch(0.85 0.06 230 / 0.45), transparent 65%),
+		linear-gradient(oklch(0.97 0.015 80), oklch(0.94 0.02 260));
+
+	--surface-page: oklch(0.97 0.01 80);
+	--surface-card: oklch(1 0 0 / 0.5);
+	--surface-inset: oklch(0 0 0 / 0.05);
+	--color-ty-primary: oklch(0.22 0.02 320);
+
+	--input: oklch(1 0 0 / 0.6);
+
+	/* sunrise coral, deep enough for white label text */
+	--primary: oklch(0.55 0.19 25);
+	--primary-foreground: var(--color-white);
+
+	--color-brand: oklch(0.55 0.17 35);
+	--color-brand-strong: oklch(0.47 0.16 35);
+	--color-mixed: oklch(0.55 0.2 350);
+}
+
+.royal {
+	/* candlelit palace: gold chandelier glow over deep aubergine velvet */
+	--background-image:
+		radial-gradient(ellipse 70% 45% at 50% -10%, oklch(0.65 0.13 85 / 0.28), transparent 65%),
+		radial-gradient(ellipse 55% 40% at 12% 30%, oklch(0.45 0.14 330 / 0.3), transparent 65%),
+		radial-gradient(ellipse 55% 40% at 88% 70%, oklch(0.4 0.12 300 / 0.3), transparent 65%),
+		linear-gradient(oklch(0.21 0.05 320), oklch(0.15 0.04 310));
+
+	--radius: 1rem;
+
+	--surface-page: oklch(0.18 0.045 315);
+	--surface-card: oklch(1 0.02 85 / 0.06);
+	--surface-inset: oklch(0 0 0 / 0.22);
+	--color-ty-primary: oklch(0.96 0.02 85);
+
+	--input: oklch(1 0 0 / 0.1);
+	--border: oklch(0.75 0.1 85 / 0.28);
+	--ring: oklch(0.8 0.13 85 / 0.5);
+
+	/* burnished gold */
+	--primary: oklch(0.78 0.13 85);
+	--primary-foreground: oklch(0.24 0.06 80);
+
+	--color-brand: oklch(0.8 0.13 85);
+	--color-brand-strong: oklch(0.88 0.11 88);
+	--color-mixed: oklch(0.72 0.15 330);
+	--color-flow: oklch(0.82 0.13 75);
+}
+
+.terminal {
+	/* 1982 phosphor CRT: scanlines, green glow vignette, zero curvature */
+	--background-image:
+		repeating-linear-gradient(0deg, oklch(0 0 0 / 0.22) 0 1px, transparent 1px 3px),
+		radial-gradient(ellipse 120% 90% at 50% 50%, oklch(0.3 0.06 145 / 0.35), transparent 75%),
+		linear-gradient(oklch(0.14 0.015 155), oklch(0.11 0.012 155));
+	font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+
+	--radius: 0;
+	--blur: 0;
+	/* a CRT has one plane of phosphor — nothing floats */
+	--card-shadow: 0 0 #0000;
+
+	--surface-page: oklch(0.12 0.014 155);
+	--surface-card: oklch(0.85 0.2 145 / 0.05);
+	--surface-inset: oklch(0 0 0 / 0.35);
+	--color-ty-primary: oklch(0.87 0.19 145);
+
+	--input: oklch(0.85 0.2 145 / 0.08);
+	--border: oklch(0.85 0.2 145 / 0.3);
+
+	--primary: oklch(0.85 0.21 145);
+	--primary-foreground: oklch(0.15 0.03 150);
+
+	/* everything glows green or amber — it's 1982; danger runs hot orange so errors still scan */
+	--color-danger: oklch(0.7 0.21 40);
+	--color-danger-strong: oklch(0.78 0.18 40);
+	--color-warning: oklch(0.85 0.17 95);
+	--color-warning-strong: oklch(0.9 0.14 95);
+	--color-success: oklch(0.87 0.21 145);
+	--color-success-strong: oklch(0.92 0.17 145);
+	--color-info: oklch(0.88 0.14 165);
+	--color-info-strong: oklch(0.92 0.11 165);
+
+	--color-mind: oklch(0.88 0.14 165);
+	--color-mind-strong: oklch(0.92 0.11 165);
+	--color-body: oklch(0.87 0.21 145);
+	--color-flow: oklch(0.85 0.17 95);
+	--color-mixed: oklch(0.8 0.15 120);
+	--color-brand: oklch(0.87 0.21 145);
+	--color-brand-strong: oklch(0.93 0.16 145);
+}
+
+.blueprint {
+	/* architect's drafting sheet: fine grid + major grid on cyanotype blue */
+	--background-image:
+		repeating-linear-gradient(0deg, oklch(1 0 0 / 0.1) 0 1px, transparent 1px 120px),
+		repeating-linear-gradient(90deg, oklch(1 0 0 / 0.1) 0 1px, transparent 1px 120px),
+		repeating-linear-gradient(0deg, oklch(1 0 0 / 0.045) 0 1px, transparent 1px 24px),
+		repeating-linear-gradient(90deg, oklch(1 0 0 / 0.045) 0 1px, transparent 1px 24px),
+		linear-gradient(oklch(0.42 0.09 255), oklch(0.36 0.09 258));
+
+	--radius: 0.25rem;
+	/* line work on a flat drafting sheet — no depth */
+	--card-shadow: 0 0 #0000;
+
+	--surface-page: oklch(0.4 0.09 256);
+	--surface-card: oklch(1 0 0 / 0.07);
+	--surface-inset: oklch(0 0 0 / 0.16);
+	--color-ty-primary: oklch(0.98 0.008 240);
+
+	--input: oklch(1 0 0 / 0.12);
+	--border: oklch(1 0 0 / 0.3);
+
+	/* drafting-pen white */
+	--primary: oklch(0.97 0.01 240);
+	--primary-foreground: oklch(0.35 0.09 256);
+
+	--color-danger: var(--color-red-300);
+	--color-danger-strong: var(--color-red-200);
+	--color-warning: var(--color-amber-300);
+	--color-warning-strong: var(--color-amber-200);
+	--color-success: var(--color-emerald-300);
+	--color-success-strong: var(--color-emerald-200);
+	--color-info: var(--color-sky-300);
+	--color-info-strong: var(--color-sky-200);
+
+	--color-mind: var(--color-sky-300);
+	--color-mind-strong: var(--color-sky-200);
+	--color-body: var(--color-emerald-300);
+	--color-flow: var(--color-amber-300);
+	--color-mixed: var(--color-violet-300);
+	--color-brand: oklch(0.85 0.08 230);
+	--color-brand-strong: oklch(0.92 0.06 230);
+}
+
+.bubblegum {
+	/* candy shop: strawberry, mint and lemon swirls — zero restraint */
+	--background-image:
+		radial-gradient(ellipse 70% 50% at 15% -5%, oklch(0.88 0.09 350 / 0.6), transparent 65%),
+		radial-gradient(ellipse 60% 45% at 90% 10%, oklch(0.92 0.08 160 / 0.5), transparent 65%),
+		radial-gradient(ellipse 65% 45% at 30% 110%, oklch(0.93 0.08 95 / 0.55), transparent 65%),
+		radial-gradient(ellipse 60% 40% at 85% 90%, oklch(0.87 0.09 300 / 0.45), transparent 65%),
+		linear-gradient(oklch(0.96 0.025 340), oklch(0.94 0.03 320));
+
+	--radius: 1.5rem;
+
+	--surface-page: oklch(0.96 0.025 340);
+	--surface-card: oklch(1 0 0 / 0.55);
+	--surface-inset: oklch(0.7 0.12 350 / 0.1);
+	--color-ty-primary: oklch(0.35 0.09 340);
+
+	--input: oklch(1 0 0 / 0.65);
+	--border: oklch(0.6 0.16 350 / 0.25);
+
+	/* hot bubblegum pink, deep enough for white label text */
+	--primary: oklch(0.58 0.21 350);
+	--primary-foreground: var(--color-white);
+
+	--color-brand: oklch(0.62 0.21 350);
+	--color-brand-strong: oklch(0.54 0.2 350);
+	--color-mixed: oklch(0.6 0.18 310);
+	--color-flow: oklch(0.72 0.15 65);
+	--color-body: oklch(0.65 0.14 165);
+	--color-mind: oklch(0.6 0.15 260);
+	--color-mind-strong: oklch(0.52 0.15 260);
+}
+
+.ukiyo {
+	/* woodblock print: hard-edged vermilion sun over washi paper, indigo swell below */
+	--background-image:
+		radial-gradient(
+			circle at 50% 0%,
+			oklch(0.63 0.17 35 / 0.55) 0 30rem,
+			transparent calc(30rem)
+		),
+		radial-gradient(ellipse 80% 45% at 74% 0%, oklch(0.78 0.09 45 / 0.18), transparent 70%),
+		radial-gradient(ellipse 70% 40% at 12% 35%, oklch(0.8 0.11 355 / 0.1), transparent 70%),
+		radial-gradient(ellipse 90% 40% at 18% 112%, oklch(0.36 0.08 255 / 0.45), transparent 65%),
+		radial-gradient(ellipse 70% 32% at 78% 106%, oklch(0.46 0.09 250 / 0.3), transparent 65%),
+		linear-gradient(oklch(0.95 0.02 72), oklch(0.92 0.026 58));
+
+	--radius: 0.375rem;
+
+	--surface-page: oklch(0.94 0.02 72);
+	--surface-card: oklch(0.98 0.012 90 / 0.6);
+	--surface-inset: oklch(0.35 0.06 255 / 0.07);
+	--color-ty-primary: oklch(0.28 0.045 255);
+
+	--input: oklch(1 0 0 / 0.55);
+	--border: oklch(0.35 0.06 255 / 0.25);
+
+	/* Prussian blue ink */
+	--primary: oklch(0.42 0.09 255);
+	--primary-foreground: oklch(0.97 0.01 90);
+
+	--color-brand: oklch(0.45 0.09 255);
+	--color-brand-strong: oklch(0.38 0.09 255);
+	/* vermilion, like the sun */
+	--color-danger: oklch(0.55 0.19 30);
+	--color-danger-strong: oklch(0.48 0.18 30);
+	--color-flow: oklch(0.62 0.13 60);
+	--color-mixed: oklch(0.5 0.12 300);
+}
+
+.abyss {
+	--surface-page: oklch(0.11 0.022 245);
+	--surface-card: oklch(0.75 0.1 210 / 0.06);
+	--surface-inset: oklch(0 0 0 / 0.3);
+	--color-ty-primary: oklch(0.95 0.015 210);
+
+	--input: oklch(1 0 0 / 0.09);
+	--border: oklch(0.75 0.12 210 / 0.22);
+
+	/* jellyfish cyan */
+	--primary: oklch(0.8 0.14 205);
+	--primary-foreground: oklch(0.15 0.04 240);
+
+	--color-brand: oklch(0.78 0.13 205);
+	--color-brand-strong: oklch(0.86 0.11 205);
+	--color-mixed: oklch(0.7 0.17 330);
+	--color-body: oklch(0.8 0.15 170);
+}
+
+.parchment {
+	/* illuminated manuscript: iron-gall ink and a wax seal on aged vellum */
+	--background-image:
+		radial-gradient(
+			ellipse 130% 100% at 50% 40%,
+			transparent 50%,
+			oklch(0.55 0.06 75 / 0.22) 100%
+		),
+		linear-gradient(oklch(0.93 0.025 85), oklch(0.89 0.035 80));
+	font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+
+	--radius: 0.125rem;
+
+	--surface-page: oklch(0.92 0.03 83);
+	--surface-card: oklch(0.97 0.02 88 / 0.55);
+	--surface-inset: oklch(0.45 0.06 70 / 0.08);
+	--color-ty-primary: oklch(0.3 0.04 60);
+
+	--input: oklch(1 0.01 90 / 0.6);
+	--border: oklch(0.45 0.07 70 / 0.3);
+
+	/* wax-seal crimson */
+	--primary: oklch(0.5 0.17 25);
+	--primary-foreground: oklch(0.96 0.02 85);
+
+	/* gold-leaf ochre */
+	--color-brand: oklch(0.55 0.12 75);
+	--color-brand-strong: oklch(0.47 0.12 72);
+	--color-flow: oklch(0.6 0.12 80);
+	--color-mixed: oklch(0.48 0.1 320);
+	--color-mind: oklch(0.45 0.09 255);
+	--color-mind-strong: oklch(0.38 0.09 255);
+}
+
+.noir {
+	/* film noir: venetian-blind light falling across a smoky monochrome scene */
+	--background-image:
+		repeating-linear-gradient(115deg, oklch(1 0 0 / 0.04) 0 2rem, transparent 2rem 4.5rem),
+		radial-gradient(ellipse 80% 60% at 70% -10%, oklch(0.65 0 0 / 0.2), transparent 65%),
+		radial-gradient(ellipse 60% 45% at 10% 110%, oklch(0.5 0 0 / 0.15), transparent 65%),
+		linear-gradient(oklch(0.2 0 0), oklch(0.12 0 0));
+
+	--radius: 0.25rem;
+	/* hard genre shadows */
+	--card-shadow: 0 20px 45px -12px oklch(0 0 0 / 0.7);
+
+	--surface-page: oklch(0.16 0 0);
+	--surface-card: oklch(1 0 0 / 0.05);
+	--surface-inset: oklch(0 0 0 / 0.3);
+	--color-ty-primary: oklch(0.97 0 0);
+
+	--input: oklch(1 0 0 / 0.09);
+	--border: oklch(1 0 0 / 0.18);
+
+	/* lipstick crimson — the only color in the scene */
+	--primary: oklch(0.55 0.21 20);
+	--primary-foreground: oklch(0.97 0 0);
+
+	--color-brand: oklch(0.62 0.19 20);
+	--color-brand-strong: oklch(0.7 0.17 20);
+	/* states stay smoky too — only crimson gets to be a color */
+	--color-danger: oklch(0.68 0.19 20);
+	--color-danger-strong: oklch(0.76 0.17 20);
+	--color-warning: oklch(0.8 0.05 90);
+	--color-warning-strong: oklch(0.87 0.04 90);
+	--color-success: oklch(0.78 0.04 160);
+	--color-success-strong: oklch(0.85 0.03 160);
+	--color-info: oklch(0.78 0.03 250);
+	--color-info-strong: oklch(0.85 0.03 250);
+	/* domain accents stay smoky so the crimson pops */
+	--color-mind: oklch(0.78 0.03 250);
+	--color-mind-strong: oklch(0.85 0.03 250);
+	--color-body: oklch(0.78 0.04 160);
+	--color-flow: oklch(0.8 0.05 90);
+	--color-mixed: oklch(0.75 0.04 320);
+}
+
+.ember {
+	/* blacksmith's forge at night: molten glow rising through charcoal */
+	--background-image:
+		radial-gradient(ellipse 80% 50% at 50% 115%, oklch(0.6 0.2 40 / 0.4), transparent 65%),
+		radial-gradient(ellipse 50% 35% at 20% 105%, oklch(0.65 0.21 30 / 0.3), transparent 60%),
+		radial-gradient(ellipse 45% 30% at 85% 100%, oklch(0.7 0.17 55 / 0.25), transparent 60%),
+		linear-gradient(oklch(0.2 0.012 50), oklch(0.13 0.015 40));
+
+	--radius: 0.5rem;
+
+	--surface-page: oklch(0.17 0.012 45);
+	--surface-card: oklch(0.85 0.08 55 / 0.06);
+	--surface-inset: oklch(0 0 0 / 0.3);
+	--color-ty-primary: oklch(0.96 0.012 60);
+
+	--input: oklch(1 0 0 / 0.09);
+	--border: oklch(0.75 0.12 50 / 0.25);
+
+	/* molten iron */
+	--primary: oklch(0.7 0.19 45);
+	--primary-foreground: oklch(0.18 0.04 40);
+
+	--color-brand: oklch(0.74 0.16 50);
+	--color-brand-strong: oklch(0.82 0.13 55);
+	--color-flow: oklch(0.8 0.15 75);
+	--color-mixed: oklch(0.7 0.14 25);
+}
+
+.glacier {
+	/* arctic morning: crisp blue ice under a pale polar sky */
+	--background-image:
+		radial-gradient(ellipse 80% 50% at 25% -10%, oklch(0.9 0.05 220 / 0.5), transparent 65%),
+		radial-gradient(ellipse 60% 40% at 90% 15%, oklch(0.92 0.04 190 / 0.45), transparent 65%),
+		radial-gradient(ellipse 90% 55% at 50% 115%, oklch(0.85 0.06 240 / 0.5), transparent 65%),
+		linear-gradient(oklch(0.97 0.012 220), oklch(0.93 0.02 230));
+
+	--radius: 0.5rem;
+
+	--surface-page: oklch(0.96 0.015 220);
+	--surface-card: oklch(1 0 0 / 0.55);
+	--surface-inset: oklch(0.55 0.08 240 / 0.08);
+	--color-ty-primary: oklch(0.25 0.045 245);
+
+	--input: oklch(1 0 0 / 0.65);
+	--border: oklch(0.45 0.08 240 / 0.25);
+
+	/* glacial teal-blue */
+	--primary: oklch(0.55 0.12 230);
+	--primary-foreground: var(--color-white);
+
+	--color-brand: oklch(0.52 0.11 230);
+	--color-brand-strong: oklch(0.44 0.11 235);
+	--color-mind: oklch(0.5 0.11 250);
+	--color-mind-strong: oklch(0.43 0.11 250);
+	--color-mixed: oklch(0.55 0.12 290);
+}
+
+.fallow {
+	/* the namesake: a field at rest — straw-gold stubble, quiet green regrowth,
+	   a wide pale sky. Rest is not idleness; it is how the ground yields again. */
+	--background-image:
+		radial-gradient(
+			ellipse 100% 55% at 50% -12%,
+			oklch(0.94 0.025 225 / 0.55),
+			transparent 68%
+		),
+		radial-gradient(ellipse 85% 45% at 12% 112%, oklch(0.72 0.1 115 / 0.32), transparent 65%),
+		radial-gradient(ellipse 90% 50% at 88% 110%, oklch(0.82 0.1 90 / 0.45), transparent 65%),
+		linear-gradient(oklch(0.96 0.012 220), oklch(0.93 0.03 100));
+
+	--radius: 1rem;
+
+	--surface-page: oklch(0.95 0.02 105);
+	--surface-card: oklch(1 0 0 / 0.55);
+	--surface-inset: oklch(0.45 0.06 110 / 0.08);
+	--color-ty-primary: oklch(0.31 0.045 130);
+
+	--input: oklch(1 0 0 / 0.6);
+	--border: oklch(0.45 0.07 115 / 0.25);
+
+	/* quiet field green */
+	--primary: oklch(0.55 0.11 130);
+	--primary-foreground: var(--color-white);
+
+	--color-brand: oklch(0.52 0.1 125);
+	--color-brand-strong: oklch(0.44 0.1 128);
+	/* straw gold */
+	--color-flow: oklch(0.65 0.13 85);
+	/* spruce teal — keeps body distinct from the field-green primary */
+	--color-body: oklch(0.5 0.12 175);
+	--color-mixed: oklch(0.55 0.11 310);
+}
+
+.lantern-drift {
+	/* toro nagashi — paper lanterns set adrift on black river water at night.
+	   A high, hard horizon splits a deep moonless sky from a still black river;
+	   the lanterns you release are the only light, doubled as wavering warm
+	   reflections on the water below. Lanterns, reflections, reeds, fireflies,
+	   a ripple sheen and low mist are theme scenery — see
+	   theme-scenery/lantern-drift.css. The day is released downstream; the mind
+	   quiets, the ground rests. */
+	--background-image:
+		/* far-shore lantern light gathered to a thin bright line at the water */
+		radial-gradient(ellipse 44% 1.6% at 50% 42%, oklch(0.85 0.085 74 / 0.32), transparent 72%),
+		/* the warm lantern-lit air above the far shore */
+			radial-gradient(ellipse 70% 7% at 50% 41%, oklch(0.66 0.12 58 / 0.24), transparent 72%),
+		/* that warmth reflected down onto the near water */
+			radial-gradient(ellipse 58% 12% at 50% 52%, oklch(0.48 0.11 52 / 0.2), transparent 74%),
+		/* cool depth pooling in the foreground water */
+			radial-gradient(
+				ellipse 120% 42% at 50% 114%,
+				oklch(0.12 0.045 225 / 0.5),
+				transparent 70%
+			),
+		/* a breath of cool night in the upper sky */
+			radial-gradient(ellipse 66% 44% at 16% 6%, oklch(0.24 0.05 262 / 0.38), transparent 70%),
+		/* deep moonless sky above, black river below — split hard at the horizon */
+			linear-gradient(
+				to bottom,
+				oklch(0.15 0.034 258) 0%,
+				oklch(0.17 0.032 252) 34%,
+				oklch(0.185 0.03 246) 41%,
+				oklch(0.1 0.03 236) 43%,
+				oklch(0.075 0.025 228) 74%,
+				oklch(0.055 0.02 222) 100%
+			);
+
+	--radius: 1rem;
+	--blur: 2rem;
+	--card-shadow: 0 20px 48px -14px oklch(0 0 0 / 0.6);
+
+	--surface-page: oklch(0.12 0.03 240);
+	/* lantern-lit river glass — translucent so the water glows through */
+	--surface-card: oklch(1 0 0 / 0.07);
+	--surface-inset: oklch(0 0 0 / 0.3);
+	--color-ty-primary: oklch(0.97 0.014 82);
+
+	--input: oklch(1 0 0 / 0.09);
+	--border: oklch(0.85 0.08 70 / 0.22);
+
+	/* paper-lantern amber */
+	--primary: oklch(0.8 0.14 66);
+	--primary-foreground: oklch(0.24 0.05 58);
+	--ring: oklch(0.8 0.14 66 / 0.5);
+
+	--color-brand: oklch(0.82 0.115 64);
+	--color-brand-strong: oklch(0.88 0.085 70);
+	/* candle-gold flow */
+	--color-flow: oklch(0.86 0.125 88);
+	/* moonless-water blue */
+	--color-mind: oklch(0.78 0.1 248);
+	--color-mind-strong: oklch(0.85 0.065 250);
+	/* river-reed green — kept clear of the amber primary */
+	--color-body: oklch(0.8 0.125 162);
+	/* dusk-magenta, the rarer reflection on the water */
+	--color-mixed: oklch(0.75 0.12 322);
+
+	/* states — hues held well apart so status stays legible on the warm field */
+	--color-warning: oklch(0.84 0.125 80);
+	--color-warning-strong: oklch(0.89 0.09 82);
+	--color-danger: oklch(0.7 0.18 28);
+	--color-danger-strong: oklch(0.76 0.14 28);
+	--color-success: oklch(0.81 0.13 150);
+	--color-success-strong: oklch(0.87 0.1 150);
+	--color-info: oklch(0.78 0.1 236);
+	--color-info-strong: oklch(0.86 0.075 238);
+}
+.canopy {
+	/* under a sunlit forest canopy: warm gold sunlight breaking through the
+	   leaves from above, a soft green ambience, deepening to moss at the
+	   forest floor. Dappled shade, god-rays and drifting pollen are theme
+	   scenery — see theme-scenery/canopy.css. */
+	--background-image:
+		radial-gradient(ellipse 60% 45% at 70% 0%, oklch(0.97 0.05 95 / 0.6), transparent 70%),
+		radial-gradient(ellipse 90% 55% at 50% 100%, oklch(0.85 0.06 145 / 0.35), transparent 65%),
+		linear-gradient(oklch(0.95 0.035 130), oklch(0.89 0.05 140));
+
+	--radius: 1rem;
+
+	--surface-page: oklch(0.92 0.035 135);
+	/* sun-warmed leaf glass */
+	--surface-card: oklch(1 0 0 / 0.55);
+	--surface-inset: oklch(0.35 0.06 145 / 0.08);
+	--color-ty-primary: oklch(0.28 0.04 145);
+
+	--input: oklch(1 0 0 / 0.6);
+	--border: oklch(0.45 0.07 145 / 0.25);
+
+	/* leaf green */
+	--primary: oklch(0.52 0.13 150);
+	--primary-foreground: var(--color-white);
+	--ring: oklch(0.52 0.13 150 / 0.5);
+
+	--color-brand: oklch(0.5 0.12 148);
+	--color-brand-strong: oklch(0.42 0.12 150);
+	/* sun gold breaking through the leaves */
+	--color-flow: oklch(0.6 0.14 95);
+	/* fern teal in the undergrowth shade */
+	--color-mind: oklch(0.48 0.11 180);
+	--color-mind-strong: oklch(0.4 0.11 182);
+	/* bark amber */
+	--color-body: oklch(0.48 0.13 60);
+	/* blossom rose */
+	--color-mixed: oklch(0.55 0.15 20);
+}
+.meridian {
+	/* deep-space ink: indigo shading to teal-black, lit only by quiet distant
+	   glows — the flow-lines and their traveling light are the real subject,
+	   see theme-scenery/meridian.css. */
+	--background-image:
+		radial-gradient(ellipse 55% 40% at 15% 10%, oklch(0.32 0.08 230 / 0.16), transparent 70%),
+		radial-gradient(ellipse 60% 45% at 88% 85%, oklch(0.28 0.09 195 / 0.14), transparent 72%),
+		radial-gradient(ellipse 45% 38% at 55% 45%, oklch(0.3 0.1 280 / 0.08), transparent 70%),
+		linear-gradient(oklch(0.15 0.032 245), oklch(0.05 0.016 240));
+
+	--radius: 1rem;
+
+	--surface-page: oklch(0.09 0.025 245);
+	/* deep-space glass */
+	--surface-card: oklch(1 0 0 / 0.06);
+	--surface-inset: oklch(0 0 0 / 0.3);
+	--color-ty-primary: oklch(0.95 0.015 240);
+
+	--input: oklch(1 0 0 / 0.08);
+	--border: oklch(0.75 0.05 230 / 0.18);
+
+	/* luminous cyan */
+	--primary: oklch(0.8 0.14 195);
+	--primary-foreground: oklch(0.14 0.03 250);
+	--ring: oklch(0.8 0.14 195 / 0.5);
+
+	--color-brand: oklch(0.76 0.13 200);
+	--color-brand-strong: oklch(0.85 0.11 200);
+	/* ribbon gold */
+	--color-flow: oklch(0.83 0.13 85);
+	/* ribbon violet */
+	--color-mind: oklch(0.74 0.15 300);
+	--color-mind-strong: oklch(0.82 0.11 300);
+	/* indigo depths */
+	--color-body: oklch(0.55 0.09 250);
+	/* ribbon rose */
+	--color-mixed: oklch(0.7 0.17 345);
+}
+.dunes {
+	/* midday desert: bottom-to-top the page itself carries pale warm sky
+	   sinking through sun-gold haze into deep terracotta sand, so the rounded
+	   dune silhouettes (theme-scenery/dunes.css) land on matching ground
+	   instead of a flat wash. One soft sun glow sits high above the dune line;
+	   heat shimmer, dune ridges and drifting sand grains are theme scenery. */
+	--background-image:
+		radial-gradient(ellipse 45% 30% at 76% 12%, oklch(0.96 0.05 85 / 0.55), transparent 70%),
+		linear-gradient(
+			to bottom,
+			oklch(0.87 0.035 235) 0%,
+			oklch(0.9 0.05 82) 42%,
+			oklch(0.8 0.08 58) 65%,
+			oklch(0.6 0.11 42) 100%
+		);
+
+	--radius: 1rem;
+
+	--surface-page: oklch(0.9 0.035 70);
+	/* sun-bleached canvas glass */
+	--surface-card: oklch(1 0 0 / 0.6);
+	--surface-inset: oklch(0.4 0.06 50 / 0.08);
+	--color-ty-primary: oklch(0.28 0.045 45);
+
+	--input: oklch(1 0 0 / 0.62);
+	--border: oklch(0.45 0.07 50 / 0.25);
+
+	/* terracotta */
+	--primary: oklch(0.58 0.16 42);
+	--primary-foreground: var(--color-white);
+	--ring: oklch(0.58 0.16 42 / 0.5);
+
+	--color-brand: oklch(0.56 0.15 42);
+	--color-brand-strong: oklch(0.46 0.15 40);
+	/* sun gold */
+	--color-flow: oklch(0.72 0.14 85);
+	/* oasis teal */
+	--color-mind: oklch(0.55 0.09 195);
+	--color-mind-strong: oklch(0.45 0.09 195);
+	/* baked clay */
+	--color-body: oklch(0.45 0.1 55);
+	/* cactus-flower rose */
+	--color-mixed: oklch(0.62 0.17 15);
+}
+.synthwave {
+	/* neon dusk: deep violet sky sinking to near-black, a sunset glow low at
+	   center — the banded sun and perspective grid are theme scenery, see
+	   theme-scenery/synthwave.css. */
+	--background-image:
+		radial-gradient(ellipse 65% 40% at 50% 88%, oklch(0.6 0.2 45 / 0.4), transparent 65%),
+		radial-gradient(ellipse 80% 55% at 50% 100%, oklch(0.45 0.18 340 / 0.25), transparent 60%),
+		linear-gradient(oklch(0.22 0.09 300), oklch(0.07 0.03 310));
+
+	--radius: 1rem;
+
+	--surface-page: oklch(0.1 0.05 320);
+	/* dusk glass */
+	--surface-card: oklch(1 0 0 / 0.06);
+	--surface-inset: oklch(0 0 0 / 0.3);
+	--color-ty-primary: oklch(0.96 0.02 40);
+
+	--input: oklch(1 0 0 / 0.08);
+	--border: oklch(0.78 0.12 330 / 0.2);
+
+	/* hot magenta */
+	--primary: oklch(0.72 0.22 335);
+	--primary-foreground: oklch(0.12 0.02 320);
+	--ring: oklch(0.72 0.22 335 / 0.5);
+
+	--color-brand: oklch(0.72 0.2 330);
+	--color-brand-strong: oklch(0.82 0.16 330);
+	/* sun orange */
+	--color-flow: oklch(0.78 0.17 55);
+	/* electric cyan */
+	--color-mind: oklch(0.82 0.14 200);
+	--color-mind-strong: oklch(0.9 0.1 200);
+	/* deep violet */
+	--color-body: oklch(0.55 0.16 295);
+	/* hot pink */
+	--color-mixed: oklch(0.72 0.19 5);
+}
+
+.orbit {
+	/* the overview effect — dawn breaking over the limb of the Earth from low
+	   orbit. The planet is the bottom quarter of the viewport: night side dark,
+	   a thin electric-blue atmosphere ring, first sunlight blooming on the limb.
+	   City lights, clouds, stars and aurora are theme scenery — see
+	   theme-scenery/orbit.css. */
+	--background-image:
+		/* haze in front of the limb where the rising light scatters forward —
+		   the only sunrise layer painted over the planet, and it's faint */
+		radial-gradient(ellipse 16vh 5vh at 58% 77.5vh, oklch(0.95 0.09 75 / 0.2), transparent 70%),
+		/* the planet and its atmosphere ring. The night side is opaque, so it
+		   genuinely occludes the sun layers below; the ring's outer stops are
+		   semi-transparent, so the hidden sun shines through them. */
+			radial-gradient(
+				circle at 50% 178vh,
+				oklch(0.1 0.02 255) 0 99vh,
+				oklch(0.3 0.06 245) 100.2vh,
+				oklch(0.78 0.1 230 / 0.9) 100.9vh,
+				oklch(0.6 0.12 225 / 0.35) 102.5vh,
+				oklch(0.5 0.1 220 / 0.12) 105vh,
+				transparent 109vh
+			),
+		/* the sun itself, BEHIND the planet — center a couple vh below the
+		   limb (edge ≈78–80vh at x=58% on any aspect ratio), so the disc is
+		   swallowed and only its corona crests the edge through the ring */
+			radial-gradient(
+				circle at 58% 81.5vh,
+				oklch(1 0.02 95) 0 2.5vh,
+				oklch(0.97 0.08 85 / 0.95) 5vh,
+				oklch(0.92 0.13 70 / 0.45) 10vh,
+				oklch(0.87 0.13 65 / 0.12) 17vh,
+				transparent 24vh
+			),
+		/* a single soft sun pillar rising from behind the arc */
+			radial-gradient(
+				ellipse 5vh 15vh at 58% 69vh,
+				oklch(0.96 0.08 82 / 0.1),
+				transparent 70%
+			),
+		/* deep space, faintly violet toward the horizon */
+			linear-gradient(oklch(0.07 0.012 275), oklch(0.11 0.03 265));
+
+	--radius: 0.875rem;
+
+	--surface-page: oklch(0.13 0.02 265);
+	/* station-window glass */
+	--surface-card: oklch(1 0 0 / 0.06);
+	--surface-inset: oklch(0 0 0 / 0.28);
+	--color-ty-primary: oklch(0.96 0.008 230);
+
+	--input: oklch(1 0 0 / 0.09);
+	--border: oklch(0.85 0.05 230 / 0.22);
+
+	/* first light over the limb */
+	--primary: oklch(0.87 0.1 80);
+	--primary-foreground: oklch(0.2 0.03 270);
+	--ring: oklch(0.87 0.1 80 / 0.5);
+
+	--color-brand: oklch(0.82 0.09 225);
+	--color-brand-strong: oklch(0.9 0.07 225);
+	/* sunrise gold */
+	--color-flow: oklch(0.85 0.12 80);
+	/* limb blue */
+	--color-mind: oklch(0.78 0.1 235);
+	--color-mind-strong: oklch(0.86 0.08 235);
+	/* aurora green */
+	--color-body: oklch(0.78 0.14 155);
+	/* airglow violet */
+	--color-mixed: oklch(0.72 0.12 310);
+}
+
+.sundial {
+	/* a limestone terrace at whatever hour it is — the scenery's sun and
+	   light gradient stand where the real sun stands (see
+	   theme-scenery/sundial.css); the palette stays warm neutral stone */
+	--background-image:
+		radial-gradient(
+			ellipse 80% 50% at 50% 115%,
+			oklch(88.04% 0.02988 80.62 / 0.5),
+			transparent 70%
+		),
+		linear-gradient(oklch(0.94 0.015 90), oklch(0.9 0.025 85));
+
+	--radius: 0.75rem;
+
+	--surface-page: oklch(0.92 0.02 88);
+	/* sun-bleached plaster */
+	--surface-card: oklch(1 0 0 / 0.6);
+	--surface-inset: oklch(0.35 0.04 70 / 0.07);
+	--color-ty-primary: oklch(0.3 0.03 60);
+
+	--input: oklch(1 0 0 / 0.7);
+	--border: oklch(0.35 0.04 70 / 0.2);
+
+	/* the bronze gnomon */
+	--primary: oklch(0.55 0.1 65);
+	--primary-foreground: oklch(0.97 0.01 85);
+	--ring: oklch(0.55 0.1 65 / 0.5);
+
+	--color-brand: oklch(0.5 0.09 60);
+	--color-brand-strong: oklch(0.42 0.09 55);
+	/* late-afternoon terracotta */
+	--color-flow: oklch(0.6 0.13 50);
+	/* shadow slate */
+	--color-mind: oklch(0.48 0.07 250);
+	--color-mind-strong: oklch(0.4 0.07 252);
+	/* courtyard cypress */
+	--color-body: oklch(0.52 0.09 145);
+	--color-mixed: oklch(0.52 0.11 310);
+}
+
+.tide {
+	/* a pale coastal morning; the sea below is scenery whose waterline
+	   stands at the day's remaining hours (see theme-scenery/tide.css) */
+	--background-image:
+		radial-gradient(ellipse 70% 40% at 50% -8%, oklch(0.97 0.02 90 / 0.7), transparent 70%),
+		linear-gradient(oklch(0.93 0.02 220), oklch(0.88 0.03 210));
+
+	--radius: 1rem;
+
+	--surface-page: oklch(0.9 0.025 215);
+	/* sea-mist glass */
+	--surface-card: oklch(1 0 0 / 0.55);
+	--surface-inset: oklch(0.3 0.06 230 / 0.08);
+	--color-ty-primary: oklch(0.26 0.04 240);
+
+	--input: oklch(1 0 0 / 0.65);
+	--border: oklch(0.3 0.06 230 / 0.2);
+
+	/* sea teal */
+	--primary: oklch(0.55 0.1 220);
+	--primary-foreground: oklch(0.97 0.01 210);
+	--ring: oklch(0.55 0.1 220 / 0.5);
+
+	--color-brand: oklch(0.5 0.09 225);
+	--color-brand-strong: oklch(0.42 0.09 230);
+	/* wet-sand amber */
+	--color-flow: oklch(0.62 0.11 75);
+	--color-mind: oklch(0.5 0.09 250);
+	--color-mind-strong: oklch(0.42 0.09 252);
+	/* sea-grass */
+	--color-body: oklch(0.55 0.09 165);
+	--color-mixed: oklch(0.55 0.11 310);
+}
+
+.breath {
+	/* a dark, still room; one glow breathing at a calm-exercise cadence is
+	   the only motion (see theme-scenery/breath.css) */
+	--background-image: linear-gradient(oklch(0.16 0.03 280), oklch(0.12 0.025 270));
+
+	--radius: 1.25rem;
+
+	--surface-page: oklch(0.14 0.028 275);
+	/* held-breath glass */
+	--surface-card: oklch(1 0 0 / 0.055);
+	--surface-inset: oklch(0 0 0 / 0.28);
+	--color-ty-primary: oklch(0.94 0.01 220);
+
+	--input: oklch(1 0 0 / 0.09);
+	--border: oklch(0.8 0.05 210 / 0.2);
+
+	/* the exhale glow */
+	--primary: oklch(0.8 0.08 200);
+	--primary-foreground: oklch(0.18 0.03 270);
+	--ring: oklch(0.8 0.08 200 / 0.5);
+
+	--color-brand: oklch(0.78 0.07 205);
+	--color-brand-strong: oklch(0.86 0.06 205);
+	--color-flow: oklch(0.8 0.1 80);
+	--color-mind: oklch(0.75 0.09 250);
+	--color-mind-strong: oklch(0.83 0.08 250);
+	--color-body: oklch(0.72 0.1 165);
+	--color-mixed: oklch(0.72 0.11 300);
+}
+
+.city-windows {
+	/* dusk over a skyline whose windows light with the sky's darkness
+	   (see theme-scenery/city-windows.css) */
+	--background-image:
+		radial-gradient(ellipse 100% 45% at 50% 118%, oklch(0.4 0.07 55 / 0.35), transparent 70%),
+		linear-gradient(oklch(0.13 0.03 265), oklch(0.2 0.05 275));
+
+	--radius: 0.75rem;
+
+	--surface-page: oklch(0.15 0.03 268);
+	/* high-rise glass */
+	--surface-card: oklch(1 0 0 / 0.06);
+	--surface-inset: oklch(0 0 0 / 0.26);
+	--color-ty-primary: oklch(0.95 0.01 85);
+
+	--input: oklch(1 0 0 / 0.09);
+	--border: oklch(0.85 0.05 85 / 0.2);
+
+	/* lit-window amber */
+	--primary: oklch(0.84 0.11 80);
+	--primary-foreground: oklch(0.2 0.04 270);
+	--ring: oklch(0.84 0.11 80 / 0.5);
+
+	--color-brand: oklch(0.8 0.09 80);
+	--color-brand-strong: oklch(0.88 0.08 80);
+	--color-flow: oklch(0.82 0.11 60);
+	--color-mind: oklch(0.75 0.09 255);
+	--color-mind-strong: oklch(0.83 0.08 255);
+	--color-body: oklch(0.72 0.1 165);
+	--color-mixed: oklch(0.73 0.11 310);
+}

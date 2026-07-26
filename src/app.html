@@ -1,8 +1,29 @@
 <!doctype html>
-<html lang="%paraglide.lang%" class="%theme%">
+<html lang="%paraglide.lang%" class="%theme% %scenery-paused%">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<!-- no-FOUC: first visit (no theme cookie) on a dark-preferring OS gets
+		     the dark default before first paint instead of a light flash; first
+		     visit (no sceneryMotion cookie) on a reduced-motion OS gets scenery
+		     paused before first paint instead of a flash of motion. The class
+		     here mirrors DEFAULT_DARK_THEME in $lib/business/model/theme.ts -->
+		<script>
+			if (
+				!document.cookie.includes('theme=') &&
+				matchMedia('(prefers-color-scheme: dark)').matches
+			) {
+				document.documentElement.className = 'dark';
+			}
+
+			if (
+				!document.cookie.includes('sceneryMotion=') &&
+				matchMedia('(prefers-reduced-motion: reduce)').matches
+			) {
+				document.documentElement.classList.add('scenery-paused');
+			}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

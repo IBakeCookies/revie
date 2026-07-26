@@ -33,12 +33,12 @@
 	rel="noreferrer"
 	style={spanStyle(span)}
 	class={cn(
-		'@container/box-service bg-box-secondary border border-transparent cursor-pointer rounded-xs p-box-md relative hover:border-border transition-colors col-span-12 xl:col-span-(--span)',
+		'@container/box-service bg-surface-inset backdrop-blur border border-transparent cursor-pointer rounded-md p-box-md relative hover:border-line-strong transition-colors col-span-12 xl:col-span-(--span)',
 		restProps.class
 	)}
 >
 	<div
-		class="gap-ty-list-2xs @2xs/box-service:gap-ty-list-md flex flex-col @2xs/box-service:flex-row items-center"
+		class="gap-text-2xs @2xs/box-service:gap-text-md flex flex-col @2xs/box-service:flex-row items-center"
 	>
 		<img class="object-contain min-w-10 size-10" src={img.src} alt="" />
 

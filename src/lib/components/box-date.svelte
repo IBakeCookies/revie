@@ -37,7 +37,7 @@
 	{...restProps}
 	style={spanStyle(span)}
 	class={cn(
-		'col-span-12 xl:col-span-(--span) p-box-md text-xl text-center bg-box-secondary rounded-xs',
+		'col-span-12 xl:col-span-(--span) p-box-md text-xl text-center bg-surface-inset backdrop-blur rounded-md',
 		restProps.class
 	)}
 >

@@ -1,0 +1,23 @@
+/* The app stylesheet — the single entry the root layout imports.
+   Split by concern; the import order below is the cascade order and is
+   load-bearing (see base.css):
+
+     scenery/  decorative fixed layers, one file per animated theme
+     tokens    @custom-variant + @theme inline (what utilities exist)
+     base      :root defaults, @layer base, .dark
+     themes    one palette class per theme, overriding base
+
+   Ported from zenith (src/lib/presentation/style/). Keep these four files
+   diffable against it, so upstream theme work stays copy-pasteable —
+   zenith's shadcn/tw-animate/fontsource imports are dropped here because
+   this project doesn't carry those dependencies. */
+
+@import 'tailwindcss';
+@import './scenery/index.css';
+
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+@import './tokens.css';
+@import './base.css';
+@import './themes.css';

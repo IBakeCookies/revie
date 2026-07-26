@@ -21,7 +21,7 @@
 	{...restProps}
 	style={spanStyle(span)}
 	class={cn(
-		'cyber-punk:border p-box-xl col-span-12 xl:col-span-(--span) bg-box-primary rounded solid:border',
+		'p-box-xl col-span-12 xl:col-span-(--span) bg-surface-card border-line-strong shadow-card backdrop-blur rounded-2xl border',
 		restProps.class
 	)}
 >
@@ -33,7 +33,7 @@
 		<h5 class="text-lg text-ty-secondary">{subTitle}</h5>
 	{/if}
 
-	<div class={cn('grid grid-cols-12 gap-grid-lg mt-ty-headline-md', gridClass)}>
+	<div class={cn('grid grid-cols-12 gap-grid-lg mt-text-md', gridClass)}>
 		{#each items as item, index (index)}
 			<ConfigContainerView container={item} />
 		{/each}

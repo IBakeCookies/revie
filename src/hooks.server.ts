@@ -1,7 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 import { sequence } from '@sveltejs/kit/hooks';
-import { themes } from '$lib/store/theme-store.svelte';
+import { readRequestAppearance } from '$lib/business/appearance';
 
 const handleParaglide: Handle = ({ event, resolve }) =>
 	paraglideMiddleware(event.request, ({ request, locale }) => {
@@ -13,13 +13,24 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 	});
 
 const handleTheme: Handle = ({ event, resolve }) => {
-	const cookieTheme = event.cookies.get('theme');
-	const theme = themes.find((item) => item.name === cookieTheme);
+	const { themeClass } = readRequestAppearance(event.cookies);
 
 	// The placeholder always has to be replaced, otherwise it ends up in the markup.
 	return resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('%theme%', theme?.css.join(' ') ?? '')
+		transformPageChunk: ({ html }) => html.replace('%theme%', themeClass)
 	});
 };
 
-export const handle: Handle = sequence(handleParaglide, handleTheme);
+// No cookie yet leaves the placeholder empty — app.html's inline script then
+// decides from prefers-reduced-motion before first paint.
+const handleSceneryMotion: Handle = ({ event, resolve }) => {
+	const sceneryPausedClass = readRequestAppearance(event.cookies).sceneryPaused
+		? 'scenery-paused'
+		: '';
+
+	return resolve(event, {
+		transformPageChunk: ({ html }) => html.replace('%scenery-paused%', sceneryPausedClass)
+	});
+};
+
+export const handle: Handle = sequence(handleParaglide, handleTheme, handleSceneryMotion);

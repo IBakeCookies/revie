@@ -7,23 +7,32 @@
 	export type Props = {
 		trigger: Snippet;
 		children: Snippet;
+		/** Extra panel classes — the theme list needs a scroll cap, the others don't. */
+		panelClass?: ClassValue;
 		class?: ClassValue;
 	} & HTMLAttributes<HTMLDivElement>;
 
-	let { trigger, children, ...restProps }: Props = $props();
+	let { trigger, children, panelClass, ...restProps }: Props = $props();
 </script>
 
 <div {...restProps} class={cn('group relative z-1', restProps.class)}>
 	<button
-		class="bg-box-secondary border-glass glass-y solid:border py-box-xs px-box-lg rounded-xs"
+		class="bg-surface-card border-line-strong backdrop-blur py-box-xs px-box-lg rounded-md border"
 	>
 		{@render trigger()}
 	</button>
 
 	<div
-		class="pt-ty-list-2xs transition-all absolute top-full left-0 invisible opacity-0 group-hover:opacity-100 group-hover:visible"
+		class="pt-text-2xs transition-all absolute top-full left-0 invisible opacity-0 group-hover:opacity-100 group-hover:visible"
 	>
-		<div class="bg-background size-max border-glass glass-x solid:border rounded-xs">
+		<!-- opaque page surface, not the translucent card: the panel floats over
+		     arbitrary content and has to stay readable on the glass themes -->
+		<div
+			class={cn(
+				'bg-popover border-line-strong shadow-card size-max rounded-md border',
+				panelClass
+			)}
+		>
 			{@render children()}
 		</div>
 	</div>

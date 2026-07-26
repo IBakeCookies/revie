@@ -6,16 +6,38 @@ import { extendTailwindMerge } from 'tailwind-merge';
 // https://github.com/dcastil/tailwind-merge/blob/v2.2.1/src/lib/default-config.ts
 const customTwMerge = extendTailwindMerge({
 	extend: {
+		// The custom spacing scale from style/tokens.css: boxes (padding), grid
+		// (gaps between blocks), text (rhythm between lines of content), page.
 		theme: {
 			spacing: [
+				'box-3xs',
+				'box-2xs',
 				'box-xs',
+				'box-sm',
 				'box-md',
 				'box-lg',
 				'box-xl',
+				'box-2xl',
 				'grid-2xs',
 				'grid-xs',
+				'grid-sm',
 				'grid-md',
-				'grid-lg'
+				'grid-lg',
+				'grid-xl',
+				'text-3xs',
+				'text-2xs',
+				'text-xs',
+				'text-sm',
+				'text-md',
+				'text-lg',
+				'text-xl',
+				'text-2xl',
+				'page-sm',
+				'page-md',
+				'page',
+				'section',
+				'section-lg',
+				'empty-state'
 			]
 		},
 		conflictingClassGroups: {}

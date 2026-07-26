@@ -1,0 +1,46 @@
+/* ---- theme scenery ---------------------------------------------
+   Fixed decorative layers rendered once in the root layout, behind
+   the app (negative z-index, no pointer events). Hidden unless a
+   theme opts in — each theme's effect lives in its own file here. */
+
+@import './aurora.css';
+@import './terminal.css';
+@import './abyss.css';
+@import './ember.css';
+@import './orbit.css';
+@import './lantern-drift.css';
+@import './canopy.css';
+@import './meridian.css';
+@import './glacier.css';
+@import './ukiyo.css';
+@import './dunes.css';
+@import './synthwave.css';
+@import './sundial.css';
+@import './tide.css';
+@import './breath.css';
+@import './city-windows.css';
+
+.theme-scenery {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* !important outranks the per-theme helper selectors; descendant selector
+	   matches the .scenery-paused rule below so nested animations pause too */
+	.theme-scenery *,
+	.theme-scenery *::before,
+	.theme-scenery *::after {
+		animation-play-state: paused !important;
+	}
+}
+
+/* toggled by ThemeStore#toggleSceneryMotion(); see theme-store.svelte.ts */
+.scenery-paused .theme-scenery *,
+.scenery-paused .theme-scenery *::before,
+.scenery-paused .theme-scenery *::after {
+	animation-play-state: paused !important;
+}

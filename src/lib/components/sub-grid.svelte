@@ -8,6 +8,6 @@
 
 <Grid
 	{...restProps}
-	class={cn('rounded-xs p-box-md', className)}
+	class={cn('rounded-md p-box-md', className)}
 	gridClass={cn('gap-grid-xs', gridClass)}
 />

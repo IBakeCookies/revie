@@ -45,7 +45,7 @@
 	rel="noreferrer"
 	style={spanStyle(span)}
 	class={cn(
-		'@container/box-adguard col-span-12 xl:col-span-(--span) block rounded-xs bg-box-secondary p-box-md border border-transparent hover:border-border transition-colors',
+		'@container/box-adguard col-span-12 xl:col-span-(--span) block rounded-md bg-surface-inset backdrop-blur p-box-md border border-transparent hover:border-line-strong transition-colors',
 		restProps.class
 	)}
 >
@@ -53,7 +53,7 @@
 		{#each items as item (item.text)}
 			<p
 				class={[
-					'@2xl/box-adguard:p-box-md bg-box-primary p-box-xs rounded-xs border',
+					'@2xl/box-adguard:p-box-md bg-surface-card p-box-xs rounded-md border',
 					item.class
 				]}
 			>
