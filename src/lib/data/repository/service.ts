@@ -16,10 +16,17 @@ export async function getServiceState(
 	return useAsyncErrorAsValue(async () => {
 		const raw = await fetch('/api/ping', {
 			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
 			body: JSON.stringify({
 				href
 			})
 		});
+
+		if (!raw.ok) {
+			throw new Error(`Ping responded with ${raw.status} ${raw.statusText}`);
+		}
 
 		return await raw.json();
 	});
