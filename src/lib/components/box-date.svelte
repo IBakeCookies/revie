@@ -1,13 +1,15 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
-	import { cn } from '$lib/utils/style';
+	import { cn, spanStyle } from '$lib/utils/style';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	export type Props = {
+		span?: number;
 		class?: ClassValue;
-	} & HTMLAttributes<any>;
+	} & HTMLAttributes<HTMLDivElement>;
 
-	const formatter = new Intl.DateTimeFormat('en', {
+	const formatter = new Intl.DateTimeFormat(getLocale(), {
 		weekday: 'short',
 		day: '2-digit',
 		month: 'short',
@@ -17,7 +19,7 @@
 		second: '2-digit'
 	});
 
-	let props: Props = $props();
+	let { span, ...restProps }: Props = $props();
 	let currentDate = $state(formatter.format(new Date()));
 
 	$effect(() => {
@@ -32,8 +34,12 @@
 </script>
 
 <div
-	{...props}
-	class={cn('col-span-12 p-box-md text-xl text-center bg-box-secondary rounded-xs', props.class)}
+	{...restProps}
+	style={spanStyle(span)}
+	class={cn(
+		'col-span-12 xl:col-span-(--span) p-box-md text-xl text-center bg-box-secondary rounded-xs',
+		restProps.class
+	)}
 >
 	{currentDate}
 </div>

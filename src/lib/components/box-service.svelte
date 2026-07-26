@@ -1,32 +1,46 @@
 <script lang="ts">
-	import type { HTMLAttributes } from 'svelte/elements';
+	import type { HTMLAnchorAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
-	import { cn } from '$lib/utils/style';
+	import { cn, spanStyle } from '$lib/utils/style';
+	import { m } from '$lib/paraglide/messages';
 
-	type Props = {
+	export type Props = {
 		title: string;
 		href: string;
 		img: {
 			src: string;
 		};
-		isOnline: boolean | null;
+		isOnline?: boolean | null;
+		span?: number;
 		class?: ClassValue;
-	} & HTMLAttributes<any>;
+	} & HTMLAnchorAttributes;
 
-	let { isOnline = null, title, href, img, ...restProps }: Props = $props();
+	let { isOnline = null, title, href, img, span, ...restProps }: Props = $props();
+
+	const statusLabel = $derived(
+		isOnline === null
+			? m.service_status_unknown()
+			: isOnline
+				? m.service_status_online()
+				: m.service_status_offline()
+	);
 </script>
 
 <a
 	{...restProps}
 	{href}
 	target="_blank"
+	rel="noreferrer"
+	style={spanStyle(span)}
 	class={cn(
-		'@container/box-service bg-box-secondary border border-transparent cursor-pointer rounded-xs p-box-md relative hover:border-border transition-colors col-span-12',
+		'@container/box-service bg-box-secondary border border-transparent cursor-pointer rounded-xs p-box-md relative hover:border-border transition-colors col-span-12 xl:col-span-(--span)',
 		restProps.class
 	)}
 >
-	<div class=" gap-ty-list-2xs @2xs/box-service:gap-ty-list-md flex flex-col @2xs/box-service:flex-row items-center">
-		<img class="object-contain min-w-10 size-10" src={img.src} alt="service" />
+	<div
+		class="gap-ty-list-2xs @2xs/box-service:gap-ty-list-md flex flex-col @2xs/box-service:flex-row items-center"
+	>
+		<img class="object-contain min-w-10 size-10" src={img.src} alt="" />
 
 		<h3>{title}</h3>
 
@@ -35,6 +49,7 @@
 				'absolute top-4 right-4 ml-auto p-1 rounded-full',
 				isOnline === true ? 'bg-success' : isOnline === false ? 'bg-danger' : 'bg-primary'
 			]}
+			aria-label={statusLabel}
 		>
 		</span>
 	</div>

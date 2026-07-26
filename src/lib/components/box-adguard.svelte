@@ -1,56 +1,64 @@
 <script lang="ts">
-	import type { HTMLAttributes } from 'svelte/elements';
+	import type { HTMLAnchorAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
-	import { cn } from '$lib/utils/style';
-	import { getAdguardStore } from '$lib/store/adguard-store.svelte';
+	import type { AdguardStats } from '$lib/business/type/adguard-stats';
+	import { cn, spanStyle } from '$lib/utils/style';
+	import { m } from '$lib/paraglide/messages';
 
-	type Props = {
+	export type Props = {
+		/** Base URL of the AdGuard Home instance. Credentials come from the environment. */
 		href: string;
-		username?: string;
-		password?: string;
+		stats?: AdguardStats;
+		span?: number;
 		class?: ClassValue;
-	} & HTMLAttributes<any>;
+	} & HTMLAnchorAttributes;
 
-	let { username, password, ...restProps }: Props = $props();
-	const adguardStore = getAdguardStore();
+	let { href, stats, span, ...restProps }: Props = $props();
 
-	const adguardDataMap = $derived.by(()=> {
-		return adguardStore && adguardStore.stats ? [
-				{
-					text: `DNS Queries: ${adguardStore.stats.dnsQueries}`,
-					class: 'border-success'
-				}, 
-				{
-					text: `Blocked: ${adguardStore.stats.numBlockedFiltering}`,
-					class: 'border-danger'
-				}, 
-				{
-					text: `Delay: ${adguardStore.stats.avgProcessingTime}ms`,
-					class: 'border-info'
-				}, 
-				{
-					text: `Top Blocked Domain: ${adguardStore.stats.topBlockedDomain}`,
-					class: 'border-warning'
-				}, 
-			] : [];
-	})
+	const items = $derived.by(() => {
+		if (!stats) {
+			return [];
+		}
+
+		return [
+			{ text: m.adguard_dns_queries({ count: stats.dnsQueries }), class: 'border-success' },
+			{
+				text: m.adguard_blocked({ count: stats.numBlockedFiltering }),
+				class: 'border-danger'
+			},
+			{
+				text: m.adguard_delay({ milliseconds: stats.avgProcessingTimeMs }),
+				class: 'border-info'
+			},
+			{
+				text: m.adguard_top_blocked_domain({ domain: stats.topBlockedDomain }),
+				class: 'border-warning'
+			}
+		];
+	});
 </script>
 
-<div
+<a
 	{...restProps}
+	{href}
+	target="_blank"
+	rel="noreferrer"
+	style={spanStyle(span)}
 	class={cn(
-		'@container/box-adguard col-span-12 rounded-xs bg-box-secondary p-box-md',
+		'@container/box-adguard col-span-12 xl:col-span-(--span) block rounded-xs bg-box-secondary p-box-md border border-transparent hover:border-border transition-colors',
 		restProps.class
 	)}
 >
 	<div class="grid gap-grid-xs grid-cols-1 @2xl:grid-cols-2">
-		{#each adguardDataMap as item}
+		{#each items as item (item.text)}
 			<p
-				class={["@2xl/box-adguard:p-box-md bg-box-primary p-box-xs rounded-xs border", item.class]}
+				class={[
+					'@2xl/box-adguard:p-box-md bg-box-primary p-box-xs rounded-xs border',
+					item.class
+				]}
 			>
 				{item.text}
 			</p>
 		{/each}
-		
 	</div>
-</div>
+</a>
