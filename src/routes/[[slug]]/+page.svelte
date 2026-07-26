@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
-	import Page from '$lib/components/page.svelte';
+	import Page from '$lib/presentation/components/page.svelte';
 
 	let { data }: PageProps = $props();
 </script>

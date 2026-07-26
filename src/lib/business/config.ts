@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'svelte';
-import type { ComponentRegistry, ComponentName } from '$lib/utils/component-registry';
-import { isComponentName } from '$lib/utils/component-registry';
+import type { ComponentRegistry, ComponentName } from '$lib/business/component-registry';
+import { isComponentName } from '$lib/business/component-registry';
 import { normalizeSpan } from '$lib/utils/style';
 
 /**

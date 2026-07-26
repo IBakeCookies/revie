@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from './$types';
-import { readConfig } from '$lib/server/config';
+import { readConfig } from '$lib/business/config-source';
 import { readOrMintScenerySeed, readRequestAppearance } from '$lib/business/appearance';
 
 export const load: LayoutServerLoad = async (event) => {

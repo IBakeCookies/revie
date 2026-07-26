@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRawSnippet } from 'svelte';
 import { render } from 'vitest-browser-svelte';
-import Dropdown from '$lib/components/dropdown.svelte';
+import Dropdown from '$lib/presentation/components/dropdown.svelte';
 
 const trigger = createRawSnippet(() => ({ render: () => '<span>Theme</span>' }));
 const children = createRawSnippet(() => ({ render: () => '<button>solid-dark</button>' }));

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ComponentProps } from 'svelte';
-	import BoxService from '$lib/components/box-service.svelte';
-	import { getServicesStore } from '$lib/store/service-store.svelte';
+	import BoxService from '$lib/presentation/components/box-service.svelte';
+	import { getServicesStore } from '$lib/presentation/store/service-store.svelte';
 
 	type Props = Omit<ComponentProps<typeof BoxService>, 'isOnline'>;
 

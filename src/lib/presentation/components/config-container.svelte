@@ -1,10 +1,10 @@
 <script lang="ts">
-	import type { ConfigContainer } from '$lib/utils/config';
-	import BoxAdguardWrapper from '$lib/components/box-adguard-wrapper.svelte';
-	import BoxDate from '$lib/components/box-date.svelte';
-	import BoxServiceWrapper from '$lib/components/box-service-wrapper.svelte';
-	import Grid from '$lib/components/grid.svelte';
-	import SubGrid from '$lib/components/sub-grid.svelte';
+	import type { ConfigContainer } from '$lib/business/config';
+	import BoxAdguardWrapper from '$lib/presentation/components/box-adguard-wrapper.svelte';
+	import BoxDate from '$lib/presentation/components/box-date.svelte';
+	import BoxServiceWrapper from '$lib/presentation/components/box-service-wrapper.svelte';
+	import Grid from '$lib/presentation/components/grid.svelte';
+	import SubGrid from '$lib/presentation/components/sub-grid.svelte';
 
 	export type Props = {
 		container: ConfigContainer;

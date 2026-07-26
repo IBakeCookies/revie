@@ -8,11 +8,11 @@ module.exports = {
 		 * Dependencies point one way only. The UI must not know where its data comes
 		 * from, so presentation reaches data THROUGH business, never directly.
 		 *
-		 *   presentation  src/lib/components, src/lib/store, everything under src/routes
-		 *                 except the server files
+		 *   presentation  src/lib/presentation, everything under src/routes except the
+		 *                 server files
 		 *   business      src/lib/business
-		 *   data          src/lib/data, src/lib/server   (cookies, http, disk)
-		 *   leaf          src/lib/utils, src/lib/style, src/lib/assets
+		 *   data          src/lib/data          (cookies, http, disk)
+		 *   leaf          src/lib/utils         (no internal imports at all)
 		 *
 		 * Reads always end at a STORE, never at a source: data -> business -> store -> UI.
 		 * SSR is the one exception and it cannot be otherwise -- a load function runs in
@@ -25,8 +25,8 @@ module.exports = {
 		 * narrow: a universal load (`+page.ts` / `+layout.ts`) also runs in the BROWSER, so
 		 * it counts as presentation and may not reach data.
 		 *
-		 * Not covered by any rule below, and therefore convention only: src/lib/style,
-		 * src/lib/assets, src/lib/test and the generated src/lib/paraglide.
+		 * Not covered by any rule below, and therefore convention only: src/lib/test and
+		 * the generated src/lib/paraglide.
 		 *
 		 * The `$` prefix on data-layer exports (src/lib/data/repository/) makes a
 		 * violation a compile error inside `.svelte` / `.svelte.ts`, because `$` is
@@ -47,7 +47,7 @@ module.exports = {
 				// Everything under src/routes IS presentation, except the server files:
 				// those are the composition root. A universal +page.ts/+layout.ts runs in
 				// the browser too, so it stays constrained.
-				path: '^src/(lib/(components|store)/|routes/)',
+				path: '^src/(lib/presentation/|routes/)',
 				pathNot: [
 					'[.]server[.]ts$',
 					'(^|/)\\+server[.]ts$',
@@ -55,7 +55,7 @@ module.exports = {
 				]
 			},
 			to: {
-				path: '^src/lib/(data|server)/'
+				path: '^src/lib/data/'
 			}
 		},
 		{
@@ -67,7 +67,7 @@ module.exports = {
 				'which is the drift the data -> store -> UI rule exists to stop. `import type` from ' +
 				'src/lib/business/type is fine and is how a component should type its props.',
 			from: {
-				path: '^src/(lib/components/|routes/)',
+				path: '^src/(lib/presentation/components/|routes/)',
 				pathNot: [
 					'[.]server[.]ts$',
 					'(^|/)\\+server[.]ts$',
@@ -88,11 +88,11 @@ module.exports = {
 				'check pulls five Svelte components into the server bundle. `import type` is fine ' +
 				'(it is erased at compile time); a value import is not.',
 			from: {
-				path: '^src/lib/(data|business|server|utils|style|assets)/',
+				path: '^src/lib/(data|business|utils)/',
 				pathNot: '[.](?:spec|test)[.](?:js|ts)$'
 			},
 			to: {
-				path: '^src/(lib/(components|store)/|routes/)',
+				path: '^src/(lib/presentation/|routes/)',
 				dependencyTypesNot: ['type-only']
 			}
 		},
@@ -100,16 +100,18 @@ module.exports = {
 			name: 'leaf-not-to-upper-layers',
 			severity: 'error',
 			comment:
-				'src/lib/utils, style and assets are leaves: pure helpers with no idea what the app ' +
-				'does. A dependency on data or business turns a helper into a layer and gives it a ' +
-				'second reason to change. Take the value as an argument instead. `import type` is ' +
-				'allowed so a helper can still be typed against what it is handed.',
+				'src/lib/utils is the shared leaf: pure helpers with no idea what the app does, ' +
+				'which is what lets both business and presentation use them. A dependency on a ' +
+				'layer turns a helper into a layer and gives it a second reason to change -- take ' +
+				'the value as an argument instead. If a helper genuinely belongs to one layer, ' +
+				'move it there (presentation/util) rather than importing upward from here. ' +
+				'`import type` is allowed so a helper can still be typed against what it is handed.',
 			from: {
-				path: '^src/lib/(utils|style|assets)/',
+				path: '^src/lib/utils/',
 				pathNot: '[.](?:spec|test)[.](?:js|ts)$'
 			},
 			to: {
-				path: '^src/lib/(data|business|server)/',
+				path: '^src/(lib/(data|business|presentation)/|routes/)',
 				dependencyTypesNot: ['type-only']
 			}
 		},
@@ -120,7 +122,7 @@ module.exports = {
 				'The data layer has to stay a leaf: it parses and fetches, it does not decide. A ' +
 				'dependency on business here means a policy decision leaked downwards.',
 			from: {
-				path: '^src/lib/(data|server)/',
+				path: '^src/lib/data/',
 				pathNot: '[.](?:spec|test)[.](?:js|ts)$'
 			},
 			to: {

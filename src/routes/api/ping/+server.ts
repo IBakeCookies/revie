@@ -1,8 +1,8 @@
 import type { RequestHandler } from './$types';
 import { error, json } from '@sveltejs/kit';
 import ping from 'ping';
-import { readConfig } from '$lib/server/config';
-import { collectServiceHrefs } from '$lib/utils/config';
+import { readConfig } from '$lib/business/config-source';
+import { collectServiceHrefs } from '$lib/business/config';
 
 const PING_TIMEOUT_SECONDS = 2;
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { render } from 'vitest-browser-svelte';
-import BoxDate from '$lib/components/box-date.svelte';
+import BoxDate from '$lib/presentation/components/box-date.svelte';
 import { spanOf } from '$lib/test/dom';
 
 beforeEach(() => {

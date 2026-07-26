@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
-	import type { ConfigContainer } from '$lib/utils/config';
-	import ConfigContainerView from '$lib/components/config-container.svelte';
+	import type { ConfigContainer } from '$lib/business/config';
+	import ConfigContainerView from '$lib/presentation/components/config-container.svelte';
 	import { cn, spanStyle } from '$lib/utils/style';
 
 	export type Props = {

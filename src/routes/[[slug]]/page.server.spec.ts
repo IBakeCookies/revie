@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from '$env/dynamic/private';
 import { getAdguardStats } from '$lib/data/repository/adguard';
-import { readConfig } from '$lib/server/config';
+import { readConfig } from '$lib/business/config-source';
 import { load } from './+page.server';
 
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
-vi.mock('$lib/server/config', () => ({ readConfig: vi.fn() }));
+vi.mock('$lib/business/config-source', () => ({ readConfig: vi.fn() }));
 vi.mock('$lib/data/repository/adguard', () => ({ getAdguardStats: vi.fn() }));
 
 const boxAdguard = {

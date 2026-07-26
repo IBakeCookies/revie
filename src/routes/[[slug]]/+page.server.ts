@@ -1,11 +1,11 @@
 import type { PageServerLoad } from './$types';
 import type { AdguardStats } from '$lib/business/type/adguard-stats';
-import type { ConfigPage } from '$lib/utils/config';
+import type { ConfigPage } from '$lib/business/config';
 import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { findContainer, isBoxAdguard } from '$lib/utils/config';
+import { findContainer, isBoxAdguard } from '$lib/business/config';
 import { getAdguardStats } from '$lib/data/repository/adguard';
-import { readConfig } from '$lib/server/config';
+import { readConfig } from '$lib/business/config-source';
 import { transformAdguardStats } from '$lib/business/transform/adguard-transform';
 
 async function loadAdguardStats(page: ConfigPage): Promise<AdguardStats | null> {

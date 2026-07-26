@@ -1,14 +1,14 @@
 <script lang="ts">
 	import type { LayoutProps } from './$types';
 	import type { Locale } from '$lib/paraglide/runtime';
-	import '$lib/style/app.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import '$lib/presentation/style/app.css';
+	import favicon from '$lib/presentation/assets/favicon.svg';
 	import { onMount } from 'svelte';
 	import { cn } from '$lib/utils/style';
-	import { setThemeStore } from '$lib/store/theme-store.svelte';
-	import { sceneryStyle } from '$lib/utils/scenery-seed';
-	import { dataSceneryStyle } from '$lib/utils/scenery-time';
-	import Dropdown from '$lib/components/dropdown.svelte';
+	import { setThemeStore } from '$lib/presentation/store/theme-store.svelte';
+	import { sceneryStyle } from '$lib/presentation/util/scenery-seed';
+	import { dataSceneryStyle } from '$lib/presentation/util/scenery-time';
+	import Dropdown from '$lib/presentation/components/dropdown.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale, locales, setLocale } from '$lib/paraglide/runtime';
 

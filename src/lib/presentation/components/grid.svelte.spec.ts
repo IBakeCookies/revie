@@ -1,7 +1,7 @@
-import type { ConfigContainer } from '$lib/utils/config';
+import type { ConfigContainer } from '$lib/business/config';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import Grid from '$lib/components/grid.svelte';
+import Grid from '$lib/presentation/components/grid.svelte';
 import { spanOf } from '$lib/test/dom';
 
 const items: ConfigContainer[] = [

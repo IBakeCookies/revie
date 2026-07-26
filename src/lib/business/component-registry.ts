@@ -12,11 +12,11 @@
  * while the types stay exact.
  */
 
-import type BoxAdguardWrapper from '$lib/components/box-adguard-wrapper.svelte';
-import type BoxDate from '$lib/components/box-date.svelte';
-import type BoxServiceWrapper from '$lib/components/box-service-wrapper.svelte';
-import type Grid from '$lib/components/grid.svelte';
-import type SubGrid from '$lib/components/sub-grid.svelte';
+import type BoxAdguardWrapper from '$lib/presentation/components/box-adguard-wrapper.svelte';
+import type BoxDate from '$lib/presentation/components/box-date.svelte';
+import type BoxServiceWrapper from '$lib/presentation/components/box-service-wrapper.svelte';
+import type Grid from '$lib/presentation/components/grid.svelte';
+import type SubGrid from '$lib/presentation/components/sub-grid.svelte';
 
 export interface ComponentRegistry {
 	BoxService: typeof BoxServiceWrapper;

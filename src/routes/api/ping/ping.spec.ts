@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ping from 'ping';
-import { readConfig } from '$lib/server/config';
+import { readConfig } from '$lib/business/config-source';
 import { POST } from './+server';
 
 vi.mock('ping', () => ({ default: { promise: { probe: vi.fn() } } }));
-vi.mock('$lib/server/config', () => ({ readConfig: vi.fn() }));
+vi.mock('$lib/business/config-source', () => ({ readConfig: vi.fn() }));
 
 const probe = vi.mocked(ping.promise.probe);
 

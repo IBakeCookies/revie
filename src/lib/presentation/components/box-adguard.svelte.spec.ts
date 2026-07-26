@@ -1,7 +1,7 @@
 import type { AdguardStats } from '$lib/business/type/adguard-stats';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import BoxAdguard from '$lib/components/box-adguard.svelte';
+import BoxAdguard from '$lib/presentation/components/box-adguard.svelte';
 import { m } from '$lib/paraglide/messages';
 import { spanOf } from '$lib/test/dom';
 

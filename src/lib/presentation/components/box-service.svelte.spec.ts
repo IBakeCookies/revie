@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import BoxService from '$lib/components/box-service.svelte';
+import BoxService from '$lib/presentation/components/box-service.svelte';
 import { m } from '$lib/paraglide/messages';
 import { spanOf } from '$lib/test/dom';
 

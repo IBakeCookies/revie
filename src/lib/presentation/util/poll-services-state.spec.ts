@@ -1,7 +1,7 @@
-import type { ConfigContainer } from '$lib/utils/config';
-import type { ServicesStore } from '$lib/store/service-store.svelte';
+import type { ConfigContainer } from '$lib/business/config';
+import type { ServicesStore } from '$lib/presentation/store/service-store.svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pollServicesState } from '$lib/utils/poll-services-state';
+import { pollServicesState } from '$lib/presentation/util/poll-services-state';
 
 const POLL_INTERVAL_MS = 1000 * 60 * 15;
 

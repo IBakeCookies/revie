@@ -1,4 +1,4 @@
-import type { ConfigContainer } from '$lib/utils/config';
+import type { ConfigContainer } from '$lib/business/config';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	collectServiceHrefs,
@@ -6,7 +6,7 @@ import {
 	isBoxAdguard,
 	isGrid,
 	normalizeConfig
-} from '$lib/utils/config';
+} from '$lib/business/config';
 
 const rawConfig = {
 	defaults: {

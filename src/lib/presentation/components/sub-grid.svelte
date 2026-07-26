@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Props } from '$lib/components/grid.svelte';
-	import Grid from '$lib/components/grid.svelte';
+	import type { Props } from '$lib/presentation/components/grid.svelte';
+	import Grid from '$lib/presentation/components/grid.svelte';
 	import { cn } from '$lib/utils/style';
 
 	let { gridClass, class: className, ...restProps }: Props = $props();
