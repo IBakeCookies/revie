@@ -1,5 +1,5 @@
 import { getContext, setContext } from 'svelte';
-import { readServiceState } from '$lib/business/service';
+import { readServiceState } from '$lib/business/model/service';
 import type { AppError } from '$lib/utils/useAsyncErrorAsValue';
 
 const CONTEXT_KEY = Symbol();

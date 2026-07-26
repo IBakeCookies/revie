@@ -5,7 +5,7 @@
 	import favicon from '$lib/presentation/assets/favicon.svg';
 	import { onMount } from 'svelte';
 	import { cn } from '$lib/utils/style';
-	import { setThemeStore } from '$lib/presentation/store/theme-store.svelte';
+	import { setThemeStore } from '$lib/business/store/theme-store.svelte';
 	import { sceneryStyle } from '$lib/presentation/util/scenery-seed';
 	import { dataSceneryStyle } from '$lib/presentation/util/scenery-time';
 	import Dropdown from '$lib/presentation/components/dropdown.svelte';

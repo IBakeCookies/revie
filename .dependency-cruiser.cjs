@@ -1,111 +1,74 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
 	forbidden: [
-		/*
-		 * ---------------------------------------------------------------------------
-		 * The layer rule: data -> business -> presentation.
-		 *
-		 * Dependencies point one way only. The UI must not know where its data comes
-		 * from, so presentation reaches data THROUGH business, never directly.
-		 *
-		 *   presentation  src/lib/presentation, everything under src/routes except the
-		 *                 server files
-		 *   business      src/lib/business
-		 *   data          src/lib/data          (cookies, http, disk)
-		 *   leaf          src/lib/utils         (no internal imports at all)
-		 *
-		 * Reads always end at a STORE, never at a source: data -> business -> store -> UI.
-		 * SSR is the one exception and it cannot be otherwise -- a load function runs in
-		 * node with no component instance, so no setContext and no runes. There the shape
-		 * is data -> business -> load -> store -> UI: the load is only how server data gets
-		 * INTO the store, and components read from the store either way.
-		 *
-		 * `src/hooks*.ts` and the route SERVER files (`*.server.ts`, `+server.ts`) are that
-		 * composition root, so they may reach any layer. That exemption is deliberately
-		 * narrow: a universal load (`+page.ts` / `+layout.ts`) also runs in the BROWSER, so
-		 * it counts as presentation and may not reach data.
-		 *
-		 * Not covered by any rule below, and therefore convention only: src/lib/test and
-		 * the generated src/lib/paraglide.
-		 *
-		 * The `$` prefix on data-layer exports (src/lib/data/repository/) makes a
-		 * violation a compile error inside `.svelte` / `.svelte.ts`, because `$` is
-		 * reserved for runes there. That is a tripwire, not a fence -- `import * as`
-		 * walks straight around it. These rules are the fence.
-		 * ---------------------------------------------------------------------------
-		 */
+		// ---- Layer boundaries (presentation -> business -> data, one direction) ----
+		// eslint's no-restricted-imports only matches the `$lib/...` specifier
+		// strings; these also catch relative imports and dynamic `import()`.
+		{
+			name: 'data-not-to-upper-layers',
+			severity: 'error',
+			comment:
+				'The data layer must not import from the business or presentation layers. Whatever a ' +
+				'read needs in order to be interpreted is passed in as a parameter (AGENTS.md R1).',
+			from: { path: '^src/lib/data' },
+			to: { path: '^src/lib/(business|presentation)' }
+		},
+		{
+			name: 'business-not-to-presentation',
+			severity: 'error',
+			comment:
+				'The business layer must not import from the presentation layer, not even with ' +
+				'`import type` (AGENTS.md R1). Business declares the config schema itself, in ' +
+				'business/model/config.ts, rather than deriving it from component props -- that is ' +
+				'what keeps the config file a contract instead of a side effect of a refactor.',
+			from: { path: '^src/lib/business' },
+			to: { path: '^src/lib/presentation' }
+		},
 		{
 			name: 'presentation-not-to-data',
 			severity: 'error',
 			comment:
-				'A component, store or universal load reaches into the data layer directly, coupling ' +
-				'the UI to how data is stored and fetched. Go through src/lib/business instead: it ' +
-				'owns the decisions raw data cannot make, and it is the layer presentation may know. ' +
-				'Type-only imports are forbidden here too -- naming a repository type is the same ' +
-				'coupling, and src/lib/business/type exists to give the UI its own types.',
+				'Presentation code (and the app shell: routes, hooks, service worker) must go through ' +
+				'the business layer -- stores in $lib/business/store, types via $lib/business/type ' +
+				'(AGENTS.md R1). Note this binds the SERVER files too: a load function is the ' +
+				'composition root, not a licence to reach the repository.',
+			from: { path: '^src/(lib/presentation|routes|hooks|service-worker)' },
+			to: { path: '^src/lib/data' }
+		},
+		{
+			name: 'presentation-not-to-business-model',
+			severity: 'error',
+			comment:
+				'Reads end at a store. A route or component may use $lib/business/store; calling a ' +
+				'model directly puts orchestration in a file no *.spec.ts can reach (AGENTS.md R2). ' +
+				'`import type` is fine -- it is how a component types its props.',
 			from: {
-				// Everything under src/routes IS presentation, except the server files:
-				// those are the composition root. A universal +page.ts/+layout.ts runs in
-				// the browser too, so it stays constrained.
+				// Server files are the composition root; specs and stories build their own
+				// fixtures and are not the drift this rule is about.
 				path: '^src/(lib/presentation/|routes/)',
 				pathNot: [
 					'[.]server[.]ts$',
 					'(^|/)\\+server[.]ts$',
-					'[.](?:spec|test)[.](?:js|ts)$'
+					'[.](?:spec|test)[.](?:js|ts)$',
+					'[.]stories[.]svelte$'
 				]
 			},
 			to: {
-				path: '^src/lib/data/'
-			}
-		},
-		{
-			name: 'presentation-not-to-business-values',
-			severity: 'error',
-			comment:
-				'Only a store (or the server-side composition root) may CALL business. A component ' +
-				'that calls business directly bypasses the store the data is supposed to live in, ' +
-				'which is the drift the data -> store -> UI rule exists to stop. `import type` from ' +
-				'src/lib/business/type is fine and is how a component should type its props.',
-			from: {
-				path: '^src/(lib/presentation/components/|routes/)',
-				pathNot: [
-					'[.]server[.]ts$',
-					'(^|/)\\+server[.]ts$',
-					'[.](?:spec|test)[.](?:js|ts)$'
-				]
-			},
-			to: {
-				path: '^src/lib/business/',
-				dependencyTypesNot: ['type-only']
-			}
-		},
-		{
-			name: 'lower-layer-not-to-presentation',
-			severity: 'error',
-			comment:
-				'A lower layer value-imports presentation, inverting the layer rule and dragging the ' +
-				'component graph into every consumer -- importing the component registry for a name ' +
-				'check pulls five Svelte components into the server bundle. `import type` is fine ' +
-				'(it is erased at compile time); a value import is not.',
-			from: {
-				path: '^src/lib/(data|business|utils)/',
-				pathNot: '[.](?:spec|test)[.](?:js|ts)$'
-			},
-			to: {
-				path: '^src/(lib/presentation/|routes/)',
+				path: '^src/lib/business/model/',
 				dependencyTypesNot: ['type-only']
 			}
 		},
 		{
 			name: 'leaf-not-to-upper-layers',
+			// Not in the zenith rule set, which has no lib/utils. This repo does, so it
+			// needs saying: utils is the shared leaf precisely because it imports nothing
+			// internal, which is what lets both business and presentation use it.
 			severity: 'error',
 			comment:
-				'src/lib/utils is the shared leaf: pure helpers with no idea what the app does, ' +
-				'which is what lets both business and presentation use them. A dependency on a ' +
-				'layer turns a helper into a layer and gives it a second reason to change -- take ' +
-				'the value as an argument instead. If a helper genuinely belongs to one layer, ' +
-				'move it there (presentation/util) rather than importing upward from here. ' +
-				'`import type` is allowed so a helper can still be typed against what it is handed.',
+				'src/lib/utils is the shared leaf: pure helpers with no idea what the app does. A ' +
+				'dependency on a layer turns a helper into a layer and gives it a second reason to ' +
+				'change -- take the value as an argument instead. If a helper genuinely belongs to ' +
+				'one layer, move it there rather than importing upward from here.',
 			from: {
 				path: '^src/lib/utils/',
 				pathNot: '[.](?:spec|test)[.](?:js|ts)$'
@@ -115,26 +78,6 @@ module.exports = {
 				dependencyTypesNot: ['type-only']
 			}
 		},
-		{
-			name: 'data-not-to-business',
-			severity: 'error',
-			comment:
-				'The data layer has to stay a leaf: it parses and fetches, it does not decide. A ' +
-				'dependency on business here means a policy decision leaked downwards.',
-			from: {
-				path: '^src/lib/data/',
-				pathNot: '[.](?:spec|test)[.](?:js|ts)$'
-			},
-			to: {
-				path: '^src/lib/business/'
-			}
-		},
-
-		/*
-		 * ---------------------------------------------------------------------------
-		 * Generic rules
-		 * ---------------------------------------------------------------------------
-		 */
 		{
 			name: 'no-circular',
 			// Kept at warn: config-container <-> grid <-> sub-grid is a real cycle and a

@@ -24,7 +24,7 @@ async function loadModule() {
 	vi.resetModules();
 
 	const fs = (await import('node:fs/promises')) as unknown as FsMock;
-	const { readConfig } = await import('$lib/business/config-source');
+	const { readConfig } = await import('$lib/business/model/config-source');
 
 	return { fs, readConfig };
 }

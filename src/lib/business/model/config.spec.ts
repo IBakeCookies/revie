@@ -1,4 +1,4 @@
-import type { ConfigContainer } from '$lib/business/config';
+import type { ConfigContainer } from '$lib/business/model/config';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	collectServiceHrefs,
@@ -6,7 +6,7 @@ import {
 	isBoxAdguard,
 	isGrid,
 	normalizeConfig
-} from '$lib/business/config';
+} from '$lib/business/model/config';
 
 const rawConfig = {
 	defaults: {
@@ -78,7 +78,9 @@ describe('normalizeConfig', () => {
 	});
 
 	it('strips class names, which could never reach the Tailwind build', () => {
-		expect(grid.props.class).toBeUndefined();
+		// Cast because the schema deliberately has no `class` — this asserts the
+		// runtime object does not carry one either.
+		expect((grid.props as Record<string, unknown>).class).toBeUndefined();
 	});
 
 	it('applies per-component defaults at any nesting depth', () => {

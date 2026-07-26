@@ -1,4 +1,4 @@
-import type { ConfigContainer } from '$lib/business/config';
+import type { ConfigContainer } from '$lib/business/model/config';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import Grid from '$lib/presentation/components/grid.svelte';

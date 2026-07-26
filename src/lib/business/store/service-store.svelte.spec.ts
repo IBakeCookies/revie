@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { readServiceState } from '$lib/business/service';
-import { ServicesStore } from '$lib/presentation/store/service-store.svelte';
+import { readServiceState } from '$lib/business/model/service';
+import { ServicesStore } from '$lib/business/store/service-store.svelte';
 
 // Mocked at the store's own boundary: business. Whether a failed probe means
 // "offline" or "undetermined" is business's call and is tested next to it.
-vi.mock('$lib/business/service', () => ({ readServiceState: vi.fn() }));
+vi.mock('$lib/business/model/service', () => ({ readServiceState: vi.fn() }));
 
 const href = 'http://wled.local';
 

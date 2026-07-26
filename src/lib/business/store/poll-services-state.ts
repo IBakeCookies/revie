@@ -1,6 +1,6 @@
-import type { ConfigContainer } from '$lib/business/config';
-import type { ServicesStore } from '$lib/presentation/store/service-store.svelte';
-import { collectServiceHrefs } from '$lib/business/config';
+import type { ConfigContainer } from '$lib/business/model/config';
+import type { ServicesStore } from '$lib/business/store/service-store.svelte';
+import { collectServiceHrefs } from '$lib/business/model/config';
 
 const POLL_INTERVAL_MS = 1000 * 60 * 15;
 

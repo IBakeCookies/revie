@@ -1,6 +1,6 @@
 import type { GetAdguardStatsOutput } from '$lib/data/repository/adguard';
 import { describe, expect, it } from 'vitest';
-import { transformAdguardStats } from '$lib/business/transform/adguard-transform';
+import { transformAdguardStats } from '$lib/business/model/adguard';
 
 const raw: GetAdguardStatsOutput = {
 	num_dns_queries: 1234,

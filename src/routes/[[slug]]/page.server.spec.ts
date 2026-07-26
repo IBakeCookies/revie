@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from '$env/dynamic/private';
-import { getAdguardStats } from '$lib/data/repository/adguard';
-import { readConfig } from '$lib/business/config-source';
+import { readAdguardStats } from '$lib/business/model/adguard';
+import { readConfig } from '$lib/business/model/config-source';
 import { load } from './+page.server';
 
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
-vi.mock('$lib/business/config-source', () => ({ readConfig: vi.fn() }));
-vi.mock('$lib/data/repository/adguard', () => ({ getAdguardStats: vi.fn() }));
+vi.mock('$lib/business/model/config-source', () => ({ readConfig: vi.fn() }));
+vi.mock('$lib/business/model/adguard', () => ({ readAdguardStats: vi.fn() }));
 
 const boxAdguard = {
 	name: 'BoxAdguard' as const,
@@ -15,11 +15,14 @@ const boxAdguard = {
 
 const boxDate = { name: 'BoxDate' as const, props: {} };
 
+// The domain shape, not AdGuard's wire shape: business hands the route the four
+// numbers a box renders. Turning the wire shape into this is tested next to it, in
+// business/model/adguard.spec.ts.
 const stats = {
-	num_dns_queries: 1234,
-	num_blocked_filtering: 56,
-	avg_processing_time: 0.0123,
-	top_blocked_domains: [{ 'ads.example.com': 42 }]
+	dnsQueries: 1234,
+	numBlockedFiltering: 56,
+	avgProcessingTimeMs: 12,
+	topBlockedDomain: 'ads.example.com'
 };
 
 function configWith(...containers: (typeof boxAdguard | typeof boxDate)[]) {
@@ -34,7 +37,7 @@ function event(pathname: string): Parameters<typeof load>[0] {
 beforeEach(() => {
 	env.ADGUARD_USERNAME = 'admin';
 	env.ADGUARD_PASSWORD = 'secret';
-	vi.mocked(getAdguardStats).mockResolvedValue([null, stats]);
+	vi.mocked(readAdguardStats).mockResolvedValue([null, stats]);
 });
 
 afterEach(() => {
@@ -54,18 +57,18 @@ describe('load', () => {
 		await expect(load(event('/nope'))).rejects.toMatchObject({ status: 404 });
 	});
 
-	it('loads AdGuard stats for the configured instance and transforms them', async () => {
+	it('loads AdGuard stats for the configured instance', async () => {
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
 
 		expect(await load(event('/'))).toMatchObject({
-			adguard: {
-				dnsQueries: 1234,
-				numBlockedFiltering: 56,
-				avgProcessingTimeMs: 12,
-				topBlockedDomain: 'ads.example.com'
-			}
+			adguard: stats
 		});
-		expect(getAdguardStats).toHaveBeenCalledWith({
+		expect(readAdguardStats).toHaveBeenCalledWith({
+			username: 'admin',
+			password: 'secret',
+			href: 'http://adguard.local'
+		});
+		expect(readAdguardStats).toHaveBeenCalledWith({
 			username: 'admin',
 			password: 'secret',
 			href: 'http://adguard.local'
@@ -76,7 +79,7 @@ describe('load', () => {
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxDate));
 
 		expect(await load(event('/'))).toMatchObject({ adguard: null });
-		expect(getAdguardStats).not.toHaveBeenCalled();
+		expect(readAdguardStats).not.toHaveBeenCalled();
 	});
 
 	it('skips AdGuard when the credentials are not set', async () => {
@@ -85,13 +88,13 @@ describe('load', () => {
 		env.ADGUARD_PASSWORD = '';
 
 		expect(await load(event('/'))).toMatchObject({ adguard: null });
-		expect(getAdguardStats).not.toHaveBeenCalled();
+		expect(readAdguardStats).not.toHaveBeenCalled();
 	});
 
 	it('renders the page without stats when AdGuard is unreachable', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
-		vi.mocked(getAdguardStats).mockResolvedValue([
+		vi.mocked(readAdguardStats).mockResolvedValue([
 			{ message: 'Could not read AdGuard stats', cause: new Error('down') },
 			null
 		]);

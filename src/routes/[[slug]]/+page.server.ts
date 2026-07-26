@@ -1,12 +1,11 @@
 import type { PageServerLoad } from './$types';
 import type { AdguardStats } from '$lib/business/type/adguard-stats';
-import type { ConfigPage } from '$lib/business/config';
+import type { ConfigPage } from '$lib/business/model/config';
 import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { findContainer, isBoxAdguard } from '$lib/business/config';
-import { getAdguardStats } from '$lib/data/repository/adguard';
-import { readConfig } from '$lib/business/config-source';
-import { transformAdguardStats } from '$lib/business/transform/adguard-transform';
+import { findContainer, isBoxAdguard } from '$lib/business/model/config';
+import { readAdguardStats } from '$lib/business/model/adguard';
+import { readConfig } from '$lib/business/model/config-source';
 
 async function loadAdguardStats(page: ConfigPage): Promise<AdguardStats | null> {
 	const container = findContainer(page, 'BoxAdguard');
@@ -23,19 +22,21 @@ async function loadAdguardStats(page: ConfigPage): Promise<AdguardStats | null> 
 		return null;
 	}
 
-	const [err, stats] = await getAdguardStats({
+	const [err, stats] = await readAdguardStats({
 		username: ADGUARD_USERNAME,
 		password: ADGUARD_PASSWORD,
 		href: container.props.href
 	});
 
+	// The box renders empty rather than the page failing; the error is logged here
+	// because nothing forwards it to the client yet (see the toast roadmap item).
 	if (err) {
-		console.error('AdGuard stats could not be read:', err);
+		console.error(err.message, err.cause ?? '');
 
 		return null;
 	}
 
-	return transformAdguardStats(stats);
+	return stats;
 }
 
 export const load: PageServerLoad = async ({ url }) => {

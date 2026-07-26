@@ -1,19 +1,57 @@
-import type { ComponentProps } from 'svelte';
-import type { ComponentRegistry, ComponentName } from '$lib/business/component-registry';
-import { isComponentName } from '$lib/business/component-registry';
 import { normalizeSpan } from '$lib/utils/style';
 
 /**
- * A container as it appears in the config file: the name of a component plus its
- * props. Distributing over the component names keeps `name` and `props` correlated,
- * so narrowing on the name narrows the props with it.
+ * The dashboard config format.
+ *
+ * This schema is declared here rather than derived from the components' props, and
+ * that is the point: `config.json` is a contract with whoever edits it. Deriving it
+ * meant renaming a prop on a component silently changed the file format, with no
+ * error anywhere. Now presentation has to satisfy this, and a mismatch is a compile
+ * error where the props are handed over (`config-container.svelte`).
+ *
+ * Business therefore names no component, in values or in types.
  */
-export type ConfigContainer<N extends ComponentName = ComponentName> = {
-	[K in N]: {
-		name: K;
-		props: ComponentProps<ComponentRegistry[K]>;
-	};
-}[N];
+
+export const CONTAINER_NAMES = ['BoxService', 'BoxAdguard', 'BoxDate', 'Grid', 'SubGrid'] as const;
+
+export type ContainerName = (typeof CONTAINER_NAMES)[number];
+
+export function isContainerName(name: string): name is ContainerName {
+	return (CONTAINER_NAMES as readonly string[]).includes(name);
+}
+
+/** Carried by every container: how many of the twelve grid columns it takes. */
+interface CommonProps {
+	span?: number;
+}
+
+interface GridProps extends CommonProps {
+	title?: string;
+	subTitle?: string;
+	items: Container[];
+}
+
+type Container =
+	| {
+			name: 'BoxService';
+			// `title` is required: the box renders it as its heading, so without one it
+			// shows an empty line. Declaring it optional here is what let a title-less
+			// entry through validation while the component demanded it.
+			props: CommonProps & { title: string; href: string; img: { src: string } };
+	  }
+	| { name: 'BoxAdguard'; props: CommonProps & { href: string } }
+	| { name: 'BoxDate'; props: CommonProps }
+	| { name: 'Grid'; props: GridProps }
+	| { name: 'SubGrid'; props: GridProps };
+
+/**
+ * A container as it appears in the config file. Narrowing on `name` narrows the
+ * props with it, so `ConfigContainer<'BoxService'>` is the BoxService member alone.
+ */
+export type ConfigContainer<N extends ContainerName = ContainerName> = Extract<
+	Container,
+	{ name: N }
+>;
 
 export type ConfigPage = {
 	name?: string;
@@ -40,9 +78,7 @@ export function isBoxService(item: ConfigContainer): item is ConfigContainer<'Bo
 	return item.name === 'BoxService';
 }
 
-export function isGrid(
-	item: ConfigContainer
-): item is ConfigContainer<'Grid'> | ConfigContainer<'SubGrid'> {
+export function isGrid(item: ConfigContainer): item is ConfigContainer<'Grid' | 'SubGrid'> {
 	return item.name === 'Grid' || item.name === 'SubGrid';
 }
 
@@ -62,7 +98,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * What each component cannot render without, returning the name of the first
+ * What each container cannot render without, returning the name of the first
  * missing prop.
  *
  * A container missing one has to be dropped HERE. The props come from a
@@ -70,12 +106,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * component throws during SSR and takes the whole page to a 500 — losing every
  * other box on it, for one typo in one entry.
  *
- * Keyed by `ComponentName`, so registering a component without deciding what it
- * requires is a compile error rather than a gap.
+ * Keyed by `ContainerName`, so adding a container to the schema without deciding
+ * what it requires is a compile error rather than a gap.
  */
-const requiredProps: Record<ComponentName, (props: Record<string, unknown>) => string | undefined> =
+const requiredProps: Record<ContainerName, (props: Record<string, unknown>) => string | undefined> =
 	{
 		BoxService: (props) => {
+			if (typeof props.title !== 'string') return 'title';
 			if (typeof props.href !== 'string') return 'href';
 			if (!isRecord(props.img) || typeof props.img.src !== 'string') return 'img.src';
 
@@ -89,20 +126,20 @@ const requiredProps: Record<ComponentName, (props: Record<string, unknown>) => s
 		SubGrid: () => undefined
 	};
 
-const CONTAINS_CHILDREN: ComponentName[] = ['Grid', 'SubGrid'];
+const CONTAINS_CHILDREN: ContainerName[] = ['Grid', 'SubGrid'];
 
 function normalizeContainer(
 	raw: unknown,
 	defaults: Record<string, unknown>
 ): ConfigContainer | undefined {
 	if (!isRecord(raw) || typeof raw.name !== 'string') {
-		console.warn('Skipping a container without a component name');
+		console.warn('Skipping a container without a name');
 
 		return undefined;
 	}
 
-	if (!isComponentName(raw.name)) {
-		console.warn(`Skipping container "${raw.name}", no such component is registered`);
+	if (!isContainerName(raw.name)) {
+		console.warn(`Skipping container "${raw.name}", no such container exists`);
 
 		return undefined;
 	}
@@ -144,14 +181,14 @@ function normalizeContainer(
 	}
 
 	// The one unavoidable assertion in the whole pipeline: the props come from JSON,
-	// and only the name validated above says which component they belong to. The
+	// and only the name validated above says which container they belong to. The
 	// guard above is what makes it safe rather than hopeful.
 	return { name: raw.name, props } as ConfigContainer;
 }
 
 /**
  * Turns the parsed config file into containers that are safe to render: unknown
- * components and malformed entries are dropped, per-component defaults are merged
+ * containers and malformed entries are dropped, per-container defaults are merged
  * in, and spans are clamped. The file is hand-edited and read at runtime, so a bad
  * entry has to degrade instead of taking down every render.
  */
@@ -180,7 +217,7 @@ export function normalizeConfig(raw: unknown): Config {
 	return { pages };
 }
 
-function scanContainer(item: ConfigContainer, target: ComponentName): ConfigContainer | undefined {
+function scanContainer(item: ConfigContainer, target: ContainerName): ConfigContainer | undefined {
 	if (item.name === target) {
 		return item;
 	}
@@ -201,7 +238,7 @@ function scanContainer(item: ConfigContainer, target: ComponentName): ConfigCont
 /** First container with the given name, at any nesting depth. */
 export function findContainer(
 	page: ConfigPage,
-	target: ComponentName
+	target: ContainerName
 ): ConfigContainer | undefined {
 	for (const container of page.containers) {
 		const found = scanContainer(container, target);

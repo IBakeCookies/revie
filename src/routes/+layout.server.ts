@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from './$types';
-import { readConfig } from '$lib/business/config-source';
-import { readOrMintScenerySeed, readRequestAppearance } from '$lib/business/appearance';
+import { readConfig } from '$lib/business/model/config-source';
+import { readOrMintScenerySeed, readRequestAppearance } from '$lib/business/model/appearance';
 
 export const load: LayoutServerLoad = async (event) => {
 	const config = await readConfig();

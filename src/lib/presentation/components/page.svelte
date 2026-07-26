@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { AdguardStats } from '$lib/business/type/adguard-stats';
-	import type { ConfigContainer } from '$lib/business/config';
+	import type { ConfigContainer } from '$lib/business/model/config';
 	import ConfigContainerView from '$lib/presentation/components/config-container.svelte';
-	import { pollServicesState } from '$lib/presentation/util/poll-services-state';
-	import { setAdguardStore } from '$lib/presentation/store/adguard-store.svelte';
-	import { setServicesStore } from '$lib/presentation/store/service-store.svelte';
+	import { pollServicesState } from '$lib/business/store/poll-services-state';
+	import { setAdguardStore } from '$lib/business/store/adguard-store.svelte';
+	import { setServicesStore } from '$lib/business/store/service-store.svelte';
 
 	export type Props = {
 		adguard: AdguardStats | null;

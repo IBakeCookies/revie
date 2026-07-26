@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getServiceState } from '$lib/data/repository/service';
-import { readServiceState } from '$lib/business/service';
+import { readServiceState } from '$lib/business/model/service';
 
 vi.mock('$lib/data/repository/service', () => ({ getServiceState: vi.fn() }));
 

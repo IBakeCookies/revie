@@ -21,7 +21,7 @@ node build            # reads ./config.json relative to the working directory
 ## Configuration
 
 `config.json` maps URL paths to a list of containers. Every container names a
-component from [the registry](src/lib/utils/component-registry.ts) and passes its
+component from [the config schema](src/lib/business/model/config.ts) and passes its
 props:
 
 ```json
@@ -55,12 +55,12 @@ props:
 }
 ```
 
-- `defaults` holds per-component props applied to every instance of that component.
+- `defaults` holds per-container props applied to every instance of that container.
 - A path that is not listed under `pages` returns 404.
 - A malformed container is dropped with a warning instead of breaking the page: an
-  unknown component name, something that isn't an object, or a missing required prop
-  (`BoxService` needs `href` and `img.src`, `BoxAdguard` needs `href`). Its siblings and
-  its parent grid still render.
+  unknown container name, something that isn't an object, or a missing required prop
+  (`BoxService` needs `title`, `href` and `img.src`; `BoxAdguard` needs `href`). Its
+  siblings and its parent grid still render.
 - A `Grid` or `SubGrid` with no `items` renders as empty, so a grid written before its
   children is safe to save.
 - `DASHBOARD_CONFIG` overrides the config path. The file is re-read whenever its
@@ -103,7 +103,7 @@ from `config.json` and are shown as written.
 
 ```sh
 npm run check      # svelte-check
-npm run lint       # prettier + eslint
+npm run lint       # prettier + eslint + lint:deps
 npm run lint:deps  # dependency-cruiser: the data -> business -> presentation rule
 npm run depgraph   # regenerate dependency-graph.svg (needs graphviz `dot`)
 npm run test:unit  # vitest (node + browser)

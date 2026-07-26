@@ -13,7 +13,7 @@
  */
 
 import { $readConfigFile, $readConfigMtime } from '$lib/data/config';
-import { type Config, emptyConfig, normalizeConfig } from '$lib/business/config';
+import { type Config, emptyConfig, normalizeConfig } from '$lib/business/model/config';
 
 let cache: { mtimeMs: number; config: Config } | undefined;
 

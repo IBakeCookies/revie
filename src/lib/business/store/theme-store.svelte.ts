@@ -8,7 +8,7 @@ import {
 	updateScenerySeed,
 	updateSceneryMotion,
 	updateTheme
-} from '$lib/business/appearance';
+} from '$lib/business/model/appearance';
 import {
 	DEFAULT_DARK_THEME,
 	DEFAULT_THEME,

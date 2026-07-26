@@ -29,77 +29,97 @@ npm run build && node build
 **Dependencies point one way, and a read always ends at a store:**
 
 ```
-data → business → store → UI                 client reads (ping, theme)
-data → business → load  → store → UI         SSR reads (adguard, config)
+data → business/model → business/store → UI    client reads (ping, theme)
+data → business/model → load → store   → UI    SSR reads (adguard, config)
 ```
 
-The UI never knows where its data comes from. It reads from a store or from props — never
-from a repository.
+The UI never knows where its data comes from. It reads from a store or from props —
+never from a repository, and never from a model directly.
 
-| Layer        | Lives in                                               | May depend on  |
-| ------------ | ------------------------------------------------------ | -------------- |
-| presentation | `src/lib/components/`, `src/lib/store/`, `src/routes/` | business, leaf |
-| business     | `src/lib/business/`                                    | data, leaf     |
-| data         | `src/lib/data/`, `src/lib/server/`                     | leaf only      |
-| leaf         | `src/lib/utils/`, `src/lib/style/`, `src/lib/assets/`  | nothing        |
+| Layer            | Lives in                                    | May depend on |
+| ---------------- | ------------------------------------------- | ------------- |
+| presentation     | `src/lib/presentation/`, `src/routes/`      | business      |
+| business (store) | `src/lib/business/store/`                   | model, data   |
+| business (model) | `src/lib/business/model/`, `business/type/` | data, leaf    |
+| data             | `src/lib/data/`                             | leaf only     |
+| leaf             | `src/lib/utils/`                            | nothing       |
 
-Not in the table and constrained by nothing: `src/lib/paraglide/` (generated) and
-`src/lib/test/`. The table is the rule set, not a map of `src/lib`.
+`business/store/` is stateful orchestration — runes, context, the reactive holders.
+`business/model/` is the pure half: rules and projections, framework-free, callable
+from node. **That split is what lets stores live in business without breaking SSR** —
+[hooks.server.ts](src/hooks.server.ts) imports `model/appearance.ts`, never a store.
+Nothing on the SSR path may reach `business/store/`.
 
-**Why SSR is the exception, and why it isn't a hole.** A store cannot sit between disk and
-a load function: `+page.server.ts` runs in node with no component instance, so no
-`setContext` and no runes, and the server must have the data before any HTML exists. So the
-load function is the composition root — it's how server data gets _into_ a store. The
-component-facing contract is identical either way, which is what
-[page.svelte:19](src/lib/components/page.svelte#L19) buys with
-`setAdguardStore(() => adguard ?? undefined)`: that thunk is the seam that keeps the SSR
-path obeying the same rule as the client path, and it's why it isn't over-indirection.
+`src/lib/utils/` is the shared leaf, and holds only modules that import nothing
+internal at all ([style.ts](src/lib/utils/style.ts),
+[useAsyncErrorAsValue.ts](src/lib/utils/useAsyncErrorAsValue.ts)). If a helper
+belongs to one layer, it moves there — `presentation/util/` for the scenery
+helpers, `business/store/` for the polling loop.
 
-`src/hooks*.ts` and the route **server** files (`*.server.ts`, `+server.ts`) are that
-composition root and may reach any layer. The exemption is deliberately narrow: a
-**universal** load (`+page.ts` / `+layout.ts`) also runs in the browser, so it counts as
-presentation and may not reach data.
+**Why SSR is the exception, and why it isn't a hole.** A store cannot sit between
+disk and a load function: `+page.server.ts` runs in node with no component instance,
+so no `setContext` and no runes, and the server must have the data before any HTML
+exists. So the load function is the composition root — it's how server data gets
+_into_ a store. The component-facing contract is identical either way, which is what
+[page.svelte](src/lib/presentation/components/page.svelte) buys with
+`setAdguardStore(() => adguard ?? undefined)`: that thunk keeps the SSR path obeying
+the same rule as the client path.
 
-**Config is the carve-out: it stays props, not a store.** `containers` isn't ambient data,
-it's the render tree — every level of the `grid` → `config-container` recursion needs its
-own subtree, so a store would remove zero prop passing and add a lookup. The store rule is
-for **fetched or mutable** data; static structure travels as props.
+Note the exemption is narrow. A route **server** file may call `business/model`, but
+it may NOT reach `src/lib/data` — a load function is the composition root, not a
+licence to call a repository. That is why `readAdguardStats` and `readConfig` are
+business functions rather than repository calls inlined into
+[+page.server.ts](src/routes/[[slug]]/+page.server.ts).
 
-This is enforced twice, on purpose:
+**Business names no component, in values or in types.**
+[business/model/config.ts](src/lib/business/model/config.ts) declares the config
+schema itself rather than deriving it from `ComponentProps`. That is deliberate:
+`config.json` is a contract with whoever edits it, and deriving it meant renaming a
+prop on a component silently changed the file format with no error anywhere. Now
+presentation has to satisfy the schema, and the mismatch surfaces at the
+`{...container.props}` spread in
+[config-container.svelte](src/lib/presentation/components/config-container.svelte) —
+the one place the two layers meet. Its `{:else}` branch is a `never` assertion, so
+adding a container to the schema without a renderer fails to compile.
 
-1. **The `$` prefix** on data-layer exports ([appearance-repository.ts](src/lib/data/repository/appearance-repository.ts))
-   is a compile-time tripwire: `$` is reserved for runes inside `.svelte` / `.svelte.ts`,
-   so naming a data function there is a build error (`dollar_prefix_invalid`). It makes the
-   violation loud at the moment you write it.
-2. **`npm run lint:deps`** is the actual fence. The tripwire is bypassable — `import * as`
-   walks straight around it, which is exactly how the two stores used to reach the
-   repositories. A naming convention can only discourage; a rule catches.
+**Config is the carve-out: it stays props, not a store.** `containers` isn't ambient
+data, it's the render tree — every level of the `grid` → `config-container` recursion
+needs its own subtree, so a store would remove zero prop passing and add a lookup.
+The store rule is for **fetched or mutable** data; static structure travels as props.
 
-Rules live in [.dependency-cruiser.cjs](.dependency-cruiser.cjs). Note the type-only
-handling differs per rule, on purpose:
+The rules are enforced twice, on purpose:
 
-| Rule                                  | `import type` |                                                                     |
-| ------------------------------------- | ------------- | ------------------------------------------------------------------- |
-| `presentation-not-to-data`            | **forbidden** | naming a repository type is the same coupling; use `business/type/` |
-| `data-not-to-business`                | **forbidden** | would invert the layer even in types                                |
-| `presentation-not-to-business-values` | allowed       | how a component types its props (`business/type/adguard-stats.ts`)  |
-| `lower-layer-not-to-presentation`     | allowed       | lets a helper be typed against what it is handed                    |
-| `leaf-not-to-upper-layers`            | allowed       | same                                                                |
+1. **The `$` prefix** on data-layer exports
+   ([appearance-repository.ts](src/lib/data/repository/appearance-repository.ts)) is a
+   compile-time tripwire: `$` is reserved for runes inside `.svelte` / `.svelte.ts`,
+   so naming a data function there is a build error (`dollar_prefix_invalid`). It
+   makes the violation loud at the moment you write it.
+2. **`npm run lint:deps`** is the actual fence. The tripwire is bypassable —
+   `import * as` walks straight around it. A naming convention can only discourage;
+   a rule catches.
 
-`lint:deps` is at **0 errors** and runs as part of `npm run lint`, so a layer violation
-fails the build. The two remaining warnings are the deliberate `config-container` ↔ `grid` ↔
-`sub-grid` render recursion. Keep it at zero: if a rule ever needs relaxing, change the rule
-and say why in its `comment`, rather than leaving a known-failing lint.
+Rules live in [.dependency-cruiser.cjs](.dependency-cruiser.cjs), shared with the
+`zenith` project so both stay consistent. `lint:deps` runs as part of `npm run lint`
+and is at **0 errors**; keep it there. Two deliberate differences from zenith's set:
+
+- `no-circular` is `warn`, not `error`. `config-container` ↔ `grid` ↔ `sub-grid` is a
+  real cycle and an unavoidable one — config containers nest, so the renderer has to
+  recurse. Any _new_ cycle outside that trio is worth a look.
+- `presentation-not-to-business-model` is `error`, not `warn`. zenith keeps it at
+  warn because it has a backlog of pages still calling models directly; this repo has
+  none, so there is nothing to grandfather.
+- `leaf-not-to-upper-layers` is an addition. zenith has no `lib/utils`; this repo
+  does, so the leaf needs saying out loud.
 
 Two cruiser config notes, both non-obvious:
 
-- It needs [tsconfig.depcruise.json](tsconfig.depcruise.json) to resolve `$lib`. The app's
-  own `tsconfig.json` can't be used because the `$lib` **`paths`** it inherits from
-  `.svelte-kit/tsconfig.json` are written relative to `.svelte-kit/` (`../src/lib`) and
-  resolve from the root config's directory instead — pointing outside the repo, so every
-  `$lib` import comes back unresolvable. (Pointing cruiser straight at
-  `.svelte-kit/tsconfig.json` fails differently, with `TS18003` on its `include` paths.)
-- `not-to-dev-dep` is set to `ignore`. SvelteKit keeps every build-time dependency in
+- It needs [tsconfig.depcruise.json](tsconfig.depcruise.json) to resolve `$lib`. The
+  app's own `tsconfig.json` can't be used because the `$lib` **`paths`** it inherits
+  from `.svelte-kit/tsconfig.json` are written relative to `.svelte-kit/`
+  (`../src/lib`) and resolve from the root config's directory instead — pointing
+  outside the repo, so every `$lib` import comes back unresolvable. (Pointing cruiser
+  straight at `.svelte-kit/tsconfig.json` fails differently, with `TS18003`.)
+- `not-to-dev-dep` is `ignore`. SvelteKit keeps every build-time dependency in
   `devDependencies`, so that rule is 100% false positives here.
 
 ### Errors are values, never exceptions
@@ -120,7 +140,7 @@ whoever holds the state, not to the innermost function.
   `Result<boolean>` and does not log: a probe that _fails_ is not a service that is _down_,
   and only the caller knows whether to keep the last known value, toast, or ignore it.
 - Reporting is presentation's job, injected: `ServicesStore` takes an
-  `ErrorReporter`([service-store.svelte.ts](src/lib/store/service-store.svelte.ts)) that
+  `ErrorReporter`([service-store.svelte.ts](src/lib/business/store/service-store.svelte.ts)) that
   defaults to `console.error`. A toast store drops in as
   `setServicesStore(toasts.report)` with no change to the store, business, or the repository.
 
@@ -131,13 +151,13 @@ carries its props.
 
 ```
 config.json ─(disk, mtime-cached)→ server/config.ts
-            ─(validate + drop bad)→ utils/config.ts  normalizeConfig
+            ─(validate + drop bad)→ business/model/config.ts  normalizeConfig
             ─(page data)→ [[slug]]/+page.server.ts
             ─(recurse)→ page.svelte → config-container.svelte → the component
 ```
 
-- [component-registry.ts](src/lib/utils/component-registry.ts) is the set of names a config
-  may use, and it **types** the config. [config-container.svelte](src/lib/components/config-container.svelte)
+- [business/model/config.ts](src/lib/business/model/config.ts) declares the names a config
+  may use AND their prop schema — business owns the format. [config-container.svelte](src/lib/presentation/components/config-container.svelte)
   is what actually renders, as an explicit `if/else` chain. Both list the same five names,
   and that duplication is load-bearing: a component held in a variable has no statically
   known props, so spreading config props into it would need an `any`. **Adding a component
@@ -170,7 +190,7 @@ I/O and **decides nothing**; business makes every decision and owns no cookie na
 appearance cookie's name and write belong in the repository, its rules in business.
 
 - The store reconciles **three** sources: the SSR payload, `document.cookie`, and
-  `matchMedia`. Read the constructor comments in [theme-store.svelte.ts](src/lib/store/theme-store.svelte.ts)
+  `matchMedia`. Read the constructor comments in [theme-store.svelte.ts](src/lib/business/store/theme-store.svelte.ts)
   before touching it.
 - [app.html](src/app.html) has an inline pre-paint script for the _first_ visit (no cookie yet)
   on a dark-preferring or reduced-motion OS. It hardcodes the default dark theme's CSS class
@@ -193,10 +213,10 @@ Things that break **silently** — no error, just wrong output.
   `normalizeConfig` strips `class` / `gridClass` from config and warns.
 - `spanStyle()` must always emit `--span`. An unset custom property makes `grid-column`
   invalid at computed-value time, which drops the whole declaration.
-- **The `@theme` spacing scale in [tokens.css](src/lib/style/tokens.css) is hand-mirrored** in
+- **The `@theme` spacing scale in [tokens.css](src/lib/presentation/style/tokens.css) is hand-mirrored** in
   `extendTailwindMerge` in [style.ts](src/lib/utils/style.ts). If they drift, `cn()` stops
   recognising a spacing class as a conflict and silently keeps both.
-- **The import order in [app.css](src/lib/style/app.css) is the cascade order** and is
+- **The import order in [app.css](src/lib/presentation/style/app.css) is the cascade order** and is
   load-bearing: `scenery → tokens → base → themes`.
 - Those four style files are **ported from the `zenith` project** (`src/lib/presentation/style/`).
   Keep them diffable against it so upstream theme work stays copy-pasteable. `zenith`'s
@@ -204,17 +224,17 @@ Things that break **silently** — no error, just wrong output.
 - **A theme lives in three hand-edited places**, plus optionally a fourth:
     1. the `ThemeName` union **and** the `themes` catalogue in
        [theme.ts](src/lib/business/model/theme.ts) — 27 entries, and the two must agree
-    2. an `@custom-variant` in [tokens.css](src/lib/style/tokens.css)
-    3. a palette class in [themes.css](src/lib/style/themes.css) — **except** the two baseline
+    2. an `@custom-variant` in [tokens.css](src/lib/presentation/style/tokens.css)
+    3. a palette class in [themes.css](src/lib/presentation/style/themes.css) — **except** the two baseline
        themes: `solid-light` and `solid-dark` (CSS class `dark`) live in
-       [base.css](src/lib/style/base.css) instead
-    4. optionally a [scenery](src/lib/style/scenery/) file
+       [base.css](src/lib/presentation/style/base.css) instead
+    4. optionally a [scenery](src/lib/presentation/style/scenery/) file
 
     The header-dropdown swatch is **not** one of them — it's generated from `theme.css`
     ([+layout.svelte:118](src/routes/+layout.svelte#L118)), which is what keeps it matching the
     real palette. Don't hand-write a swatch.
 
-- **[scenery-seed.ts](src/lib/utils/scenery-seed.ts) draws from two shared PRNG streams, so
+- **[scenery-seed.ts](src/lib/presentation/util/scenery-seed.ts) draws from two shared PRNG streams, so
   variable _position_ is an invariant within each stream** — `rnd` for everything up to
   `--meridian-ribbons`, `rnd2 = mulberry32(seed ^ 0x9e3779b9)` for everything added after
   (there is also an independent local stream inside `dunesRidgesUrl`). Inserting a variable
@@ -236,8 +256,8 @@ they cannot use `$state` / `$effect` — a store whose constructor registers eff
 built inside a component.
 
 **Components are tested, wrappers are not.** A wrapper reads a store and forwards props
-([box-service-wrapper.svelte](src/lib/components/box-service-wrapper.svelte),
-[box-adguard-wrapper.svelte](src/lib/components/box-adguard-wrapper.svelte)); the component
+([box-service-wrapper.svelte](src/lib/presentation/components/box-service-wrapper.svelte),
+[box-adguard-wrapper.svelte](src/lib/presentation/components/box-adguard-wrapper.svelte)); the component
 beside it takes the same data as a plain prop and is tested directly.
 
 **One e2e file per feature**, named after it (`e2e/can-change-theme.spec.ts`). Playwright
@@ -277,7 +297,7 @@ what breaks soonest. **Nothing below is fixed** — see "Already done" at the en
    out of the tab order. Two classes fix it: `group-focus-within:visible group-focus-within:opacity-100`.
    Note [e2e/dropdown.ts](e2e/dropdown.ts) hardcodes `.hover()`, so no current test can catch this.
 6. **box-date builds its `Intl` formatter at module scope from `getLocale()`**
-   ([box-date.svelte](src/lib/components/box-date.svelte)) — the module body runs once per node
+   ([box-date.svelte](src/lib/presentation/components/box-date.svelte)) — the module body runs once per node
    process while the locale is per-request, so every SSR response is frozen to the first
    visitor's locale. Move it to instance scope.
 
@@ -286,11 +306,11 @@ what breaks soonest. **Nothing below is fixed** — see "Already done" at the en
 7. **Storybook is installed with zero stories** — 8 devDeps, `.storybook/main.ts` +
    `preview.ts`, two npm scripts, and `main.ts` globs `../src/**/*.stories.@(js|ts|svelte)`
    which currently matches nothing. Write the stories rather than deleting the install.
-   Good order, cheapest first: [box-date](src/lib/components/box-date.svelte) (no props) →
-   [box-service](src/lib/components/box-service.svelte) (one story per `isOnline` state:
-   `true` / `false` / `null`) → [box-adguard](src/lib/components/box-adguard.svelte) (with and
-   without `stats`) → [dropdown](src/lib/components/dropdown.svelte) →
-   [grid](src/lib/components/grid.svelte) / [sub-grid](src/lib/components/sub-grid.svelte)
+   Good order, cheapest first: [box-date](src/lib/presentation/components/box-date.svelte) (no props) →
+   [box-service](src/lib/presentation/components/box-service.svelte) (one story per `isOnline` state:
+   `true` / `false` / `null`) → [box-adguard](src/lib/presentation/components/box-adguard.svelte) (with and
+   without `stats`) → [dropdown](src/lib/presentation/components/dropdown.svelte) →
+   [grid](src/lib/presentation/components/grid.svelte) / [sub-grid](src/lib/presentation/components/sub-grid.svelte)
    (nested containers; the interesting one). Notes for whoever picks this up:
     - Use the presentational components, **not** the wrappers — wrappers need a store in
       context, the components take plain props. This is the same split the unit tests already
@@ -306,9 +326,9 @@ what breaks soonest. **Nothing below is fixed** — see "Already done" at the en
 
 8. **Wire a toast store into the `ErrorReporter` seam.** `ServicesStore` already accepts one
    and defaults to `console.error`, so a failed ping is reported rather than swallowed — but
-   nothing shows it to the user yet. A `ToastStore` in `lib/store/`, set in
+   nothing shows it to the user yet. A `ToastStore` in `business/store/`, set in
    [+layout.svelte](src/routes/+layout.svelte), then `setServicesStore(toasts.report)` in
-   [page.svelte](src/lib/components/page.svelte). `AppError.message` is guaranteed renderable,
+   [page.svelte](src/lib/presentation/components/page.svelte). `AppError.message` is guaranteed renderable,
    so the toast body is `error.message` and nothing else. Do the same for the AdGuard failure
    in [+page.server.ts](src/routes/[[slug]]/+page.server.ts), which still logs and returns
    `null` — the error is available, it just isn't forwarded to the page yet.
@@ -348,6 +368,18 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   148 violations, all false, and never resolved `.svelte` so most edges were missing from the
   graph). It now has the five layer rules plus
   [tsconfig.depcruise.json](tsconfig.depcruise.json).
+- **The registry is gone; the schema replaced it.** `business/component-registry.ts`
+  used to map config names to component types via `ComponentProps`, which made the
+  config format a derivative of component internals. Business now declares the schema
+  and names no component. Don't reintroduce a `ComponentProps`-derived container type.
+- **`BoxService.title` is required**, in the schema and in `requiredProps`. It was
+  optional in the derived type while the component demanded it, so a title-less entry
+  passed validation and rendered an empty heading.
+- **Stores live in `business/store/`**, not presentation. The reactive holder is only
+  half of what a store does; the other half is orchestration, and that is business. The
+  split that makes it safe is `model/` staying framework-free for the SSR path.
+- **`readAdguardStats` and `readConfig` are business functions.** Route server files
+  may not reach `src/lib/data` — see the layer rule.
 - **`normalizeContainer` guards required props.** `requiredProps` is a
   `Record<ComponentName, …>`, so registering a component without deciding what it needs is a
   compile error. `items` is set unconditionally for `Grid`/`SubGrid` — a grid written before
