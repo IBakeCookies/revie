@@ -1,24 +1,27 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
-	import type { TransformConfigOutput } from '$lib/utils/config';
-	import { cn } from '$lib/utils/style';
+	import type { ConfigContainer } from '$lib/utils/config';
+	import ConfigContainerView from '$lib/components/config-container.svelte';
+	import { cn, spanStyle } from '$lib/utils/style';
 
 	export type Props = {
 		title?: string;
 		subTitle?: string;
-		items: TransformConfigOutput[];
+		items: ConfigContainer[];
+		span?: number;
 		gridClass?: ClassValue;
 		class?: ClassValue;
-	} & HTMLAttributes<any>;
+	} & HTMLAttributes<HTMLDivElement>;
 
-	let { title, subTitle, items, gridClass, ...restProps }: Props = $props();
+	let { title, subTitle, items, span, gridClass, ...restProps }: Props = $props();
 </script>
 
 <div
 	{...restProps}
+	style={spanStyle(span)}
 	class={cn(
-		'cyber-punk:border p-box-xl col-span-12 bg-box-primary rounded solid:border',
+		'cyber-punk:border p-box-xl col-span-12 xl:col-span-(--span) bg-box-primary rounded solid:border',
 		restProps.class
 	)}
 >
@@ -31,14 +34,8 @@
 	{/if}
 
 	<div class={cn('grid grid-cols-12 gap-grid-lg mt-ty-headline-md', gridClass)}>
-		{#each items as item}
-			{@const Component = item.component as any}
-
-			{#if Component}
-				<Component {...item.props} />
-			{:else}
-				<p class="text-xl font-bold text-danger">Unknown component: {item.name}</p>
-			{/if}
+		{#each items as item, index (index)}
+			<ConfigContainerView container={item} />
 		{/each}
 	</div>
 </div>

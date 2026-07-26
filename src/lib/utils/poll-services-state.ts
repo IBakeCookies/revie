@@ -1,17 +1,22 @@
-import type { TransformConfigOutput } from '$lib/utils/config';
-import { getServicesStore } from '$lib/store/service-store.svelte';
+import type { ConfigContainer } from '$lib/utils/config';
+import type { ServicesStore } from '$lib/store/service-store.svelte';
+import { collectServiceHrefs } from '$lib/utils/config';
 
-export function pollServicesState(containers: TransformConfigOutput[]): () => void {
-	const servicesStore = getServicesStore();
-	const hrefs = servicesStore.getServicesHrefs(containers);
+const POLL_INTERVAL_MS = 1000 * 60 * 15;
+
+export function pollServicesState(
+	servicesStore: ServicesStore,
+	containers: ConfigContainer[]
+): () => void {
+	const hrefs = collectServiceHrefs(containers);
 
 	function poll(): void {
-		hrefs.forEach(servicesStore.getServiceStatus, servicesStore);
+		hrefs.forEach((href) => servicesStore.refresh(href));
 	}
 
 	poll();
 
-	const id = setInterval(poll, 1000 * 60 * 15);
+	const id = setInterval(poll, POLL_INTERVAL_MS);
 
 	return () => {
 		clearInterval(id);

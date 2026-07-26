@@ -1,47 +1,26 @@
-import type { ConfigContainer } from '$lib/utils/config';
-import { isBoxService, isGrid } from '$lib/utils/config';
 import { getContext, setContext } from 'svelte';
 import { getServiceState } from '$lib/data/repository/service';
-
-interface ServiceState {
-	href: string;
-	isAlive: boolean;
-}
 
 const CONTEXT_KEY = Symbol();
 
 export class ServicesStore {
-	services = $state<ServiceState[]>([]);
+	/** Keyed by href so a refresh replaces the previous result instead of stacking up. */
+	#states = $state<Record<string, boolean>>({});
 
-	async getServiceStatus(href: string): Promise<void> {
+	isAlive(href: string): boolean | null {
+		return this.#states[href] ?? null;
+	}
+
+	async refresh(href: string): Promise<void> {
 		const [err, res] = await getServiceState(href);
 
 		if (err) {
-			console.error('Service fetch error:', err);
+			console.error(`Service state for ${href} could not be read:`, err);
 
 			return;
 		}
 
-		this.services.push({
-			href,
-			isAlive: res.isAlive
-		});
-	}
-
-	getServicesHrefs(items: ConfigContainer[]) {
-		const hrefs: string[] = [];
-
-		for (const item of items) {
-			if (isBoxService(item)) {
-				hrefs.push(item.props.href);
-			}
-
-			if (isGrid(item) && item.props.items) {
-				hrefs.push(...this.getServicesHrefs(item.props.items));
-			}
-		}
-
-		return hrefs;
+		this.#states[href] = res.isAlive;
 	}
 }
 
