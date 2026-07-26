@@ -1,5 +1,4 @@
-import { getContext, setContext } from 'svelte';
-import { onMount } from 'svelte';
+import { getContext, onMount, setContext } from 'svelte';
 
 export type ThemeName = 'solid-light' | 'solid-dark' | 'glass-light' | 'glass-dark' | 'cyber-punk';
 
@@ -32,7 +31,8 @@ export const themes: ThemeItem[] = [
 ] as const;
 
 const CONTEXT_KEY = Symbol();
-const themeStorageKey = 'theme';
+const THEME_COOKIE = 'theme';
+const allThemeClasses = themes.flatMap((item) => item.css);
 
 export function getClassesToAdd(themeName: ThemeName): string[] {
 	return themes.find((t) => t.name === themeName)?.css ?? [];
@@ -40,24 +40,24 @@ export function getClassesToAdd(themeName: ThemeName): string[] {
 
 export class ThemeStore {
 	#theme = $state<ThemeName>('solid-light');
-	#themes: ThemeItem[] = themes;
 
-	#classesToAdd = $derived.by<string[]>(() => {
-		return getClassesToAdd(this.#theme);
-	});
+	#classesToAdd = $derived.by<string[]>(() => getClassesToAdd(this.#theme));
 
-	#classesToRemove = $derived.by<string[]>(() => {
-		return themes.map((t) => t.css).flat();
-	});
-
-	constructor(initialTheme?: ThemeName) {
+	/**
+	 * @param initialTheme read lazily so the caller can hand over a prop without
+	 * capturing it outside of a reactive context.
+	 */
+	constructor(initialTheme: () => ThemeName | undefined) {
+		// Only runs on the client; the server stamps the class onto <html> directly.
 		$effect(() => {
-			document.documentElement.classList.remove(...this.#classesToRemove);
+			document.documentElement.classList.remove(...allThemeClasses);
 			document.documentElement.classList.add(...this.#classesToAdd);
 		});
 
-		if (initialTheme) {
-			this.#theme = initialTheme;
+		const theme = initialTheme();
+
+		if (theme) {
+			this.#theme = theme;
 
 			return;
 		}
@@ -74,22 +74,22 @@ export class ThemeStore {
 		});
 	}
 
-	get theme() {
+	get theme(): ThemeName {
 		return this.#theme;
 	}
 
-	get themes() {
-		return this.#themes;
+	get themes(): ThemeItem[] {
+		return themes;
 	}
 
 	switchTheme(newTheme: ThemeName): void {
 		this.#theme = newTheme;
 
-		document.cookie = `${themeStorageKey}=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
+		document.cookie = `${THEME_COOKIE}=${newTheme}; path=/; max-age=31536000; SameSite=Lax`;
 	}
 }
 
-export function setThemeStore(initialTheme?: ThemeName): ThemeStore {
+export function setThemeStore(initialTheme: () => ThemeName | undefined): ThemeStore {
 	return setContext<ThemeStore>(CONTEXT_KEY, new ThemeStore(initialTheme));
 }
 

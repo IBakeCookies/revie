@@ -1,8 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
-import type { ThemeName } from '$lib/composable/useTheme.svelte';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 import { sequence } from '@sveltejs/kit/hooks';
-import { getClassesToAdd, themes } from '$lib/store/theme-store.svelte';
+import { themes } from '$lib/store/theme-store.svelte';
 
 const handleParaglide: Handle = ({ event, resolve }) =>
 	paraglideMiddleware(event.request, ({ request, locale }) => {
@@ -13,21 +12,14 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 		});
 	});
 
-const handleTheme: Handle = async ({ event, resolve }) => {
-	const { cookies } = event;
-	const theme = cookies.get('theme') as ThemeName;
+const handleTheme: Handle = ({ event, resolve }) => {
+	const cookieTheme = event.cookies.get('theme');
+	const theme = themes.find((item) => item.name === cookieTheme);
 
-	if (!theme || !themes.find((t) => t.name === theme)) {
-		return await resolve(event);
-	}
-
-	const themeClass = getClassesToAdd(theme).join(' ');
-
-	const response = await resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('%theme%', themeClass)
+	// The placeholder always has to be replaced, otherwise it ends up in the markup.
+	return resolve(event, {
+		transformPageChunk: ({ html }) => html.replace('%theme%', theme?.css.join(' ') ?? '')
 	});
-
-	return response;
 };
 
 export const handle: Handle = sequence(handleParaglide, handleTheme);
