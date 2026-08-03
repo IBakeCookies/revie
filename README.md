@@ -3,6 +3,9 @@
 A self-hosted start page for home services: every box on it comes from `config.json`,
 which is read from disk at runtime.
 
+![The dashboard: a date box, AdGuard Home stats, and two sub-grids of services with
+status dots](docs/screenshot.png)
+
 ## Running
 
 ```sh
