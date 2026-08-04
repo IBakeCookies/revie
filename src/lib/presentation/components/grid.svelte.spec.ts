@@ -24,7 +24,7 @@ const items: ConfigContainer[] = [
 
 describe('grid.svelte', () => {
 	it('renders the configured containers at any nesting depth', async () => {
-		const screen = render(Grid, {
+		const screen = await render(Grid, {
 			title: 'Services',
 			items,
 		});
@@ -34,7 +34,7 @@ describe('grid.svelte', () => {
 	});
 
 	it('shows the title and the subtitle', async () => {
-		const screen = render(Grid, {
+		const screen = await render(Grid, {
 			title: 'Services',
 			subTitle: 'All of them',
 			items: [],
@@ -44,8 +44,8 @@ describe('grid.svelte', () => {
 		await expect.element(screen.getByText('All of them')).toBeInTheDocument();
 	});
 
-	it('omits both headings when the config names neither', () => {
-		const screen = render(Grid, {
+	it('omits both headings when the config names neither', async () => {
+		const screen = await render(Grid, {
 			items: [],
 		});
 
@@ -54,8 +54,8 @@ describe('grid.svelte', () => {
 		expect(screen.container.querySelectorAll(':is(h1, h2, h3, h4, h5, h6)')).toHaveLength(0);
 	});
 
-	it('passes the column span as a custom property', () => {
-		const screen = render(Grid, {
+	it('passes the column span as a custom property', async () => {
+		const screen = await render(Grid, {
 			items: [],
 			span: 8,
 		});

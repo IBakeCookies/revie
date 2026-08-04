@@ -574,12 +574,32 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
     here at 0 violations — porting them is a pure loosening); zenith's `--strategy` on
     paraglide, its `tsc -p tsconfig.worker.json`, and its `depcheck` script (our `lint`
     already chains `lint:deps`, which zenith's does not).
-  - **Not attempted:** zenith's dependency **majors** — eslint 10, TypeScript 6, Vite 8,
-    svelte 5.56, dependency-cruiser 18. Those are version parity, not architecture, and the
-    `@eslint/compat` → `eslint/config` `includeIgnoreFile` move is gated on eslint 10.
+  - **The dependency majors landed later (2026-08-04)**, in a security-driven update: eslint
+    10, TypeScript 6, Vite 8, dependency-cruiser 18, vite-plugin-svelte 7,
+    prettier-plugin-svelte 4, globals 17, vitest-browser-svelte 3. What each cost:
+    `@eslint/compat` is **gone** — eslint 10 exports `includeIgnoreFile` from `eslint/config`,
+    so the shim had one consumer and no reason to stay. Vite 8 rejects `__dirname` in
+    [vite.config.ts](vite.config.ts) under `configLoader: 'native'`, so it is
+    `import.meta.dirname` now. vitest-browser-svelte 3 made `render()` **async**, so all 22
+    call sites in the `*.svelte.spec.ts` files `await` it and their `it()` callbacks are
+    `async` — a sync `render` now yields a `Promise` whose `getByRole` is undefined, which
+    `svelte-check` catches. **TypeScript is capped at 6, not 7**: `svelte-check@4` peers
+    `typescript@^5 || ^6`, and typescript-eslint 8 peers `<6.1.0`. `@types/node` stays on
+    **22** to match `engines.node`, not the 26 that is latest.
   - The vitest 4.x family **cross-peer-pins exact versions**, so `@vitest/coverage-v8` is
     pinned to vitest's exact minor rather than caret-ranged. It moves as one unit or not at
-    all; npm's peer check makes any drift a loud `ERESOLVE`, not a silent mismatch.
+    all; npm's peer check makes any drift a loud `ERESOLVE`, not a silent mismatch. The trap
+    is that a **stale `node_modules` also counts** as a pin: npm reads the installed tree as
+    "Found", so bumping the family reports `ERESOLVE` even when the manifest resolves cleanly
+    from scratch. Regenerate the lock with an empty tree (`npm install --package-lock-only` in
+    a clean directory), then `npm ci` — `npm audit fix --force` instead offers
+    `@vitest/ui@4.1.10` as "outside the stated range" and is not what you want.
+  - **`cookie` GHSA-pxg6-pf52-xh8x (3 low) has no upstream fix and is left open.**
+    `@sveltejs/kit@2.70.2` is the latest release and still depends on `cookie@^0.6.0`, so
+    `npm audit` reports it on a fully-updated tree; `--force` "fixes" it by proposing
+    `@sveltejs/kit@0.0.30`. An `overrides` block pinning `cookie@^0.7.2` clears it and was
+    deliberately **refused** — kit's own peer range is the thing to wait on. Re-check when kit
+    releases past 2.70.2.
   - `.dependency-cruiser.cjs` is a **superset** of zenith's, not a copy — ours adds
     `leaf-not-to-upper-layers` (zenith has no `lib/utils`) and carries zenith's inert
     `logger-imports-nothing`. A byte-identical shared file would need a matching change in

@@ -92,32 +92,32 @@
 			radial-gradient(ellipse 9rem 2.5rem at 30% 88%, oklch(0.92 0.01 240 / 0.09), transparent 70%),
 			radial-gradient(ellipse 7rem 2rem at 72% 95%, oklch(0.92 0.01 240 / 0.07), transparent 70%),
 			/* coastal metro, warm sodium (cluster at 18% 96%) */
-				radial-gradient(2.5px 2.5px at 18% 96%, oklch(0.87 0.12 75), transparent),
+			radial-gradient(2.5px 2.5px at 18% 96%, oklch(0.87 0.12 75), transparent),
 			radial-gradient(1.5px 1.5px at 16.5% 95.2%, oklch(0.85 0.12 72 / 0.9), transparent),
 			radial-gradient(2px 2px at 19.7% 96.9%, oklch(0.86 0.12 70 / 0.95), transparent),
 			radial-gradient(1px 1px at 17.1% 97.5%, oklch(0.85 0.11 75 / 0.8), transparent),
 			radial-gradient(1.5px 1.5px at 20.9% 95.3%, oklch(0.84 0.12 70 / 0.85), transparent),
 			/* sprawling capital, warm (cluster at 52% 91%) */
-				radial-gradient(3px 3px at 52% 91%, oklch(0.84 0.13 70), transparent),
+			radial-gradient(3px 3px at 52% 91%, oklch(0.84 0.13 70), transparent),
 			radial-gradient(2px 2px at 50.3% 91.8%, oklch(0.85 0.12 72 / 0.9), transparent),
 			radial-gradient(1.5px 1.5px at 54.1% 90.3%, oklch(0.86 0.12 75 / 0.9), transparent),
 			radial-gradient(1px 1px at 53.4% 92.4%, oklch(0.85 0.12 72 / 0.8), transparent),
 			radial-gradient(1.5px 1.5px at 48.9% 90.5%, oklch(0.84 0.12 70 / 0.8), transparent),
 			radial-gradient(1px 1px at 55.7% 91.6%, oklch(0.85 0.11 73 / 0.75), transparent),
 			/* newer city, cool LED white (cluster at 86% 89%) */
-				radial-gradient(2.5px 2.5px at 86% 89%, oklch(0.9 0.04 235), transparent),
+			radial-gradient(2.5px 2.5px at 86% 89%, oklch(0.9 0.04 235), transparent),
 			radial-gradient(1.5px 1.5px at 84.5% 89.9%, oklch(0.88 0.05 235 / 0.9), transparent),
 			radial-gradient(1.5px 1.5px at 87.5% 88.2%, oklch(0.9 0.04 240 / 0.85), transparent),
 			radial-gradient(1px 1px at 85.3% 87.9%, oklch(0.88 0.05 235 / 0.75), transparent),
 			/* scattered towns between */
-				radial-gradient(1.5px 1.5px at 64% 97%, oklch(0.87 0.12 75 / 0.85), transparent),
+			radial-gradient(1.5px 1.5px at 64% 97%, oklch(0.87 0.12 75 / 0.85), transparent),
 			radial-gradient(1.5px 1.5px at 38% 93.5%, oklch(0.85 0.12 72 / 0.85), transparent),
 			radial-gradient(1px 1px at 72% 95%, oklch(0.85 0.12 75 / 0.7), transparent),
 			radial-gradient(1.5px 1.5px at 8% 90%, oklch(0.85 0.12 75 / 0.75), transparent),
 			radial-gradient(1px 1px at 44% 89.5%, oklch(0.9 0.04 235 / 0.6), transparent),
 			radial-gradient(1px 1px at 95% 93.5%, oklch(0.85 0.12 75 / 0.6), transparent),
 			/* glows pooling beneath the clusters */
-				radial-gradient(ellipse 4.5rem 1.5rem at 18% 96%, oklch(0.8 0.12 70 / 0.2), transparent 70%),
+			radial-gradient(ellipse 4.5rem 1.5rem at 18% 96%, oklch(0.8 0.12 70 / 0.2), transparent 70%),
 			radial-gradient(ellipse 5rem 1.7rem at 52% 91%, oklch(0.8 0.12 70 / 0.22), transparent 70%),
 			radial-gradient(
 				ellipse 3.5rem 1.2rem at 86% 89%,

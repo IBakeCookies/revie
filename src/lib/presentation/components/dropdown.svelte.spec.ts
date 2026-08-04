@@ -13,7 +13,7 @@ const children = createRawSnippet(() => ({
 
 describe('dropdown.svelte', () => {
 	it('renders the trigger inside the only focusable control of the closed dropdown', async () => {
-		const screen = render(Dropdown, {
+		const screen = await render(Dropdown, {
 			trigger,
 			children,
 		});
@@ -28,7 +28,7 @@ describe('dropdown.svelte', () => {
 	});
 
 	it('renders the panel content', async () => {
-		const screen = render(Dropdown, {
+		const screen = await render(Dropdown, {
 			trigger,
 			children,
 		});
@@ -42,8 +42,8 @@ describe('dropdown.svelte', () => {
 			.toBeInTheDocument();
 	});
 
-	it('hides the panel until the dropdown is hovered', () => {
-		const screen = render(Dropdown, {
+	it('hides the panel until the dropdown is hovered', async () => {
+		const screen = await render(Dropdown, {
 			trigger,
 			children,
 		});

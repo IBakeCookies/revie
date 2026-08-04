@@ -461,15 +461,15 @@
 		/* far-shore lantern light gathered to a thin bright line at the water */
 		radial-gradient(ellipse 44% 1.6% at 50% 42%, oklch(0.85 0.085 74 / 0.32), transparent 72%),
 		/* the warm lantern-lit air above the far shore */
-			radial-gradient(ellipse 70% 7% at 50% 41%, oklch(0.66 0.12 58 / 0.24), transparent 72%),
+		radial-gradient(ellipse 70% 7% at 50% 41%, oklch(0.66 0.12 58 / 0.24), transparent 72%),
 		/* that warmth reflected down onto the near water */
-			radial-gradient(ellipse 58% 12% at 50% 52%, oklch(0.48 0.11 52 / 0.2), transparent 74%),
+		radial-gradient(ellipse 58% 12% at 50% 52%, oklch(0.48 0.11 52 / 0.2), transparent 74%),
 		/* cool depth pooling in the foreground water */
-			radial-gradient(ellipse 120% 42% at 50% 114%, oklch(0.12 0.045 225 / 0.5), transparent 70%),
+		radial-gradient(ellipse 120% 42% at 50% 114%, oklch(0.12 0.045 225 / 0.5), transparent 70%),
 		/* a breath of cool night in the upper sky */
-			radial-gradient(ellipse 66% 44% at 16% 6%, oklch(0.24 0.05 262 / 0.38), transparent 70%),
+		radial-gradient(ellipse 66% 44% at 16% 6%, oklch(0.24 0.05 262 / 0.38), transparent 70%),
 		/* deep moonless sky above, black river below — split hard at the horizon */
-			linear-gradient(
+		linear-gradient(
 				to bottom,
 				oklch(0.15 0.034 258) 0%,
 				oklch(0.17 0.032 252) 34%,
@@ -690,7 +690,7 @@
 		/* the planet and its atmosphere ring. The night side is opaque, so it
 		   genuinely occludes the sun layers below; the ring's outer stops are
 		   semi-transparent, so the hidden sun shines through them. */
-			radial-gradient(
+		radial-gradient(
 				circle at 50% 178vh,
 				oklch(0.1 0.02 255) 0 99vh,
 				oklch(0.3 0.06 245) 100.2vh,
@@ -702,7 +702,7 @@
 		/* the sun itself, BEHIND the planet — center a couple vh below the
 		   limb (edge ≈78–80vh at x=58% on any aspect ratio), so the disc is
 		   swallowed and only its corona crests the edge through the ring */
-			radial-gradient(
+		radial-gradient(
 				circle at 58% 81.5vh,
 				oklch(1 0.02 95) 0 2.5vh,
 				oklch(0.97 0.08 85 / 0.95) 5vh,
@@ -711,9 +711,9 @@
 				transparent 24vh
 			),
 		/* a single soft sun pillar rising from behind the arc */
-			radial-gradient(ellipse 5vh 15vh at 58% 69vh, oklch(0.96 0.08 82 / 0.1), transparent 70%),
+		radial-gradient(ellipse 5vh 15vh at 58% 69vh, oklch(0.96 0.08 82 / 0.1), transparent 70%),
 		/* deep space, faintly violet toward the horizon */
-			linear-gradient(oklch(0.07 0.012 275), oklch(0.11 0.03 265));
+		linear-gradient(oklch(0.07 0.012 275), oklch(0.11 0.03 265));
 
 	--radius: 0.875rem;
 

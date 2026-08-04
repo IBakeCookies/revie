@@ -16,7 +16,7 @@ const stats: AdguardStats = {
 
 describe('box-adguard.svelte', () => {
 	it('links to the AdGuard instance without leaking the dashboard as referrer', async () => {
-		const screen = render(BoxAdguard, {
+		const screen = await render(BoxAdguard, {
 			href,
 			stats,
 		});
@@ -29,7 +29,7 @@ describe('box-adguard.svelte', () => {
 	});
 
 	it('shows every stat in the current language', async () => {
-		const screen = render(BoxAdguard, {
+		const screen = await render(BoxAdguard, {
 			href,
 			stats,
 		});
@@ -78,16 +78,16 @@ describe('box-adguard.svelte', () => {
 			.toBeInTheDocument();
 	});
 
-	it('renders an empty box when AdGuard could not be reached', () => {
-		const screen = render(BoxAdguard, {
+	it('renders an empty box when AdGuard could not be reached', async () => {
+		const screen = await render(BoxAdguard, {
 			href,
 		});
 
 		expect(screen.container.querySelectorAll('p')).toHaveLength(0);
 	});
 
-	it('passes the column span as a custom property', () => {
-		const screen = render(BoxAdguard, {
+	it('passes the column span as a custom property', async () => {
+		const screen = await render(BoxAdguard, {
 			href,
 			stats,
 			span: 4,

@@ -14,14 +14,14 @@ afterEach(() => {
 });
 
 describe('box-date.svelte', () => {
-	it('shows the current time down to the second', () => {
-		const screen = render(BoxDate);
+	it('shows the current time down to the second', async () => {
+		const screen = await render(BoxDate);
 
 		expect(screen.container.textContent).toMatch(/\d{1,2}:\d{2}:\d{2}/);
 	});
 
-	it('keeps the clock ticking', () => {
-		const screen = render(BoxDate);
+	it('keeps the clock ticking', async () => {
+		const screen = await render(BoxDate);
 
 		// The interval is registered by an $effect, which has to run first.
 		flushSync();
@@ -35,8 +35,8 @@ describe('box-date.svelte', () => {
 		expect(screen.container.textContent).not.toBe(before);
 	});
 
-	it('stops the interval when it is unmounted', () => {
-		const screen = render(BoxDate);
+	it('stops the interval when it is unmounted', async () => {
+		const screen = await render(BoxDate);
 
 		flushSync();
 		screen.unmount();
@@ -44,8 +44,8 @@ describe('box-date.svelte', () => {
 		expect(vi.getTimerCount()).toBe(0);
 	});
 
-	it('passes the column span as a custom property', () => {
-		const screen = render(BoxDate, {
+	it('passes the column span as a custom property', async () => {
+		const screen = await render(BoxDate, {
 			span: 3,
 		});
 

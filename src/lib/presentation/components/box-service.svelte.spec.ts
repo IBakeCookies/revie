@@ -14,7 +14,7 @@ const props = {
 
 describe('box-service.svelte', () => {
 	it('links to the service without leaking the dashboard as referrer', async () => {
-		const screen = render(BoxService, props);
+		const screen = await render(BoxService, props);
 		const link = screen.getByRole('link');
 
 		await expect.element(link).toHaveAttribute('href', props.href);
@@ -23,7 +23,7 @@ describe('box-service.svelte', () => {
 	});
 
 	it('shows the title next to an icon that is hidden from assistive tech', async () => {
-		const screen = render(BoxService, props);
+		const screen = await render(BoxService, props);
 		const img = screen.container.querySelector('img');
 
 		await expect
@@ -38,8 +38,8 @@ describe('box-service.svelte', () => {
 		expect(img?.getAttribute('alt')).toBe('');
 	});
 
-	it('passes the column span as a custom property, because config cannot reach Tailwind', () => {
-		const screen = render(BoxService, {
+	it('passes the column span as a custom property, because config cannot reach Tailwind', async () => {
+		const screen = await render(BoxService, {
 			...props,
 			span: 6,
 		});
@@ -47,21 +47,21 @@ describe('box-service.svelte', () => {
 		expect(spanOf(screen.container)).toBe('6');
 	});
 
-	it('falls back to the full width when no span is configured', () => {
-		const screen = render(BoxService, props);
+	it('falls back to the full width when no span is configured', async () => {
+		const screen = await render(BoxService, props);
 
 		expect(spanOf(screen.container)).toBe('12');
 	});
 
 	it('marks an unknown status apart from offline', async () => {
-		const screen = render(BoxService, props);
+		const screen = await render(BoxService, props);
 		const dot = screen.getByLabelText(m.service_status_unknown());
 
 		await expect.element(dot).toHaveClass('bg-primary');
 	});
 
 	it('marks a reachable service as online', async () => {
-		const screen = render(BoxService, {
+		const screen = await render(BoxService, {
 			...props,
 			isOnline: true,
 		});
@@ -72,7 +72,7 @@ describe('box-service.svelte', () => {
 	});
 
 	it('marks an unreachable service as offline', async () => {
-		const screen = render(BoxService, {
+		const screen = await render(BoxService, {
 			...props,
 			isOnline: false,
 		});

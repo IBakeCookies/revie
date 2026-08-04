@@ -93,7 +93,7 @@
 				transparent 2px 2.4rem
 			),
 			/* rails: cyan, one tile = 3rem, never animated so x is free */
-				repeating-linear-gradient(to right, oklch(0.78 0.16 200 / 0.4) 0 2px, transparent 2px 3rem);
+			repeating-linear-gradient(to right, oklch(0.78 0.16 200 / 0.4) 0 2px, transparent 2px 3rem);
 		/* seed lever: rails are a static tile — x is free to offset per user */
 		background-position:
 			0 0,
