@@ -474,26 +474,33 @@ the same applies to a future 34.
 
 27. **Ship a production invocation that actually loads `.env`, and document the AdGuard contract** —
     `S`
-    README's production path is `npm run build && node build` (README.md:20-21), but adapter-node
-    reads only `process.env` (build/env.js; `grep -c dotenv build/index.js` = 0) — so
-    `ADGUARD_USERNAME`, `ADGUARD_PASSWORD` and `DASHBOARD_CONFIG` are all silently absent in
-    production while working in dev. Document `node --env-file=.env build` (Node ≥20.6), an
-    **absolute** `DASHBOARD_CONFIG` (src/lib/data/config.ts:16 resolves from the process CWD at
-    module scope), and a systemd unit (`EnvironmentFile=`, `WorkingDirectory=`) or compose file with
-    the config bind-mounted. Add `engines: { node: ">=20.6" }` so `.npmrc:1`'s `engine-strict=true`
-    stops being inert. In the same README pass, name the two AdGuard variables (they appear
-    **nowhere** in README.md or AGENTS.md — only `.env.example` and `+page.server.ts:17`), state that
-    they are runtime `$env/dynamic/private`, describe the one degradation with two causes
-    (credentials absent → +page.server.ts:19-22; box unreachable/401 → :33-37, both `console.warn` +
-    `return null` = an empty box with no user-visible reason), and mention the 3s
-    `AbortSignal.timeout` (repository/adguard.ts:38).
+    README's production path is a bare `node build` (README.md:24-25), but adapter-node reads only
+    `process.env` (build/env.js; `grep -c dotenv build/index.js` = 0) — so `ADGUARD_USERNAME`,
+    `ADGUARD_PASSWORD` and `DASHBOARD_CONFIG` are all silently absent in production while working in
+    dev. Document `node --env-file=.env build`, an **absolute** `DASHBOARD_CONFIG`
+    (src/lib/data/config.ts:16 resolves from the process CWD at module scope, which README.md:25
+    notes without connecting it to the variable), and a systemd unit (`EnvironmentFile=`,
+    `WorkingDirectory=`) or compose file with the config bind-mounted — neither `deploy/` nor a
+    compose file exists yet. In the same README pass, name the two AdGuard variables (they appear
+    **nowhere** in README.md or AGENTS.md — README.md:17 says only "AdGuard credentials, optional",
+    and the names live in `.env.example` and `+page.server.ts:17`), state that they are runtime
+    `$env/dynamic/private`, describe the one degradation with two causes (credentials absent →
+    +page.server.ts:19-22; box unreachable/401 → :33-37, both `console.warn` + `return null` = an
+    empty box with no user-visible reason), and mention the 3s `AbortSignal.timeout`
+    (repository/adguard.ts:38).
+    _The `engines` half landed_ (verified 2026-08-04): package.json:6-8 declares `"node": ">=22"`,
+    so `.npmrc`'s `engine-strict=true` is no longer inert, and README.md:11-12 documents that an
+    older node fails `npm install` outright rather than warning. That also retires this item's
+    "(Node ≥20.6)" qualifier on `--env-file` — the flag is guaranteed present at the version the
+    package now enforces, so the README does not have to caveat it.
     _Prevents:_ measured — `node ./build` with a populated `.env` logs
     `ADGUARD_USERNAME / ADGUARD_PASSWORD are not set, skipping AdGuard stats` and answers in 33ms;
     `node --env-file=.env build` resolves them and takes 2.98s attempting the fetch. `config.json`
     is now gitignored rather than pointed at with `DASHBOARD_CONFIG`, so the variable matters most
     for a bind-mounted deployment — which is exactly the invocation this item documents.
-    _Files:_ README.md:13-22,63-74, package.json, .env.example,
-    deploy/revie-dashboard.service or compose.yaml (new)
+    _Files:_ README.md:21-26,65-74, .env.example,
+    deploy/revie-dashboard.service or compose.yaml (new). package.json is off this list — its
+    `engines` half landed.
 
 28. **Point Playwright's `webServer` at the shipped artifact** — `S`
     _The CI half of this item landed in the zenith parity pass_ —
