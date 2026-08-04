@@ -11,7 +11,7 @@ const stats: AdguardStats = {
 	dnsQueries: 1234,
 	numBlockedFiltering: 56,
 	avgProcessingTimeMs: 12,
-	topBlockedDomain: 'ads.example.com'
+	topBlockedDomain: 'ads.example.com',
 };
 
 describe('box-adguard.svelte', () => {
@@ -39,8 +39,8 @@ describe('box-adguard.svelte', () => {
 		await expect
 			.element(
 				screen.getByText(m.adguard_top_blocked_domain({ domain: 'ads.example.com' }), {
-					exact: true
-				})
+					exact: true,
+				}),
 			)
 			.toBeInTheDocument();
 	});

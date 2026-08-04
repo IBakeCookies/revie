@@ -28,10 +28,10 @@ export function documentCookies(): CookieSource {
 		get(name) {
 			if (typeof document === 'undefined') return undefined;
 			const match = document.cookie.match(
-				new RegExp(`(?:^|; )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]*)`)
+				new RegExp(`(?:^|; )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]*)`),
 			);
 			return match ? decodeURIComponent(match[1]) : undefined;
-		}
+		},
 	};
 }
 
@@ -46,5 +46,5 @@ export const COOKIE_WRITE_OPTIONS = {
 	path: '/',
 	maxAge: MAX_AGE_SECONDS,
 	sameSite: 'lax',
-	httpOnly: false
+	httpOnly: false,
 } as const;

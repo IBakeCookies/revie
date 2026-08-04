@@ -19,13 +19,13 @@ const configPath = env.DASHBOARD_CONFIG || 'config.json';
 export async function $readConfigMtime(): Promise<Result<number>> {
 	return useAsyncErrorAsValue(
 		async () => (await stat(configPath)).mtimeMs,
-		`Could not reach the dashboard config at "${configPath}"`
+		`Could not reach the dashboard config at "${configPath}"`,
 	);
 }
 
 export async function $readConfigFile(): Promise<Result<unknown>> {
 	return useAsyncErrorAsValue(
 		async () => JSON.parse(await readFile(configPath, 'utf8')),
-		`Could not read the dashboard config at "${configPath}"`
+		`Could not read the dashboard config at "${configPath}"`,
 	);
 }

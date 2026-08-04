@@ -7,7 +7,7 @@ import {
 	readClientTheme,
 	updateScenerySeed,
 	updateSceneryMotion,
-	updateTheme
+	updateTheme,
 } from '$lib/business/model/appearance';
 import {
 	DEFAULT_DARK_THEME,
@@ -17,7 +17,7 @@ import {
 	randomScenerySeed,
 	themes,
 	type ThemeItem,
-	type ThemeName
+	type ThemeName,
 } from '$lib/business/model/theme';
 
 const CONTEXT_KEY = Symbol();
@@ -55,7 +55,7 @@ export class ThemeStore {
 	constructor(
 		initialTheme?: ThemeName,
 		initialScenerySeed?: number,
-		initialSceneryPaused?: boolean
+		initialSceneryPaused?: boolean,
 	) {
 		this.#scenerySeed = initialScenerySeed ?? 0;
 		this.#sceneryPaused = initialSceneryPaused ?? false;
@@ -158,11 +158,11 @@ export class ThemeStore {
 export function setThemeStore(
 	initialTheme?: ThemeName,
 	initialScenerySeed?: number,
-	initialSceneryPaused?: boolean
+	initialSceneryPaused?: boolean,
 ): ThemeStore {
 	return setContext<ThemeStore>(
 		CONTEXT_KEY,
-		new ThemeStore(initialTheme, initialScenerySeed, initialSceneryPaused)
+		new ThemeStore(initialTheme, initialScenerySeed, initialSceneryPaused),
 	);
 }
 

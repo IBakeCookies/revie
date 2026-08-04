@@ -11,7 +11,7 @@ module.exports = {
 				'The data layer must not import from the business or presentation layers. Whatever a ' +
 				'read needs in order to be interpreted is passed in as a parameter (AGENTS.md R1).',
 			from: { path: '^src/lib/data' },
-			to: { path: '^src/lib/(business|presentation)' }
+			to: { path: '^src/lib/(business|presentation)' },
 		},
 		{
 			name: 'business-not-to-presentation',
@@ -22,7 +22,7 @@ module.exports = {
 				'business/model/config.ts, rather than deriving it from component props -- that is ' +
 				'what keeps the config file a contract instead of a side effect of a refactor.',
 			from: { path: '^src/lib/business' },
-			to: { path: '^src/lib/presentation' }
+			to: { path: '^src/lib/presentation' },
 		},
 		{
 			name: 'presentation-not-to-data',
@@ -33,7 +33,7 @@ module.exports = {
 				'(AGENTS.md R1). Note this binds the SERVER files too: a load function is the ' +
 				'composition root, not a licence to reach the repository.',
 			from: { path: '^src/(lib/presentation|routes|hooks|service-worker)' },
-			to: { path: '^src/lib/data' }
+			to: { path: '^src/lib/data' },
 		},
 		{
 			name: 'presentation-not-to-business-model',
@@ -50,13 +50,13 @@ module.exports = {
 					'[.]server[.]ts$',
 					'(^|/)\\+server[.]ts$',
 					'[.](?:spec|test)[.](?:js|ts)$',
-					'[.]stories[.]svelte$'
-				]
+					'[.]stories[.]svelte$',
+				],
 			},
 			to: {
 				path: '^src/lib/business/model/',
-				dependencyTypesNot: ['type-only']
-			}
+				dependencyTypesNot: ['type-only'],
+			},
 		},
 		{
 			name: 'leaf-not-to-upper-layers',
@@ -71,12 +71,12 @@ module.exports = {
 				'one layer, move it there rather than importing upward from here.',
 			from: {
 				path: '^src/lib/utils/',
-				pathNot: '[.](?:spec|test)[.](?:js|ts)$'
+				pathNot: '[.](?:spec|test)[.](?:js|ts)$',
 			},
 			to: {
 				path: '^src/(lib/(data|business|presentation)/|routes/)',
-				dependencyTypesNot: ['type-only']
-			}
+				dependencyTypesNot: ['type-only'],
+			},
 		},
 		{
 			name: 'no-circular',
@@ -89,8 +89,8 @@ module.exports = {
 				'your solution (i.e. use dependency inversion, make sure the modules have a single responsibility) ',
 			from: {},
 			to: {
-				circular: true
-			}
+				circular: true,
+			},
 		},
 		{
 			name: 'no-orphans',
@@ -112,10 +112,10 @@ module.exports = {
 					'(^|/)[.][^/]+[.](?:js|cjs|mjs|ts|cts|mts|json)$', // dot files
 					'[.]d[.]ts$', // TypeScript declaration files
 					'(^|/)tsconfig[.]json$', // TypeScript config
-					'(^|/)(?:babel|webpack)[.]config[.](?:js|cjs|mjs|ts|cts|mts|json)$' // other configs
-				]
+					'(^|/)(?:babel|webpack)[.]config[.](?:js|cjs|mjs|ts|cts|mts|json)$', // other configs
+				],
 			},
-			to: {}
+			to: {},
 		},
 		{
 			name: 'no-deprecated-core',
@@ -126,7 +126,7 @@ module.exports = {
 			from: {
 				// generated paraglide code uses async_hooks for AsyncLocalStorage, which is
 				// stable - only the original hooks API in that module is deprecated
-				pathNot: ['^src/lib/paraglide/']
+				pathNot: ['^src/lib/paraglide/'],
 			},
 			to: {
 				dependencyTypes: ['core'],
@@ -150,9 +150,9 @@ module.exports = {
 					'^constants$',
 					'^sys$',
 					'^_linklist$',
-					'^_stream_wrap$'
-				]
-			}
+					'^_stream_wrap$',
+				],
+			},
 		},
 		{
 			name: 'not-to-deprecated',
@@ -162,8 +162,8 @@ module.exports = {
 			severity: 'warn',
 			from: {},
 			to: {
-				dependencyTypes: ['deprecated']
-			}
+				dependencyTypes: ['deprecated'],
+			},
 		},
 		{
 			name: 'no-non-package-json',
@@ -175,8 +175,8 @@ module.exports = {
 				'in your package.json.',
 			from: {},
 			to: {
-				dependencyTypes: ['npm-no-pkg', 'npm-unknown']
-			}
+				dependencyTypes: ['npm-no-pkg', 'npm-unknown'],
+			},
 		},
 		{
 			name: 'not-to-unresolvable',
@@ -188,8 +188,8 @@ module.exports = {
 			to: {
 				couldNotResolve: true,
 				// SvelteKit virtual modules and generated route types only exist at build time
-				pathNot: ['^\\$app/', '^\\$env/', '^\\$service-worker$', '(^|/)\\$types$']
-			}
+				pathNot: ['^\\$app/', '^\\$env/', '^\\$service-worker$', '(^|/)\\$types$'],
+			},
 		},
 		{
 			name: 'no-duplicate-dep-types',
@@ -203,8 +203,8 @@ module.exports = {
 				moreThanOneDependencyType: true,
 				// as it's common to use a devDependency for type-only imports: don't
 				// consider type-only dependencyTypes for this rule
-				dependencyTypesNot: ['type-only']
-			}
+				dependencyTypesNot: ['type-only'],
+			},
 		},
 		{
 			name: 'not-to-spec',
@@ -215,8 +215,8 @@ module.exports = {
 			severity: 'error',
 			from: {},
 			to: {
-				path: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$'
-			}
+				path: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$',
+			},
 		},
 		{
 			name: 'not-to-dev-dep',
@@ -232,15 +232,15 @@ module.exports = {
 				'from.pathNot re of the not-to-dev-dep rule in the dependency-cruiser configuration',
 			from: {
 				path: '^(src)',
-				pathNot: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$'
+				pathNot: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$',
 			},
 			to: {
 				dependencyTypes: ['npm-dev'],
 				// type only dependencies are not a problem as they don't end up in the
 				// production code or are ignored by the runtime.
 				dependencyTypesNot: ['type-only'],
-				pathNot: ['node_modules/@types/']
-			}
+				pathNot: ['node_modules/@types/'],
+			},
 		},
 		{
 			name: 'optional-deps-used',
@@ -252,8 +252,8 @@ module.exports = {
 				'dependency-cruiser configuration.',
 			from: {},
 			to: {
-				dependencyTypes: ['npm-optional']
-			}
+				dependencyTypes: ['npm-optional'],
+			},
 		},
 		{
 			name: 'peer-deps-used',
@@ -265,18 +265,18 @@ module.exports = {
 			severity: 'warn',
 			from: {},
 			to: {
-				dependencyTypes: ['npm-peer']
-			}
-		}
+				dependencyTypes: ['npm-peer'],
+			},
+		},
 	],
 	options: {
 		doNotFollow: {
-			path: ['node_modules']
+			path: ['node_modules'],
 		},
 
 		exclude: {
 			// generated paraglide message functions - hundreds of files, no insight
-			path: ['^src/lib/paraglide/messages']
+			path: ['^src/lib/paraglide/messages'],
 		},
 
 		detectProcessBuiltinModuleCalls: true,
@@ -291,7 +291,7 @@ module.exports = {
 		// whose relative `include` paths only resolve from inside .svelte-kit. See the
 		// comment in tsconfig.depcruise.json.
 		tsConfig: {
-			fileName: 'tsconfig.depcruise.json'
+			fileName: 'tsconfig.depcruise.json',
 		},
 
 		enhancedResolveOptions: {
@@ -299,7 +299,7 @@ module.exports = {
 			// 'svelte' and 'browser' are needed on top of the defaults so imports of
 			// svelte itself resolve to real files instead of showing up unresolvable.
 			conditionNames: ['import', 'require', 'node', 'default', 'types', 'svelte', 'browser'],
-			mainFields: ['module', 'main', 'types', 'typings']
+			mainFields: ['module', 'main', 'types', 'typings'],
 		},
 
 		skipAnalysisNotInRules: true,
@@ -308,15 +308,15 @@ module.exports = {
 			dot: {
 				// Collapse node_modules one folder deep, and fold the generated paraglide
 				// output into a single node, so the graph shows this app's own structure.
-				collapsePattern: 'node_modules/(?:@[^/]+/[^/]+|[^/]+)|^src/lib/paraglide'
+				collapsePattern: 'node_modules/(?:@[^/]+/[^/]+|[^/]+)|^src/lib/paraglide',
 			},
 			archi: {
 				collapsePattern:
-					'^(?:packages|src|lib(s?)|app(s?)|bin|test(s?)|spec(s?))/[^/]+|node_modules/(?:@[^/]+/[^/]+|[^/]+)'
+					'^(?:packages|src|lib(s?)|app(s?)|bin|test(s?)|spec(s?))/[^/]+|node_modules/(?:@[^/]+/[^/]+|[^/]+)',
 			},
 			text: {
-				highlightFocused: true
-			}
-		}
-	}
+				highlightFocused: true,
+			},
+		},
+	},
 };

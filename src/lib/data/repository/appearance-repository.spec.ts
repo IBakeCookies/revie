@@ -4,7 +4,7 @@ import {
 	$readAppearance,
 	$updateSceneryMotion,
 	$updateScenerySeed,
-	$updateTheme
+	$updateTheme,
 } from './appearance-repository';
 
 /** Stands in for `event.cookies` (server) — the read path's whole contract. */
@@ -13,7 +13,7 @@ const from = (jar: Record<string, string>) => ({ get: (name: string) => jar[name
 describe('$readAppearance', () => {
 	it('reads all three cookies out of a source', () => {
 		expect(
-			$readAppearance(from({ theme: 'abyss', scenerySeed: '42', sceneryMotion: 'paused' }))
+			$readAppearance(from({ theme: 'abyss', scenerySeed: '42', sceneryMotion: 'paused' })),
 		).toEqual({ theme: 'abyss', scenerySeed: 42, sceneryPaused: true });
 	});
 
@@ -23,7 +23,7 @@ describe('$readAppearance', () => {
 		expect($readAppearance(from({}))).toEqual({
 			theme: undefined,
 			scenerySeed: undefined,
-			sceneryPaused: undefined
+			sceneryPaused: undefined,
 		});
 	});
 
@@ -54,7 +54,7 @@ describe('appearance writes', () => {
 			},
 			get cookie() {
 				return written.join('; ');
-			}
+			},
 		});
 	});
 
@@ -92,7 +92,7 @@ describe('appearance writes', () => {
 			path: '/',
 			maxAge: 31536000,
 			sameSite: 'lax',
-			httpOnly: false
+			httpOnly: false,
 		});
 	});
 });

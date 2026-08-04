@@ -123,14 +123,14 @@ const requiredProps: Record<ContainerName, (props: Record<string, unknown>) => s
 		// Grid and SubGrid need `items`, but it is defaulted below rather than
 		// required, so a grid written before its children still renders as empty.
 		Grid: () => undefined,
-		SubGrid: () => undefined
+		SubGrid: () => undefined,
 	};
 
 const CONTAINS_CHILDREN: ContainerName[] = ['Grid', 'SubGrid'];
 
 function normalizeContainer(
 	raw: unknown,
-	defaults: Record<string, unknown>
+	defaults: Record<string, unknown>,
 ): ConfigContainer | undefined {
 	if (!isRecord(raw) || typeof raw.name !== 'string') {
 		console.warn('Skipping a container without a name');
@@ -148,7 +148,7 @@ function normalizeContainer(
 
 	const props: Record<string, unknown> = {
 		...(isRecord(defaultProps) ? defaultProps : undefined),
-		...(isRecord(raw.props) ? raw.props : undefined)
+		...(isRecord(raw.props) ? raw.props : undefined),
 	};
 
 	for (const key of STYLE_KEYS) {
@@ -210,7 +210,7 @@ export function normalizeConfig(raw: unknown): Config {
 			name: typeof rawPage.name === 'string' ? rawPage.name : undefined,
 			containers: (Array.isArray(rawPage.containers) ? rawPage.containers : [])
 				.map((container) => normalizeContainer(container, defaults))
-				.filter((item): item is ConfigContainer => item !== undefined)
+				.filter((item): item is ConfigContainer => item !== undefined),
 		};
 	}
 
@@ -238,7 +238,7 @@ function scanContainer(item: ConfigContainer, target: ContainerName): ConfigCont
 /** First container with the given name, at any nesting depth. */
 export function findContainer(
 	page: ConfigPage,
-	target: ContainerName
+	target: ContainerName,
 ): ConfigContainer | undefined {
 	for (const container of page.containers) {
 		const found = scanContainer(container, target);

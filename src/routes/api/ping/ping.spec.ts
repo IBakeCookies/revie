@@ -11,7 +11,7 @@ const probe = vi.mocked(ping.promise.probe);
 /** The handler only ever touches the request. */
 function event(body: BodyInit): Parameters<typeof POST>[0] {
 	return {
-		request: new Request('http://localhost/api/ping', { method: 'POST', body })
+		request: new Request('http://localhost/api/ping', { method: 'POST', body }),
 	} as Parameters<typeof POST>[0];
 }
 
@@ -25,12 +25,12 @@ beforeEach(() => {
 						props: {
 							title: 'WLED',
 							href: 'http://wled.local:80',
-							img: { src: '' }
-						}
-					}
-				]
-			}
-		}
+							img: { src: '' },
+						},
+					},
+				],
+			},
+		},
 	});
 
 	probe.mockResolvedValue({ alive: true } as Awaited<ReturnType<typeof probe>>);
@@ -54,14 +54,14 @@ describe('POST /api/ping', () => {
 
 	it('refuses a host that is not in the config, so the endpoint is not a port scanner', async () => {
 		await expect(
-			POST(event(JSON.stringify({ href: 'http://192.168.178.1' })))
+			POST(event(JSON.stringify({ href: 'http://192.168.178.1' }))),
 		).rejects.toMatchObject({ status: 403 });
 		expect(probe).not.toHaveBeenCalled();
 	});
 
 	it('rejects a body without an absolute URL', async () => {
 		await expect(POST(event(JSON.stringify({ href: 'wled.local' })))).rejects.toMatchObject({
-			status: 400
+			status: 400,
 		});
 	});
 

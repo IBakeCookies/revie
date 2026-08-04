@@ -6,7 +6,7 @@ const raw: GetAdguardStatsOutput = {
 	num_dns_queries: 1234,
 	num_blocked_filtering: 56,
 	avg_processing_time: 0.0123,
-	top_blocked_domains: [{ 'ads.example.com': 42 }, { 'tracker.example.com': 7 }]
+	top_blocked_domains: [{ 'ads.example.com': 42 }, { 'tracker.example.com': 7 }],
 };
 
 describe('transformAdguardStats', () => {
@@ -15,13 +15,13 @@ describe('transformAdguardStats', () => {
 			dnsQueries: 1234,
 			numBlockedFiltering: 56,
 			avgProcessingTimeMs: 12,
-			topBlockedDomain: 'ads.example.com'
+			topBlockedDomain: 'ads.example.com',
 		});
 	});
 
 	it('falls back to a dash when AdGuard reports no blocked domains', () => {
 		expect(transformAdguardStats({ ...raw, top_blocked_domains: [] }).topBlockedDomain).toBe(
-			'–'
+			'–',
 		);
 	});
 
@@ -30,7 +30,7 @@ describe('transformAdguardStats', () => {
 
 		expect(
 			transformAdguardStats(withoutDomains as unknown as GetAdguardStatsOutput)
-				.topBlockedDomain
+				.topBlockedDomain,
 		).toBe('–');
 	});
 });

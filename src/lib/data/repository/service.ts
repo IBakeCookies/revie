@@ -7,17 +7,17 @@ export interface GetServiceStateOutput {
 }
 
 export async function getServiceState(
-	href: GetServiceStateInput
+	href: GetServiceStateInput,
 ): Promise<Result<GetServiceStateOutput>> {
 	return useAsyncErrorAsValue(async () => {
 		const raw = await fetch('/api/ping', {
 			method: 'POST',
 			headers: {
-				'Content-Type': 'application/json'
+				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				href
-			})
+				href,
+			}),
 		});
 
 		if (!raw.ok) {

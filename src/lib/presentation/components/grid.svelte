@@ -22,7 +22,7 @@
 	style={spanStyle(span)}
 	class={cn(
 		'p-box-xl col-span-12 xl:col-span-(--span) bg-surface-card border-line-strong shadow-card backdrop-blur rounded-2xl border',
-		restProps.class
+		restProps.class,
 	)}
 >
 	{#if title}

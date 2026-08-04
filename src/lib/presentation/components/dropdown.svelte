@@ -30,7 +30,7 @@
 		<div
 			class={cn(
 				'bg-popover border-line-strong shadow-card size-max rounded-md border',
-				panelClass
+				panelClass,
 			)}
 		>
 			{@render children()}

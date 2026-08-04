@@ -22,7 +22,7 @@ test('marks a service that does not resolve as offline', async ({ page }) => {
 
 test('refuses to probe a host that is not in the config', async ({ request }) => {
 	const response = await request.post('/api/ping', {
-		data: { href: 'http://192.168.1.1' }
+		data: { href: 'http://192.168.1.1' },
 	});
 
 	expect(response.status()).toBe(403);

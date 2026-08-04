@@ -7,7 +7,7 @@ import { spanOf } from '$lib/test/dom';
 const props = {
 	title: 'Proxmox',
 	href: 'https://proxmox.local:8006',
-	img: { src: '/favicon.svg' }
+	img: { src: '/favicon.svg' },
 };
 
 describe('box-service.svelte', () => {

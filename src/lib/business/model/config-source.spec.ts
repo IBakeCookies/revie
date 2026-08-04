@@ -12,8 +12,8 @@ type FsMock = {
 
 const file = JSON.stringify({
 	pages: {
-		'/': { name: 'Home', containers: [{ name: 'BoxDate' }] }
-	}
+		'/': { name: 'Home', containers: [{ name: 'BoxDate' }] },
+	},
 });
 
 /**

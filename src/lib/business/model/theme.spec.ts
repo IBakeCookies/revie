@@ -5,7 +5,7 @@ import {
 	getClassesToAdd,
 	randomScenerySeed,
 	resolveThemeName,
-	themes
+	themes,
 } from './theme';
 
 describe('theme catalogue', () => {

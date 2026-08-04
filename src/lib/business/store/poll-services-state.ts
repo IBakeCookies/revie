@@ -6,7 +6,7 @@ const POLL_INTERVAL_MS = 1000 * 60 * 15;
 
 export function pollServicesState(
 	servicesStore: ServicesStore,
-	containers: ConfigContainer[]
+	containers: ConfigContainer[],
 ): () => void {
 	const hrefs = collectServiceHrefs(containers);
 

@@ -9,9 +9,9 @@ const items: ConfigContainer[] = [
 		name: 'SubGrid',
 		props: {
 			subTitle: 'Smart Home',
-			items: [{ name: 'SubGrid', props: { subTitle: 'Lights', items: [] } }]
-		}
-	}
+			items: [{ name: 'SubGrid', props: { subTitle: 'Lights', items: [] } }],
+		},
+	},
 ];
 
 describe('grid.svelte', () => {
