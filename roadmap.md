@@ -13,44 +13,12 @@ has, the item says so and names the files to copy. Every finding was adversarial
 the code before it was written down. Ordered within each group by what breaks soonest, or by impact
 over effort. Effort is `S` / `M` / `L`.
 
+**Numbers are stable, so gaps mean landed.** 26 items are open; **1, 2, 3, 4, 6 and 7 are done** —
+the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and the
+rest of the numbering stays put so the cross-references below keep resolving.
+
 ## Correctness
 
-1. **`config.json` is git-tracked and is also production's default read path.** A `git pull` or
-   `checkout .` during an update silently reverts the live dashboard, and the file holds the
-   internal network map. Gitignore it, commit `config.example.json`.
-2. **Status dots measure the wrong thing** — `/api/ping` discards the port and probes ICMP, so a
-   dead service on a live host stays green, and two boxes on one host always agree. Replacing
-   `ping.promise.probe` with `net.connect({host, port})` keyed on `host:port` fixes that _and_
-   drops the `ping` dependency, the fork+exec per unauthenticated POST, an unhandled rejection when
-   the `ping` binary is missing from a slim image, and an IPv6 bug
-   (`new URL('http://[fd00::5]/').hostname` keeps the brackets).
-3. **[app.html](src/app.html) destroys the server-stamped `scenery-paused` class** —
-   `className = 'dark'` is a whole-attribute write, and the block that would re-add it is gated on
-   the cookie being _absent_, which is false exactly when the server had reason to stamp it.
-   **This is a straight port, not a design task**: copy `zenith/src/app.html`'s pre-paint script
-   (`classList.remove(...%theme.default%)` / `add(...%theme.default-dark%)`, with its "swap only the
-   classes this script owns" comment) plus the two module-scope
-   `JSON.stringify(getClassesToAdd(…))` constants in `zenith/src/hooks.server.ts` and its two extra
-   `.replace` calls — the same shape [hooks.server.ts](src/hooks.server.ts) already uses for
-   `%theme%`. The import path adapts (`$lib/business/model/appearance` here). Behaviour is
-   preserved: with no theme cookie the SSR-stamped class _is_ `fallow`, so `remove(['fallow'])` +
-   `add(['dark'])` reproduces today's write minus the wipe; `%theme%` and `%theme.default%` can't
-   collide, since the former needs its closing `%` immediately after `theme`. Landing this also
-   **deletes the AGENTS.md invariant** that app.html hardcodes `DEFAULT_DARK_THEME`'s class — the
-   placeholders remove the hand-mirroring — and retires assertion (4) of #29 entirely. Note
-   [e2e/can-change-theme.spec.ts](e2e/can-change-theme.spec.ts) matches only `/dark/` and passes
-   with the bug present; zenith's `not.toHaveClass(/fallow/)` is the assertion that catches it.
-4. **"Resume animations" is dead under `prefers-reduced-motion`** — the CSS pauses with `!important`
-   and no opt-out, so the button flips its label and nothing moves. Don't just skip rendering it on
-   a one-time read: port zenith's `#prefersReducedMotion = $state(false)` in
-   `business/store/theme-store.svelte.ts` — one unconditional `onMount` holding the
-   `MediaQueryList`, a `sync()`, seeding only when `sceneryPaused === undefined`, an
-   `addEventListener('change', sync)` and its teardown — plus the `sceneryMotionToggleable` getter,
-   then gate the toggle in [+layout.svelte](src/routes/+layout.svelte) on it. Ours today registers
-   that `onMount` **only** inside `if (initialSceneryPaused === undefined)`, so it never learns a
-   mid-session flip, which is exactly what upstream's comment says the tracking is for. Don't copy
-   the store wholesale — routing writes through `updateSceneryMotion` here where zenith calls the
-   repository directly, and that routing is settled in AGENTS.md's "Already done".
 5. **No keyboard path to any appearance control** — the dropdowns are hover-only, so
    `visibility: hidden` keeps all 27 theme buttons, both locales, reroll and the motion toggle out
    of the tab order. Two classes fix it:
@@ -59,37 +27,12 @@ over effort. Effort is `S` / `M` / `L`.
    they need. Note [e2e/dropdown.ts](e2e/dropdown.ts) hardcodes `.hover()`, so no current test can
    catch this. Nothing to port: zenith gets its keyboard path from bits-ui's `DropdownMenu`
    primitive, and AGENTS.md records dropping zenith's shadcn dependencies on purpose.
-6. **box-date builds its `Intl` formatter at module scope from `getLocale()`**
-   ([box-date.svelte](src/lib/presentation/components/box-date.svelte)) — the module body runs once
-   per node process while the locale is per-request, so every SSR response is frozen to the first
-   visitor's locale. Move it to instance scope.
 
 ## Storybook
 
-7. **Storybook is installed with zero stories** — 8 devDeps, `.storybook/main.ts` + `preview.ts`,
-   two npm scripts, and `main.ts` globs `../src/**/*.stories.@(js|ts|svelte)` which currently
-   matches nothing. Write the stories rather than deleting the install. Good order, cheapest first:
-   [box-date](src/lib/presentation/components/box-date.svelte) (no props) →
-   [box-service](src/lib/presentation/components/box-service.svelte) (one story per `isOnline`
-   state: `true` / `false` / `null`) →
-   [box-adguard](src/lib/presentation/components/box-adguard.svelte) (with and without `stats`) →
-   [dropdown](src/lib/presentation/components/dropdown.svelte) →
-   [grid](src/lib/presentation/components/grid.svelte) /
-   [sub-grid](src/lib/presentation/components/sub-grid.svelte) (nested containers; the interesting
-   one). Notes for whoever picks this up:
-    - Use the presentational components, **not** the wrappers — wrappers need a store in context,
-      the components take plain props. This is the same split the unit tests already use, so the
-      specs are the reference for prop shapes.
-    - Theme classes live on `<html>`, so a story renders unstyled unless `.storybook/preview.ts`
-      stamps a theme class on the root. Add a global decorator or a theme toolbar there.
-    - `@storybook/addon-vitest` overlaps the existing vitest-browser project. Decide whether
-      stories replace the component specs or sit beside them before adding more.
-    - The theme decorator is a port, not a design task — see #32.
-    - `eslint-plugin-storybook` is **already wired** in [eslint.config.js](eslint.config.js), at 0
-      violations. Don't expect much from it: `flat/recommended`'s story globs are
-      `**/*.stories.@(ts|tsx|js|jsx|mjs|cjs)` with no `.svelte`, so its 12 story rules will never
-      fire on the `*.stories.svelte` files this repo intends to write. What it actually buys is
-      `storybook/no-uninstalled-addons` on `.storybook/main.ts`, which also globs `../src/**/*.mdx`.
+_(#7 — "Storybook is installed with zero stories" — landed in the zenith parity pass. All ten
+components now have a `*.stories.svelte` beside them whose play functions run as tests in a third
+vitest project. See AGENTS.md's "Already done".)_
 
 ## Cleanup
 
@@ -108,9 +51,10 @@ over effort. Effort is `S` / `M` / `L`.
    the blocks below look conditional when they aren't. Unverifiable until #30's rune harness exists.
 10. **`git rm --cached dps.js`** — unrelated gacha-game DPS math at the repo root that
     `npm run lint` currently walks. Same treatment for the two tracked inlang cache blobs
-    (`project.inlang/cache/plugins/*`): `git rm --cached` them and add `project.inlang/cache/` to
-    [.gitignore](.gitignore), as zenith's does — neither `.gitignore` nor `.prettierignore` has an
-    inlang entry here at all.
+    (`project.inlang/cache/plugins/*`): `git rm --cached` them.
+    _Half landed in the zenith parity pass:_ `project.inlang/cache/` is now in
+    [.gitignore](.gitignore), as zenith's is — but the blobs were already tracked, so the line is
+    inert until the `git rm --cached` actually runs. `dps.js` is still tracked.
 11. **Re-seed scenery per theme group** so variable order stops being global. That deletes the
     second PRNG stream, the "must stay last" guard, and the call-count preservation in
     `dunesRidgesUrl`. Don't pin current output with a golden test — that freezes the invariant
@@ -275,19 +219,21 @@ over effort. Effort is `S` / `M` / `L`.
     add `aria-current="page"` (needs `import { page } from '$app/state'`, which the layout does not
     have today); add a `<title>` to the `<svelte:head>` block (:61-63, currently only the favicon)
     composed from `m.app_title()` plus the configured page name from `data.pages` — no page in the
-    app emits a title at all. Demote headings so the outline stops reading h1 → h3 → h5 → h3:
-    grid.svelte:29/:33 and box-service.svelte:45 all need planning together. Then add
-    `@axe-core/playwright` and one `e2e/is-accessible.spec.ts` scanning `/`, `/services`, `/nope` in
-    both locales and with `colorScheme: 'dark'` (the `test.use` pattern exists at
-    e2e/can-change-theme.spec.ts:32-33).
-    _Payoff:_ an axe run against the real built page currently reports exactly three violations —
-    `document-title`, `heading-order`, and `link-name` (serious): box-adguard.svelte:41 is an `<a>`
-    whose only content is the stats paragraphs, so when `stats` is undefined the items array is empty
-    (:18-21) and the live accessible name is `""`. `@storybook/addon-a11y` is already a dependency
-    (package.json:29) running against zero stories (.storybook/main.ts:4 globs nothing), so axe is
-    installed and audits nothing. Note the status dot's `aria-label` **does** surface in Chromium
-    (measured: link name `"Loopback online"`), so the residual dot defect is WCAG 1.4.1 colour-only
-    information, not a missing name — a non-colour cue, not an ARIA change.
+    app emits a title at all. Then add `@axe-core/playwright` and one `e2e/is-accessible.e2e.ts`
+    scanning `/`, `/services`, `/nope` in both locales and with `colorScheme: 'dark'` (the
+    `test.use` pattern exists at e2e/can-change-theme.e2e.ts:32-33).
+    _Two of the three component-level violations landed in the zenith parity pass_, once the
+    storybook a11y gate went to `test: 'error'` and every component got a story to run axe
+    against: `heading-order` (grid.svelte's subTitle was h5 under an h3 — now h4) and `link-name`
+    (box-adguard.svelte's anchor was empty whenever `stats` was undefined, so its accessible name
+    was `""`; it now carries an unconditional `aria-label={m.adguard_open()}`, which also replaces
+    the four-readings-run-together name in the populated case). The status dot's `aria-label` on a
+    role-less `<span>` was fixed the same way — it now has `role="img"`, without which the label
+    was ignored outright.
+    **What is left here is the page-level half:** `document-title` — no component story can catch
+    it, because no component owns `<svelte:head>`. The residual dot defect is also still open and
+    is WCAG 1.4.1 colour-only information, not a missing name: it wants a non-colour cue, not
+    another ARIA change.
     _Port only the nav half:_ take zenith's `nav.svelte` `<nav>` wrapper and its
     `aria-current={isActive(link.href) ? 'page' : undefined}` compared against
     `deLocalizeUrl(page.url).pathname`. Zenith has no `banner` landmark either — its `<nav>` also
@@ -305,8 +251,8 @@ over effort. Effort is `S` / `M` / `L`.
     src/lib/presentation/components/grid.svelte:29,33,
     src/lib/presentation/components/box-service.svelte:45,
     src/lib/presentation/components/box-adguard.svelte:18-21,41,
-    src/lib/presentation/components/grid.svelte.spec.ts:35, e2e/is-accessible.spec.ts (new),
-    e2e/can-navigate-between-pages.spec.ts
+    src/lib/presentation/components/grid.svelte.spec.ts:35, e2e/is-accessible.e2e.ts (new),
+    e2e/can-navigate-between-pages.e2e.ts
 
 ## Architecture & extensibility
 
@@ -399,7 +345,7 @@ over effort. Effort is `S` / `M` / `L`.
     Same three edit points as #24 (`CONTAINER_NAMES`, `requiredProps`, one config-container branch):
     `title` required, `img.src`/`subtitle` optional, no status dot, no store. Because
     `collectServiceHrefs` (config.ts:253) walks only `isBoxService`, a bookmark is automatically
-    excluded from the poll set and from `/api/ping`'s allowlist (api/ping/+server.ts:23) — zero
+    excluded from the poll set and from `/api/ping`'s allowlist (api/ping/+server.ts:45) — zero
     changes to the probing path. Then migrate the one offending config entry.
     _Payoff:_ BoxService is the only link container and it demands `title` + `href` + `img.src`
     (config.ts:114-120), renders the status `<span>` unconditionally (box-service.svelte:47-54 —
@@ -418,7 +364,8 @@ over effort. Effort is `S` / `M` / `L`.
     first SSR response and only reaches German by clicking the dropdown — and there is no way to link
     a locale. Adding `preferredLanguage` also makes `test.use({ locale: 'de-DE' })` a usable e2e
     lever. Then run the two counters through `Intl.NumberFormat(getLocale())` at **instance** scope
-    (same per-request reason as #6): box-adguard.svelte:24,26 pass raw numbers and the compiled
+    (the same per-request reason box-date.svelte's formatter sits there): box-adguard.svelte:24,26
+    pass raw numbers and the compiled
     message is `` `DNS-Anfragen: ${i?.count}` ``.
     _Payoff:_ closes the first-render locale gap in a deliberately bilingual app, and `43871` becomes
     `43.871` in German. No test today can tell German output from English:
@@ -449,38 +396,35 @@ over effort. Effort is `S` / `M` / `L`.
     `AbortSignal.timeout` (repository/adguard.ts:38).
     _Prevents:_ measured — `node ./build` with a populated `.env` logs
     `ADGUARD_USERNAME / ADGUARD_PASSWORD are not set, skipping AdGuard stats` and answers in 33ms;
-    `node --env-file=.env build` resolves them and takes 2.98s attempting the fetch. #1's own
-    mitigation ("Point `DASHBOARD_CONFIG` at it", README.md:74) cannot work as documented until this
-    lands.
+    `node --env-file=.env build` resolves them and takes 2.98s attempting the fetch. `config.json`
+    is now gitignored rather than pointed at with `DASHBOARD_CONFIG`, so the variable matters most
+    for a bind-mounted deployment — which is exactly the invocation this item documents.
     _Files:_ README.md:13-22,63-74, package.json, .env.example,
     deploy/revie-dashboard.service or compose.yaml (new)
 
-28. **Add CI, and point Playwright's `webServer` at the shipped artifact** — `S`
-    One workflow running `npm run check`, `npm run lint` (which chains `lint:deps`),
-    `npm run test:unit -- --run` and `npm run test:e2e`, with
-    `npx playwright install --with-deps chromium` — needed by the e2e suite **and** by the vitest
-    `client` project, which uses a real Chromium (vite.config.ts:26-29). In the same pass change
-    playwright.config.ts:5 from `npm run build && npm run preview` (i.e. `vite preview`) to
-    `node build` with explicit `PORT=4173` and the existing
+28. **Point Playwright's `webServer` at the shipped artifact** — `S`
+    _The CI half of this item landed in the zenith parity pass_ —
+    [.github/workflows/ci.yml](.github/workflows/ci.yml) now runs `npm run check`, `npm run lint`
+    (which chains `lint:deps`), `npm run test:unit -- --run` and `npm run test:e2e`, with
+    `npx playwright install --with-deps chromium` and an `actions/cache@v4` on
+    `~/.cache/ms-playwright` keyed by the resolved Playwright version, plus
+    `permissions: contents: read` and a concurrency block with `cancel-in-progress` on non-main.
+    zenith's `depcheck` step and chromatic job were dropped as planned.
+    **What is left:** change playwright.config.ts:15 from `npm run build && npm run preview`
+    (i.e. `vite preview`) to `node build` with an explicit `PORT=4173` and the existing
     `DASHBOARD_CONFIG: 'e2e/fixture-config.json'`.
-    _Start from zenith's `.github/workflows/ci.yml`_, which has two things this item didn't: a
-    `permissions: contents: read` + concurrency block with `cancel-in-progress` on non-main, and an
-    `actions/cache@v4` on `~/.cache/ms-playwright` keyed by the resolved Playwright version (an
-    `id: playwright` step) — the browser is needed twice here, so the cache pays twice. Drop its
-    `depcheck` step (our `lint` already chains `lint:deps`) and its chromatic job
-    (`@chromatic-com/storybook` is a dependency here but would snapshot zero stories). `npm run check`
-    now chains `npm run paraglide`, so a clean checkout no longer fails on 13 unresolved modules.
-    _Payoff:_ there is no `.github/` and no workflow, Dockerfile, compose, Makefile or any `.yml` in
-    the 124 tracked files — five gates and AGENTS.md's "`lint:deps` … is at **0 errors**; keep it
-    there" declaration rest on the author remembering. And everything under build/ — the artifact
-    that ships — is exercised by nothing: the Playwright command builds it and throws it away. That
+    _Payoff:_ everything under build/ — the artifact that ships — is exercised by nothing: the
+    Playwright command builds it and throws it away, then tests `vite preview` instead. That
     runtime split (own CWD/env resolution at src/lib/data/config.ts:16, ORIGIN-derived CSRF check
-    that the `POST /api/ping` tests at e2e/can-see-service-status.spec.ts:23-34 depend on,
+    that the `POST /api/ping` tests at e2e/can-see-service-status.e2e.ts:23-49 depend on,
     sirv/compression instead of Vite) is structurally why the `.env` divergence in #27 went
-    unnoticed; assert the ping POST still behaves under it. Optional: fail on a `npm run depgraph`
-    diff (needs graphviz `dot`) — the committed dependency-graph.svg is **not** currently stale
-    (68e35c9 is the last commit touching both it and src/).
-    _Files:_ .github/workflows/ci.yml (new), playwright.config.ts:4-6, package.json:11-21
+    unnoticed; assert the ping POST still behaves under it. It also means CI's only build is the
+    one the e2e webServer performs, so a broken `node build` is still nobody's failure.
+    Optional: fail on a `npm run depgraph` diff (needs graphviz `dot`) — the committed
+    dependency-graph.svg is **not** currently stale (68e35c9 is the last commit touching both it
+    and src/). Deliberately not done: graphviz output is not stable across `dot` versions, so a
+    runner upgrade would fail unrelated PRs.
+    _Files:_ playwright.config.ts:14-23
 
 29. **Add two drift-fence node specs: the four hand-mirrored invariants, and doc links** — `M`
     One spec reading the real files with `node:fs` (the `server` project at vite.config.ts:35-43 is
@@ -490,9 +434,10 @@ over effort. Effort is `S` / `M` / `L`.
     array in style.ts:12-41 (28) — exporting that array out of the inline `extendTailwindMerge` call
     is part of the work; (3) every `css` class of every one of the 27 `themes` entries has a palette
     selector in themes.css (25) or base.css (`.solid-light`:19, `.dark`:183), and an
-    `@custom-variant` in tokens.css **except** `solid-light`. There is no assertion (4): #3's port
-    replaces app.html's hardcoded class with `%theme.default%` placeholders filled from the catalogue,
-    so after it lands there is no hand-mirrored token left to fence. Second spec: extract every
+    `@custom-variant` in tokens.css **except** `solid-light`. There is no assertion (4): app.html's
+    hardcoded class is already gone, replaced by the `%theme.default%` placeholders `handleTheme`
+    fills from the catalogue, so no hand-mirrored token is left there to fence. Second spec: extract
+    every
     `](relative/path)` from AGENTS.md, README.md, roadmap.md, CLAUDE.md, strip any `#L…`, assert
     `existsSync`, and assert every `#L<n>` is within the file's line count.
     _Payoff:_ (1) is the highest-value and the reason this ranks here: AGENTS.md and README.md
@@ -541,8 +486,8 @@ over effort. Effort is `S` / `M` / `L`.
 
 ## Upstream drift (the `zenith` ports)
 
-Everything else portable from zenith maps onto an item above — see #3, #4, #10, #11, #18, #21, #28.
-These two are new.
+Everything else portable from zenith maps onto an item above — see #10, #11, #18, #21, #28. The
+app.html and reduced-motion ports (#3, #4) have landed. These two are new.
 
 31. **Retire the self-referential `--color-x: var(--color-x)` idiom in `tokens.css`** — `M`
     17 `@theme` entries alias themselves: the four `--color-ty-*` (tokens.css:98-101),
@@ -574,7 +519,7 @@ These two are new.
     Copy it over [.storybook/preview.ts](.storybook/preview.ts) (14 lines, controls matchers only).
     Two edits: `presentation/utils/scenery-seed` → `presentation/util/scenery-seed` and the same for
     `scenery-time`, since this repo's directory is singular. Then `npm run format` — though far less
-    of a rewrite now that `.prettierrc` is `trailingComma: "all"`, which upstream already matches.
+    of a rewrite now that `prettier.config.js` is `trailingComma: 'all'`, which upstream already matches.
     Set `a11y: { test: 'todo' }`, not upstream's `'error'`. Everything it imports already exists here
     under the same name — `themes`, `DEFAULT_THEME`, `getClassesToAdd`, `ThemeName`, `sceneryStyle`,
     `dataSceneryStyle` — and the `.theme-scenery` + `theme-helper-1..4` DOM its `mountScenery()`
@@ -595,23 +540,15 @@ These two are new.
 The order that matters, beyond the group ranking:
 
 - **#23 before #12** — item 12's two warnings need the diagnostics channel to write into.
-- **#27 before #1** — item 1's documented mitigation ("point `DASHBOARD_CONFIG` at it") is inert
-  until `.env` is actually loaded in production.
-- **#25 before or with #2** — item 2 becomes strictly _more_ dangerous without it: `net.connect` on
-  `host:port` would open a real TCP connection to community-scripts.github.io four times an hour
-  (config.json:32-42 + POLL_INTERVAL_MS 15min). Move that entry to a bookmark first.
+- **#25 is now overdue, not optional** — #2 has landed, so `/api/ping` opens a real TCP connection
+  to whatever a `BoxService` names. `config.json:32-42`'s `tteck` entry points at
+  community-scripts.github.io, which means four connects an hour to GitHub Pages to paint a
+  meaningless dot (`POLL_INTERVAL_MS` 15min). Move that entry to a bookmark.
 - **#17 before #16** — #17 changes the load's return type to a record, rippling into
   page.svelte:9-18.
 - **#30 before #9** — the `ThemeStore` edit is unverifiable without a rune harness.
-- **#3 before #29** — #3 replaces app.html's hardcoded class with catalogue-filled placeholders, so
-  #29 has one fewer assertion to write. Doing them the other way round means writing a fence for a
-  mirror that is about to disappear.
-- **#3 and #4 touch the same two files** (app.html + `theme-store.svelte.ts`'s reduced-motion path)
-  and are both zenith ports — land them together and diff once against upstream.
 - **#32 before #7's first story** — without the theme decorator every story renders unstyled, which
   is #7's own third bullet.
-- **#3 vs #29** — #3 rewrites app.html:17, so #29's assertion must parse class tokens rather than
-  string-match `className = 'dark'`.
 - **#7 and #21 are complementary**, not substitutes. `@storybook/addon-a11y` is installed
   (package.json:29) and globs zero stories (.storybook/main.ts:4), but landmarks, heading order
   across the config recursion, and the 27 theme palettes only exist on the composed,

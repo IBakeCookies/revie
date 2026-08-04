@@ -361,7 +361,10 @@ export function sceneryStyle(seed: number): string {
 		'--sw-haze-phase': sec2(-8, 0),
 	};
 
-	return Object.entries({ ...vars, ...vars2 })
+	return Object.entries({
+		...vars,
+		...vars2,
+	})
 		.map(([k, v]) => `${k}: ${v}`)
 		.join('; ');
 }

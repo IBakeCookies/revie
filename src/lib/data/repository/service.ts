@@ -24,6 +24,6 @@ export async function getServiceState(
 			throw new Error(`Ping responded with ${raw.status} ${raw.statusText}`);
 		}
 
-		return await raw.json();
+		return raw.json();
 	}, `Could not reach ${href}`);
 }

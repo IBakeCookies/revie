@@ -28,10 +28,7 @@
 		<!-- opaque page surface, not the translucent card: the panel floats over
 		     arbitrary content and has to stay readable on the glass themes -->
 		<div
-			class={cn(
-				'bg-popover border-line-strong shadow-card size-max rounded-md border',
-				panelClass,
-			)}
+			class={cn('bg-popover border-line-strong shadow-card size-max rounded-md border', panelClass)}
 		>
 			{@render children()}
 		</div>

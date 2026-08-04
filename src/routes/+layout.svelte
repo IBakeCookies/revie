@@ -109,7 +109,9 @@
 					<button
 						class={cn(
 							'py-text-xs px-box-md cursor-pointer flex w-full items-center gap-text-xs text-left',
-							{ 'font-bold': themeStore.theme === theme.name },
+							{
+								'font-bold': themeStore.theme === theme.name,
+							},
 						)}
 						onclick={() => themeStore.switchTheme(theme.name)}
 					>
@@ -121,8 +123,7 @@
 							)} border-line-strong flex h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border"
 							aria-hidden="true"
 						>
-							<span class="h-full w-1/2" style="background: var(--surface-page)"
-							></span>
+							<span class="h-full w-1/2" style="background: var(--surface-page)"></span>
 							<span class="h-full w-1/2" style="background: var(--primary)"></span>
 						</span>
 						{theme.label}
@@ -140,14 +141,17 @@
 					{m.theme_reroll_scenery()}
 				</button>
 
-				<button
-					class="py-text-xs px-box-md cursor-pointer block w-full text-left"
-					onclick={() => themeStore.toggleSceneryMotion()}
-				>
-					{themeStore.sceneryPaused
-						? m.theme_resume_animations()
-						: m.theme_pause_animations()}
-				</button>
+				<!-- absent under prefers-reduced-motion: the CSS pauses scenery there no
+				     matter what the cookie says, so the control would only mislabel a
+				     state it cannot change -->
+				{#if themeStore.sceneryMotionToggleable}
+					<button
+						class="py-text-xs px-box-md cursor-pointer block w-full text-left"
+						onclick={() => themeStore.toggleSceneryMotion()}
+					>
+						{themeStore.sceneryPaused ? m.theme_resume_animations() : m.theme_pause_animations()}
+					</button>
+				{/if}
 			</Dropdown>
 
 			<Dropdown>

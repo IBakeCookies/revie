@@ -30,7 +30,9 @@
 	{/if}
 
 	{#if subTitle}
-		<h5 class="text-lg text-ty-secondary">{subTitle}</h5>
+		<!-- h4, not h5: skipping a level is a heading-order violation. The size is a
+		     class, so the visual step is unchanged. -->
+		<h4 class="text-lg text-ty-secondary">{subTitle}</h4>
 	{/if}
 
 	<div class={cn('grid grid-cols-12 gap-grid-lg mt-text-md', gridClass)}>

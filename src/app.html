@@ -7,14 +7,18 @@
 		<!-- no-FOUC: first visit (no theme cookie) on a dark-preferring OS gets
 		     the dark default before first paint instead of a light flash; first
 		     visit (no sceneryMotion cookie) on a reduced-motion OS gets scenery
-		     paused before first paint instead of a flash of motion. The class
-		     here mirrors DEFAULT_DARK_THEME in $lib/business/model/theme.ts -->
+		     paused before first paint instead of a flash of motion -->
 		<script>
 			if (
 				!document.cookie.includes('theme=') &&
 				matchMedia('(prefers-color-scheme: dark)').matches
 			) {
-				document.documentElement.className = 'dark';
+				// swap only the classes this script owns: assigning className would
+				// wipe the scenery-paused class hooks.server.ts already stamped.
+				// hooks.server.ts fills both placeholders from the theme catalogue,
+				// so a default-theme change no longer needs a hand edit here.
+				document.documentElement.classList.remove(...%theme.default%);
+				document.documentElement.classList.add(...%theme.default-dark%);
 			}
 
 			if (

@@ -1,0 +1,52 @@
+{
+	"defaults": {
+		"BoxService": { "span": 4 }
+	},
+	"pages": {
+		"/": {
+			"name": "Home",
+			"containers": [
+				{ "name": "BoxDate" },
+				{
+					"name": "BoxAdguard",
+					"props": { "href": "http://192.168.1.2" }
+				},
+				{
+					"name": "Grid",
+					"props": {
+						"title": "Services",
+						"items": [
+							{
+								"name": "BoxService",
+								"props": {
+									"title": "Proxmox",
+									"href": "https://192.168.1.10:8006",
+									"span": 6,
+									"img": { "src": "https://cdn.simpleicons.org/proxmox" }
+								}
+							},
+							{
+								"name": "SubGrid",
+								"props": {
+									"subTitle": "Smart Home",
+									"items": [
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Home Assistant",
+												"href": "http://192.168.1.20:8123",
+												"img": {
+													"src": "https://cdn.simpleicons.org/homeassistant"
+												}
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				}
+			]
+		}
+	}
+}

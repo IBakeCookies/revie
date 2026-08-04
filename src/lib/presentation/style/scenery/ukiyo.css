@@ -14,31 +14,11 @@
 		   wrap copy shifted ±100% — otherwise the repeat clips them into hard
 		   vertical seams at every 56rem tile boundary */
 		background-image:
-			radial-gradient(
-				ellipse 55% 16% at 15% 102%,
-				oklch(0.36 0.08 255 / 0.4),
-				transparent 70%
-			),
-			radial-gradient(
-				ellipse 55% 16% at 115% 102%,
-				oklch(0.36 0.08 255 / 0.4),
-				transparent 70%
-			),
-			radial-gradient(
-				ellipse 50% 14% at 50% 106%,
-				oklch(0.46 0.09 250 / 0.32),
-				transparent 70%
-			),
-			radial-gradient(
-				ellipse 58% 18% at 85% 100%,
-				oklch(0.36 0.08 255 / 0.38),
-				transparent 70%
-			),
-			radial-gradient(
-				ellipse 58% 18% at -15% 100%,
-				oklch(0.36 0.08 255 / 0.38),
-				transparent 70%
-			);
+			radial-gradient(ellipse 55% 16% at 15% 102%, oklch(0.36 0.08 255 / 0.4), transparent 70%),
+			radial-gradient(ellipse 55% 16% at 115% 102%, oklch(0.36 0.08 255 / 0.4), transparent 70%),
+			radial-gradient(ellipse 50% 14% at 50% 106%, oklch(0.46 0.09 250 / 0.32), transparent 70%),
+			radial-gradient(ellipse 58% 18% at 85% 100%, oklch(0.36 0.08 255 / 0.38), transparent 70%),
+			radial-gradient(ellipse 58% 18% at -15% 100%, oklch(0.36 0.08 255 / 0.38), transparent 70%);
 		background-repeat: repeat-x;
 		background-size: 56rem 100%;
 		/* seed lever: seamless one-tile drift — phase only */

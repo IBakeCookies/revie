@@ -9,34 +9,56 @@ const items: ConfigContainer[] = [
 		name: 'SubGrid',
 		props: {
 			subTitle: 'Smart Home',
-			items: [{ name: 'SubGrid', props: { subTitle: 'Lights', items: [] } }],
+			items: [
+				{
+					name: 'SubGrid',
+					props: {
+						subTitle: 'Lights',
+						items: [],
+					},
+				},
+			],
 		},
 	},
 ];
 
 describe('grid.svelte', () => {
 	it('renders the configured containers at any nesting depth', async () => {
-		const screen = render(Grid, { title: 'Services', items });
+		const screen = render(Grid, {
+			title: 'Services',
+			items,
+		});
 
 		await expect.element(screen.getByText('Smart Home')).toBeInTheDocument();
 		await expect.element(screen.getByText('Lights')).toBeInTheDocument();
 	});
 
 	it('shows the title and the subtitle', async () => {
-		const screen = render(Grid, { title: 'Services', subTitle: 'All of them', items: [] });
+		const screen = render(Grid, {
+			title: 'Services',
+			subTitle: 'All of them',
+			items: [],
+		});
 
 		await expect.element(screen.getByText('Services')).toBeInTheDocument();
 		await expect.element(screen.getByText('All of them')).toBeInTheDocument();
 	});
 
 	it('omits both headings when the config names neither', () => {
-		const screen = render(Grid, { items: [] });
+		const screen = render(Grid, {
+			items: [],
+		});
 
-		expect(screen.container.querySelectorAll('h3, h5')).toHaveLength(0);
+		// By role, not by tag: a tag list goes stale the moment a heading level changes
+		// and then covers nothing while still passing.
+		expect(screen.container.querySelectorAll(':is(h1, h2, h3, h4, h5, h6)')).toHaveLength(0);
 	});
 
 	it('passes the column span as a custom property', () => {
-		const screen = render(Grid, { items: [], span: 8 });
+		const screen = render(Grid, {
+			items: [],
+			span: 8,
+		});
 
 		expect(spanOf(screen.container)).toBe('8');
 	});

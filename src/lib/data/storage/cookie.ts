@@ -27,9 +27,11 @@ export function documentCookies(): CookieSource {
 	return {
 		get(name) {
 			if (typeof document === 'undefined') return undefined;
+
 			const match = document.cookie.match(
 				new RegExp(`(?:^|; )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}=([^;]*)`),
 			);
+
 			return match ? decodeURIComponent(match[1]) : undefined;
 		},
 	};
@@ -38,6 +40,7 @@ export function documentCookies(): CookieSource {
 /** Browser-side write. Server-side writes go through SvelteKit's `cookies`. */
 export function writeCookie(name: string, value: string): void {
 	if (typeof document === 'undefined') return;
+
 	document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${MAX_AGE_SECONDS}; SameSite=Lax`;
 }
 

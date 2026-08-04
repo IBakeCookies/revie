@@ -1,7 +1,7 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
 	forbidden: [
-		// ---- Layer boundaries (presentation -> business -> data, one direction) ----
+		// ---- Layer boundaries (presentation → business → data, one direction) ----
 		// eslint's no-restricted-imports only matches the `$lib/...` specifier
 		// strings; these also catch relative imports and dynamic `import()`.
 		{
@@ -9,39 +9,51 @@ module.exports = {
 			severity: 'error',
 			comment:
 				'The data layer must not import from the business or presentation layers. Whatever a ' +
-				'read needs in order to be interpreted is passed in as a parameter (AGENTS.md R1).',
-			from: { path: '^src/lib/data' },
-			to: { path: '^src/lib/(business|presentation)' },
+				'read needs in order to be interpreted is passed in as a parameter (AGENTS.md R1) — ' +
+				'model defaults a migration needs arrive as parameters.',
+			from: {
+				path: '^src/lib/data',
+			},
+			to: {
+				path: '^src/lib/(business|presentation)',
+			},
 		},
 		{
 			name: 'business-not-to-presentation',
 			severity: 'error',
 			comment:
 				'The business layer must not import from the presentation layer, not even with ' +
-				'`import type` (AGENTS.md R1). Business declares the config schema itself, in ' +
-				'business/model/config.ts, rather than deriving it from component props -- that is ' +
-				'what keeps the config file a contract instead of a side effect of a refactor.',
-			from: { path: '^src/lib/business' },
-			to: { path: '^src/lib/presentation' },
+				'`import type` (AGENTS.md R1).',
+			from: {
+				path: '^src/lib/business',
+			},
+			to: {
+				path: '^src/lib/presentation',
+			},
 		},
 		{
 			name: 'presentation-not-to-data',
 			severity: 'error',
 			comment:
 				'Presentation code (and the app shell: routes, hooks, service worker) must go through ' +
-				'the business layer -- stores in $lib/business/store, types via $lib/business/type ' +
+				'the business layer — stores in $lib/business/store, types via $lib/business/type ' +
 				'(AGENTS.md R1). Note this binds the SERVER files too: a load function is the ' +
 				'composition root, not a licence to reach the repository.',
-			from: { path: '^src/(lib/presentation|routes|hooks|service-worker)' },
-			to: { path: '^src/lib/data' },
+			from: {
+				path: '^src/(lib/presentation|routes|hooks|service-worker)',
+			},
+			to: {
+				path: '^src/lib/data',
+			},
 		},
 		{
 			name: 'presentation-not-to-business-model',
 			severity: 'error',
 			comment:
-				'Reads end at a store. A route or component may use $lib/business/store; calling a ' +
-				'model directly puts orchestration in a file no *.spec.ts can reach (AGENTS.md R2). ' +
-				'`import type` is fine -- it is how a component types its props.',
+				'Reads end at a store. A route or component may use $lib/business/store and ' +
+				'$lib/business/state; calling a model directly puts orchestration in a file no ' +
+				'*.spec.ts / *.test.ts can reach (AGENTS.md R2). `import type` is fine — it is how a component ' +
+				'types its props — and so are the pure helpers in $lib/business/utils.',
 			from: {
 				// Server files are the composition root; specs and stories build their own
 				// fixtures and are not the drift this rule is about.
@@ -59,16 +71,28 @@ module.exports = {
 			},
 		},
 		{
+			name: 'logger-imports-nothing',
+			severity: 'error',
+			comment:
+				'$lib/logger sits below all three layers on purpose — every layer reports through it ' +
+				'(AGENTS.md R1). Importing app code from it would make it a member of whichever layer ' +
+				'it imported, and break the direction for the other two.',
+			from: {
+				path: '^src/lib/logger[.]ts$',
+			},
+			to: {
+				path: '^src/(lib/(data|business|presentation)|routes)',
+			},
+		},
+		{
 			name: 'leaf-not-to-upper-layers',
-			// Not in the zenith rule set, which has no lib/utils. This repo does, so it
-			// needs saying: utils is the shared leaf precisely because it imports nothing
-			// internal, which is what lets both business and presentation use it.
 			severity: 'error',
 			comment:
 				'src/lib/utils is the shared leaf: pure helpers with no idea what the app does. A ' +
 				'dependency on a layer turns a helper into a layer and gives it a second reason to ' +
-				'change -- take the value as an argument instead. If a helper genuinely belongs to ' +
-				'one layer, move it there rather than importing upward from here.',
+				'change — take the value as an argument instead. If a helper genuinely belongs to ' +
+				'one layer, move it there rather than importing upward from here. (Inert in a repo ' +
+				'with no src/lib/utils.)',
 			from: {
 				path: '^src/lib/utils/',
 				pathNot: '[.](?:spec|test)[.](?:js|ts)$',
@@ -80,14 +104,17 @@ module.exports = {
 		},
 		{
 			name: 'no-circular',
-			// Kept at warn: config-container <-> grid <-> sub-grid is a real cycle and a
-			// deliberate one -- config containers nest, so the renderer has to recurse.
-			// Any NEW cycle outside that trio is worth a look.
-			severity: 'warn',
+			severity: 'error',
 			comment:
 				'This dependency is part of a circular relationship. You might want to revise ' +
 				'your solution (i.e. use dependency inversion, make sure the modules have a single responsibility) ',
-			from: {},
+			// The one exempted cycle is a config-driven renderer recursing through its own
+			// container: config-container ↔ grid ↔ sub-grid. Only cycles wholly inside that
+			// trio are silenced — a new cycle involving one of them plus any other module is
+			// still reported from the other module. No such files in zenith, so it is inert there.
+			from: {
+				pathNot: '^src/lib/presentation/components/(?:config-container|grid|sub-grid)[.]svelte$',
+			},
 			to: {
 				circular: true,
 			},
@@ -100,7 +127,7 @@ module.exports = {
 				'add an exception for it in your dependency-cruiser configuration. By default ' +
 				'this rule does not scrutinize dot-files (e.g. .eslintrc.js), TypeScript declaration ' +
 				'files (.d.ts), tsconfig.json and some of the babel and webpack configs.',
-			severity: 'warn',
+			severity: 'error',
 			from: {
 				orphan: true,
 				pathNot: [
@@ -108,7 +135,7 @@ module.exports = {
 					// type-only modules: `import type` inside .svelte files is stripped by the
 					// svelte compiler before dependency-cruiser sees it, so these look like
 					// orphans even when components use them
-					'^src/lib/business/type/',
+					'^src/lib/(presentation|business|data)/type(s)?/',
 					'(^|/)[.][^/]+[.](?:js|cjs|mjs|ts|cts|mts|json)$', // dot files
 					'[.]d[.]ts$', // TypeScript declaration files
 					'(^|/)tsconfig[.]json$', // TypeScript config
@@ -124,8 +151,8 @@ module.exports = {
 				"bound to exist - node doesn't deprecate lightly.",
 			severity: 'warn',
 			from: {
-				// generated paraglide code uses async_hooks for AsyncLocalStorage, which is
-				// stable - only the original hooks API in that module is deprecated
+				// generated paraglide code uses async_hooks for AsyncLocalStorage,
+				// which is stable - only the original hooks API in that module is deprecated
 				pathNot: ['^src/lib/paraglide/'],
 			},
 			to: {
@@ -206,6 +233,9 @@ module.exports = {
 				dependencyTypesNot: ['type-only'],
 			},
 		},
+
+		// rules you might want to tweak for your specific situation:
+
 		{
 			name: 'not-to-spec',
 			comment:
@@ -220,9 +250,8 @@ module.exports = {
 		},
 		{
 			name: 'not-to-dev-dep',
-			// SvelteKit keeps every build-time dependency in devDependencies (Vite bundles
-			// them), so this rule is all false positives here -- every `svelte` and
-			// `@sveltejs/kit` import would be flagged.
+			// SvelteKit apps keep all deps in devDependencies (Vite bundles at build time),
+			// so this rule produces only false positives here.
 			severity: 'ignore',
 			comment:
 				"This module depends on an npm package from the 'devDependencies' section of your " +
@@ -270,49 +299,172 @@ module.exports = {
 		},
 	],
 	options: {
+		// Which modules not to follow further when encountered
 		doNotFollow: {
+			// path: an array of regular expressions in strings to match against
 			path: ['node_modules'],
 		},
 
+		// Which modules to exclude
 		exclude: {
 			// generated paraglide message functions - hundreds of files, no insight
 			path: ['^src/lib/paraglide/messages'],
 		},
 
+		// Which modules to exclusively include (array of regular expressions in strings)
+		// dependency-cruiser will skip everything that doesn't match this pattern
+		// includeOnly : [''],
+
+		// List of module systems to cruise.
+		// When left out dependency-cruiser will fall back to the list of _all_
+		// module systems it knows of ('amd', 'cjs', 'es6', 'tsd']). It's the
+		// default because it's the safe option. It comes at a performance penalty, though
+		// As in practice only commonjs ('cjs') and ecmascript modules ('es6')
+		// are in wide use, you can limit the moduleSystems to those.
+		// moduleSystems: ['cjs', 'es6'],
+
+		// false: don't look at JSDoc imports (the default)
+		// true: detect dependencies in JSDoc-style import statements.
+		// Implies parser: 'tsc', which a.o. means the typescript compiler will need
+		// to be installed in the same spot you run dependency-cruiser from.
+		// detectJSDocImports: true,
+
+		// false: don't look at process.getBuiltinModule calls (the default)
+		// true: dependency-cruiser will detect calls to process.getBuiltinModule/
+		// globalThis.process.getBuiltinModule as imports.
 		detectProcessBuiltinModuleCalls: true,
 
-		// `import type` is erased before the bundler sees it -- and it is exactly what
-		// separates a legal type reference across layers from an illegal value import,
-		// so the layer rules need these detected.
+		// prefix for links in html, d2, mermaid and dot/ svg output (e.g. 'https://github.com/you/yourrepo/blob/main/'
+		// to open it on your online repo or `vscode://file/${process.cwd()}/` to
+		// open it in visual studio code),
+		// prefix: `vscode://file/${process.cwd()}/`,
+
+		// suffix for links in output. E.g. put .html here if you use it to link to
+		// your coverage reports.
+		// suffix: '.html',
+
+		// false (the default): ignore dependencies that only exist before typescript-to-javascript compilation
+		// true: also detect dependencies that only exist before typescript-to-javascript compilation
+		// 'specify': for each dependency identify whether it only exists before compilation or also after
 		tsPreCompilationDeps: true,
 
-		// Resolves `$lib`. The app's own tsconfig.json can't be used here: it delegates
-		// aliases to svelte.config.js and inherits them via .svelte-kit/tsconfig.json,
-		// whose relative `include` paths only resolve from inside .svelte-kit. See the
-		// comment in tsconfig.depcruise.json.
+		// list of extensions to scan that aren't javascript or compile-to-javascript.
+		// Empty by default. Only put extensions in here that you want to take into
+		// account that are _not_ parsable.
+		// extraExtensionsToScan: ['.json', '.jpg', '.png', '.svg', '.webp'],
+
+		// if true combines the package.jsons found from the module up to the base
+		// folder the cruise is initiated from. Useful for how (some) mono-repos
+		// manage dependencies & dependency definitions.
+		// combinedDependencies: false,
+
+		// if true leave symlinks untouched, otherwise use the realpath
+		// preserveSymlinks: false,
+
+		// TypeScript project file ('tsconfig.json') to use for
+		// (1) compilation and
+		// (2) resolution (e.g. with the paths property)
+		//
+		// The (optional) fileName attribute specifies which file to take (relative to
+		// dependency-cruiser's current working directory). When not provided
+		// defaults to './tsconfig.json'.
 		tsConfig: {
 			fileName: 'tsconfig.depcruise.json',
 		},
 
+		// Webpack configuration to use to get resolve options from.
+		//
+		// The (optional) fileName attribute specifies which file to take (relative
+		// to dependency-cruiser's current working directory. When not provided defaults
+		// to './webpack.conf.js'.
+		//
+		// The (optional) 'env' and 'arguments' attributes contain the parameters
+		// to be passed if your webpack config is a function and takes them (see
+		//  webpack documentation for details)
+		// webpackConfig: {
+		//  fileName: 'webpack.config.js',
+		//  env: {},
+		//  arguments: {}
+		// },
+
+		// Babel config ('.babelrc', '.babelrc.json', '.babelrc.json5', ...) to use
+		// for compilation
+		// babelConfig: {
+		//   fileName: '.babelrc',
+		// },
+
+		// List of strings you have in use in addition to cjs/ es6 requires
+		// & imports to declare module dependencies. Use this e.g. if you've
+		// re-declared require, use a require-wrapper or use window.require as
+		// a hack.
+		// exoticRequireStrings: [],
+
+		// options to pass on to enhanced-resolve, the package dependency-cruiser
+		// uses to resolve module references to disk. The values below should be
+		// suitable for most situations
+		//
+		// If you use webpack: you can also set these in webpack.conf.js. The set
+		// there will override the ones specified here.
 		enhancedResolveOptions: {
+			// What to consider as an 'exports' field in package.jsons
 			exportsFields: ['exports'],
-			// 'svelte' and 'browser' are needed on top of the defaults so imports of
-			// svelte itself resolve to real files instead of showing up unresolvable.
+
+			// List of conditions to check for in the exports field.
+			// Only works when the 'exportsFields' array is non-empty.
+			// 'svelte' and 'browser' are on top of the defaults so imports of svelte
+			// itself resolve to real files instead of showing up unresolvable.
 			conditionNames: ['import', 'require', 'node', 'default', 'types', 'svelte', 'browser'],
+
+			// The extensions, by default are the same as the ones dependency-cruiser
+			// can access (run `npx depcruise --info` to see which ones that are in
+			// _your_ environment). If that list is larger than you need you can pass
+			// the extensions you actually use (e.g. ['.js', '.jsx']). This can speed
+			// up module resolution, which is the most expensive step.
+			// extensions: [".js", ".jsx", ".ts", ".tsx", ".d.ts"],
+
+			// What to consider a 'main' field in package.json
 			mainFields: ['module', 'main', 'types', 'typings'],
+
+			// A list of alias fields in package.jsons
+			// See https://github.com/defunctzombie/package-browser-field-spec and
+			// the webpack [resolve.alias](https://webpack.js.org/configuration/resolve/#resolvealiasfields)
+			// documentation.
+			// Defaults to an empty array (= don't use alias fields).
+			// aliasFields: ['browser'],
 		},
 
+		// skipAnalysisNotInRules will make dependency-cruiser execute
+		// analysis strictly necessary for checking the rule set only.
+		// See https://github.com/sverweij/dependency-cruiser/blob/main/doc/options-reference.md#skipanalysisnotinrules
 		skipAnalysisNotInRules: true,
 
 		reporterOptions: {
 			dot: {
-				// Collapse node_modules one folder deep, and fold the generated paraglide
-				// output into a single node, so the graph shows this app's own structure.
+				// Pattern of modules to consolidate to. The default pattern in this configuration
+				// collapses everything in node_modules to one folder deep so you see
+				// the external modules, but not their innards.
 				collapsePattern: 'node_modules/(?:@[^/]+/[^/]+|[^/]+)|^src/lib/paraglide',
+
+				// Options to tweak the appearance of your graph. See
+				// https://github.com/sverweij/dependency-cruiser/blob/main/doc/options-reference.md#reporteroptions
+				// If you don't specify a theme dependency-cruiser falls back to a built-in one.
+				// theme: {
+				//   graph: {
+				//     // splines: 'ortho' - straight lines; slow on big graphs
+				//     // splines: 'true' - bezier curves; fast but not as nice as ortho
+				//     splines: 'true'
+				//   },
+				// },
 			},
 			archi: {
+				// Pattern of modules to consolidate to.
 				collapsePattern:
 					'^(?:packages|src|lib(s?)|app(s?)|bin|test(s?)|spec(s?))/[^/]+|node_modules/(?:@[^/]+/[^/]+|[^/]+)',
+
+				// Options to tweak the appearance of your graph. If you don't specify a
+				// theme for 'archi' dependency-cruiser will use the one specified in the
+				// dot section above and otherwise use the default one.
+				// theme: { },
 			},
 			text: {
 				highlightFocused: true,

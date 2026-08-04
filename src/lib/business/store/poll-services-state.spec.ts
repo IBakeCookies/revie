@@ -12,16 +12,28 @@ const containers: ConfigContainer[] = [
 			items: [
 				{
 					name: 'BoxService',
-					props: { title: 'Proxmox', href: 'https://proxmox.local', img: { src: '' } },
+					props: {
+						title: 'Proxmox',
+						href: 'https://proxmox.local',
+						img: {
+							src: '',
+						},
+					},
 				},
 			],
 		},
 	},
-	{ name: 'BoxDate', props: {} },
+	{
+		name: 'BoxDate',
+		props: {},
+	},
 ];
 
 function fakeStore(): ServicesStore {
-	return { refresh: vi.fn(), isAlive: vi.fn() } as unknown as ServicesStore;
+	return {
+		refresh: vi.fn(),
+		isAlive: vi.fn(),
+	} as unknown as ServicesStore;
 }
 
 beforeEach(() => {

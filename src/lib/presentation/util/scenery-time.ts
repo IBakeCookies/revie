@@ -12,17 +12,14 @@
 
 export function dataSceneryStyle(now: Date): string {
 	const hours = now.getHours() + now.getMinutes() / 60;
-
 	/* sundial: 0 at 06:00 → 1 at 20:00, clamped; alt is the sun's altitude
 	   arc (0 at the ends, 1 at noon); vis fades the whole scenery out over
 	   the hour past 20:00 and back in before 06:00 — at night the dial sleeps */
 	const sun = Math.min(1, Math.max(0, (hours - 6) / 14));
 	const alt = Math.sin(Math.PI * sun);
 	const vis = Math.min(1, Math.max(0, Math.min(hours - 5, 21 - hours)));
-
 	/* tide: the day's water — full early, ebbing to low at 23:00 */
 	const tide = Math.min(1, Math.max(0, (23 - hours) / 16));
-
 	/* city-windows: how dark the sky is — vis inverted, so the skyline's
 	   windows light in waves as the sun goes down (thresholds in the CSS) */
 	const dark = 1 - vis;

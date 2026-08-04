@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # `check` chains `npm run paraglide` itself, and so does the `prepare` that
+      # `npm ci` runs: src/lib/paraglide/ is gitignored and only the compiler
+      # writes it, so a fresh clone reports unresolved modules without it. Don't
+      # add a standalone paraglide step — it would be a third invocation.
+      - run: npm run check
+      # prettier --check, eslint, and lint:deps (the dependency-cruiser layer
+      # rules) — all three are at 0 and AGENTS.md says keep them there. There is
+      # no separate `depcheck` script here; `lint` already chains `lint:deps`.
+      - run: npm run lint
+      # chromium is needed TWICE: the vitest `client` project runs in a real
+      # browser and the e2e suite drives one. Cached per Playwright version;
+      # `install` skips the download on a cache hit and only apt deps re-install.
+      - id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.playwright.outputs.version }}
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:unit -- --run
+      # playwright.config.ts's webServer runs `npm run build && npm run preview`
+      # with DASHBOARD_CONFIG=e2e/fixture-config.json, so this step is also the
+      # build smoke test and never reads the gitignored config.json.
+      - run: npm run test:e2e
+
+      # Playwright's report and failure traces/videos, plus vitest coverage once
+      # it is wired — all under test-result/. Upload even when a test failed.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: test-result/
+          if-no-files-found: ignore
+
+      # dependency-graph.svg IS tracked here, so this artifact is a comparison
+      # aid rather than the only copy — don't gate on a diff, `dot` output is not
+      # stable across graphviz versions. `dot` is not on the runner by default.
+      - name: Render the dependency graph
+        run: sudo apt-get install -y --no-install-recommends graphviz && npm run depgraph
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dependency-graph
+          path: dependency-graph.svg
+          if-no-files-found: error

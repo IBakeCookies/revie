@@ -11,7 +11,16 @@ describe('cn', () => {
 	});
 
 	it('resolves conditional and falsy inputs', () => {
-		expect(cn('rounded', { 'rounded-xs': true, hidden: false }, undefined)).toBe('rounded-xs');
+		expect(
+			cn(
+				'rounded',
+				{
+					'rounded-xs': true,
+					hidden: false,
+				},
+				undefined,
+			),
+		).toBe('rounded-xs');
 	});
 });
 

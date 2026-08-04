@@ -9,6 +9,11 @@
 		class?: ClassValue;
 	} & HTMLAttributes<HTMLDivElement>;
 
+	let { span, ...restProps }: Props = $props();
+
+	// Instance scope, not module scope: the module body runs once per node
+	// process while the locale is per request, so a module-level formatter
+	// freezes every SSR response to the first visitor's locale.
 	const formatter = new Intl.DateTimeFormat(getLocale(), {
 		weekday: 'short',
 		day: '2-digit',
@@ -19,7 +24,6 @@
 		second: '2-digit',
 	});
 
-	let { span, ...restProps }: Props = $props();
 	let currentDate = $state(formatter.format(new Date()));
 
 	$effect(() => {

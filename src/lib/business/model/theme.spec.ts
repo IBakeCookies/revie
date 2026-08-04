@@ -13,6 +13,7 @@ describe('theme catalogue', () => {
 		const names = themes.map((t) => t.name);
 
 		expect(new Set(names).size).toBe(names.length);
+
 		for (const theme of themes) {
 			expect(theme.label.length).toBeGreaterThan(0);
 			expect(theme.css.length).toBeGreaterThan(0);

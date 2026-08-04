@@ -24,16 +24,85 @@ test('switches the theme and drops the classes of the previous one', async ({ pa
 
 test('marks the theme that is currently active', async ({ page }) => {
 	await chooseFromDropdown(page, 'Theme', 'Terminal');
-	await page.getByRole('button', { name: 'Theme' }).hover();
 
-	await expect(page.getByRole('button', { name: 'Terminal' })).toHaveClass(/font-bold/);
+	await page
+		.getByRole('button', {
+			name: 'Theme',
+		})
+		.hover();
+
+	await expect(
+		page.getByRole('button', {
+			name: 'Terminal',
+		}),
+	).toHaveClass(/font-bold/);
 });
 
 test.describe('with an operating system that prefers dark', () => {
-	test.use({ colorScheme: 'dark' });
+	test.use({
+		colorScheme: 'dark',
+	});
 
 	test('starts on the dark default', async ({ page }) => {
 		await expect(page.locator('html')).toHaveClass(/dark/);
+		// the pre-paint script swaps the classes it owns rather than assigning
+		// className, so the light default's has to be gone
+		await expect(page.locator('html')).not.toHaveClass(/fallow/);
+	});
+});
+
+test.describe('with an operating system that asks for reduced motion', () => {
+	// emulateMedia, not test.use({ reducedMotion }): the context option does not
+	// reach matchMedia in this Chromium, so the page would see no preference.
+	test.beforeEach(async ({ page }) => {
+		await page.emulateMedia({
+			reducedMotion: 'reduce',
+		});
+
+		await page.goto('/');
+	});
+
+	test('pauses the scenery before first paint, with no cookie', async ({ page }) => {
+		await expect(page.locator('html')).toHaveClass(/scenery-paused/);
+	});
+
+	/* style/scenery/index.css pauses motion under prefers-reduced-motion with
+	   !important, so the toggle could not honor a resume — it is hidden rather than
+	   left to mislabel a state it cannot change. The reroll is unaffected: a static
+	   arrangement still varies per user. */
+	test('hides the motion toggle and keeps the reroll', async ({ page }) => {
+		await page
+			.getByRole('button', {
+				name: 'Theme',
+			})
+			.hover();
+
+		await expect(
+			page.getByRole('button', {
+				name: 'Reroll scenery',
+			}),
+		).toBeVisible();
+
+		await expect(
+			page.getByRole('button', {
+				name: /animations/,
+			}),
+		).toHaveCount(0);
+	});
+
+	// Both preferences at once is what the pre-paint script used to break: it
+	// assigned className, wiping the scenery-paused class the server had stamped.
+	test('keeps the paused scenery when it also swaps in the dark default', async ({ page }) => {
+		await page.emulateMedia({
+			colorScheme: 'dark',
+			reducedMotion: 'reduce',
+		});
+
+		await page.goto('/');
+
+		await expect(page.locator('html')).toHaveClass(/dark/);
+		await expect(page.locator('html')).toHaveClass(/scenery-paused/);
+		await expect(page.locator('html')).not.toHaveClass(/fallow/);
 	});
 });
 

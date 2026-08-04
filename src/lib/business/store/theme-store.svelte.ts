@@ -44,6 +44,10 @@ export class ThemeStore {
 	// defaults to prefers-reduced-motion when no cookie says otherwise
 	#sceneryPaused = $state<boolean>(false);
 
+	// the OS setting, tracked live: `scenery/index.css` pauses motion under it
+	// with !important, so nothing the pause/resume control does can be honored
+	#prefersReducedMotion = $state<boolean>(false);
+
 	#classesToAdd = $derived.by<string[]>(() => {
 		return getClassesToAdd(this.#theme);
 	});
@@ -69,19 +73,28 @@ export class ThemeStore {
 			document.documentElement.classList.toggle('scenery-paused', this.#sceneryPaused);
 		});
 
-		// no cookie means no explicit preference yet — honor the OS setting,
-		// same onMount/matchMedia approach as the dark-theme default below
-		if (initialSceneryPaused === undefined) {
-			onMount(() => {
-				const prefersReducedMotion =
-					window.matchMedia &&
-					window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		// Tracked rather than read once: the OS setting can flip mid-session and
+		// the CSS honors it immediately, so the control has to appear/disappear
+		// with it. No cookie also means no explicit preference yet, in which
+		// case the same query seeds the initial pause state — once, so a later
+		// flip cannot overwrite a choice the user has made since.
+		onMount(() => {
+			const query = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-				if (!prefersReducedMotion) return;
+			const sync = () => {
+				this.#prefersReducedMotion = query.matches;
+			};
 
+			sync();
+
+			if (initialSceneryPaused === undefined && query.matches) {
 				this.#sceneryPaused = true;
-			});
-		}
+			}
+
+			query.addEventListener('change', sync);
+
+			return () => query.removeEventListener('change', sync);
+		});
 
 		// a cached or prerendered document carries a serialized theme that may be
 		// stale — the cookie is the source of truth, so it wins over initialTheme
@@ -134,6 +147,11 @@ export class ThemeStore {
 
 	get sceneryPaused() {
 		return this.#sceneryPaused;
+	}
+
+	/** False while the OS asks for reduced motion — see `#prefersReducedMotion`. */
+	get sceneryMotionToggleable() {
+		return !this.#prefersReducedMotion;
 	}
 
 	switchTheme(newTheme: ThemeName): void {

@@ -11,6 +11,7 @@ describe('useAsyncErrorAsValue', () => {
 
 	it('turns a thrown Error into a value instead of rejecting', async () => {
 		const cause = new Error('boom');
+
 		const [err, res] = await useAsyncErrorAsValue(async () => {
 			throw cause;
 		});

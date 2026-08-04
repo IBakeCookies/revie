@@ -7,6 +7,7 @@
 			"name": "Home",
 			"containers": [
 				{ "name": "BoxDate" },
+
 				{
 					"name": "BoxAdguard",
 					"props": { "href": "http://127.0.0.1:9999" }
@@ -25,7 +26,7 @@
 											"name": "BoxService",
 											"props": {
 												"title": "Loopback",
-												"href": "http://127.0.0.1:8080",
+												"href": "http://127.0.0.1:4173",
 												"img": { "src": "/robots.txt" }
 											}
 										}
@@ -52,7 +53,7 @@
 					"name": "BoxService",
 					"props": {
 						"title": "Loopback",
-						"href": "http://127.0.0.1:8080",
+						"href": "http://127.0.0.1:4173",
 						"img": { "src": "/robots.txt" }
 					}
 				}

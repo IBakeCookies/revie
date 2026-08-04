@@ -80,9 +80,11 @@ export function readOrMintScenerySeed(
 	cookies: CookieSource & Parameters<typeof appearanceRepository.$createScenerySeedCookie>[0],
 ): number {
 	const stored = appearanceRepository.$readAppearance(cookies).scenerySeed;
+
 	if (stored !== undefined) return stored;
 
 	const seed = randomScenerySeed();
 	appearanceRepository.$createScenerySeedCookie(cookies, seed);
+
 	return seed;
 }

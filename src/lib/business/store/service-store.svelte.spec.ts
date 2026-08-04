@@ -4,7 +4,9 @@ import { ServicesStore } from '$lib/business/store/service-store.svelte';
 
 // Mocked at the store's own boundary: business. Whether a failed probe means
 // "offline" or "undetermined" is business's call and is tested next to it.
-vi.mock('$lib/business/model/service', () => ({ readServiceState: vi.fn() }));
+vi.mock('$lib/business/model/service', () => ({
+	readServiceState: vi.fn(),
+}));
 
 const href = 'http://wled.local';
 
@@ -45,7 +47,13 @@ describe('ServicesStore', () => {
 		vi.mocked(readServiceState).mockResolvedValue([null, true]);
 		await store.refresh(href);
 
-		vi.mocked(readServiceState).mockResolvedValue([{ message: 'Could not reach' }, null]);
+		vi.mocked(readServiceState).mockResolvedValue([
+			{
+				message: 'Could not reach',
+			},
+			null,
+		]);
+
 		await store.refresh(href);
 
 		expect(store.isAlive(href)).toBe(true);
@@ -54,7 +62,11 @@ describe('ServicesStore', () => {
 	it('reports the failure instead of swallowing it, with a renderable message', async () => {
 		const report = vi.fn();
 		const store = new ServicesStore(report);
-		const error = { message: `Could not reach ${href}`, cause: new Error('fetch failed') };
+
+		const error = {
+			message: `Could not reach ${href}`,
+			cause: new Error('fetch failed'),
+		};
 
 		vi.mocked(readServiceState).mockResolvedValue([error, null]);
 		await store.refresh(href);
@@ -68,7 +80,13 @@ describe('ServicesStore', () => {
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const store = new ServicesStore();
 
-		vi.mocked(readServiceState).mockResolvedValue([{ message: 'boom' }, null]);
+		vi.mocked(readServiceState).mockResolvedValue([
+			{
+				message: 'boom',
+			},
+			null,
+		]);
+
 		await store.refresh(href);
 
 		expect(consoleError).toHaveBeenCalledOnce();

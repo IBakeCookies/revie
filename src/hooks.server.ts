@@ -2,6 +2,7 @@ import type { Handle } from '@sveltejs/kit';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 import { sequence } from '@sveltejs/kit/hooks';
 import { readRequestAppearance } from '$lib/business/model/appearance';
+import { DEFAULT_DARK_THEME, DEFAULT_THEME, getClassesToAdd } from '$lib/business/model/theme';
 
 const handleParaglide: Handle = ({ event, resolve }) =>
 	paraglideMiddleware(event.request, ({ request, locale }) => {
@@ -12,12 +13,23 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 		});
 	});
 
+// app.html's pre-paint script swaps the default theme's classes for the dark
+// default's; injecting them as JS array literals keeps the catalogue in
+// business/model/theme.ts the single source of both.
+const defaultThemeClasses = JSON.stringify(getClassesToAdd(DEFAULT_THEME));
+const defaultDarkThemeClasses = JSON.stringify(getClassesToAdd(DEFAULT_DARK_THEME));
+
 const handleTheme: Handle = ({ event, resolve }) => {
 	const { themeClass } = readRequestAppearance(event.cookies);
 
-	// The placeholder always has to be replaced, otherwise it ends up in the markup.
+	// Every placeholder always has to be replaced, otherwise it ends up in the
+	// markup — as a syntax error, for the two inside the script.
 	return resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('%theme%', themeClass),
+		transformPageChunk: ({ html }) =>
+			html
+				.replace('%theme%', themeClass)
+				.replace('%theme.default%', defaultThemeClasses)
+				.replace('%theme.default-dark%', defaultDarkThemeClasses),
 	});
 };
 

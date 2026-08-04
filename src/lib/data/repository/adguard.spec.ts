@@ -28,12 +28,16 @@ afterEach(() => {
 
 describe('getAdguardStats', () => {
 	it('asks the stats endpoint with basic auth', async () => {
-		const fetchMock = stubFetch({ ok: true, json: async () => stats });
+		const fetchMock = stubFetch({
+			ok: true,
+			json: async () => stats,
+		});
 
 		const [err, res] = await getAdguardStats(input);
 
 		expect(err).toBeNull();
 		expect(res).toEqual(stats);
+
 		expect(fetchMock).toHaveBeenCalledWith(
 			'http://adguard.local/control/stats',
 			expect.objectContaining({
@@ -45,7 +49,10 @@ describe('getAdguardStats', () => {
 	});
 
 	it('bounds the request, so an unreachable host cannot stall the page load', async () => {
-		const fetchMock = stubFetch({ ok: true, json: async () => stats });
+		const fetchMock = stubFetch({
+			ok: true,
+			json: async () => stats,
+		});
 
 		await getAdguardStats(input);
 
@@ -56,7 +63,12 @@ describe('getAdguardStats', () => {
 	});
 
 	it('surfaces a message that is safe to show a user', async () => {
-		stubFetch({ ok: false, status: 401, statusText: 'Unauthorized', json: async () => ({}) });
+		stubFetch({
+			ok: false,
+			status: 401,
+			statusText: 'Unauthorized',
+			json: async () => ({}),
+		});
 
 		const [err] = await getAdguardStats(input);
 

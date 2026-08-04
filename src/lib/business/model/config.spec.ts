@@ -10,7 +10,9 @@ import {
 
 const rawConfig = {
 	defaults: {
-		BoxService: { span: 6 },
+		BoxService: {
+			span: 6,
+		},
 	},
 	pages: {
 		'/': {
@@ -29,20 +31,26 @@ const rawConfig = {
 									items: [
 										{
 											name: 'BoxAdguard',
-											props: { href: 'http://adguard.local' },
+											props: {
+												href: 'http://adguard.local',
+											},
 										},
 										{
 											name: 'BoxService',
 											props: {
 												title: 'Proxmox',
 												href: 'https://proxmox.local:8006',
-												img: { src: 'https://icons.local/proxmox.svg' },
+												img: {
+													src: 'https://icons.local/proxmox.svg',
+												},
 											},
 										},
 									],
 								},
 							},
-							{ name: 'NotAComponent' },
+							{
+								name: 'NotAComponent',
+							},
 							'not a container',
 						],
 					},
@@ -99,22 +107,43 @@ describe('normalizeConfig', () => {
 describe('containers that would throw while rendering', () => {
 	function pageWith(...containers: unknown[]) {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		const page = normalizeConfig({ pages: { '/': { containers } } }).pages['/'];
 
-		return { page, warn };
+		const page = normalizeConfig({
+			pages: {
+				'/': {
+					containers,
+				},
+			},
+		}).pages['/'];
+
+		return {
+			page,
+			warn,
+		};
 	}
 
 	it('gives a Grid written before its children an empty items array', () => {
 		// The most likely half-finished hand edit. `items` used to stay undefined,
 		// which threw in every traversal below and took the page to a 500.
-		const { page } = pageWith({ name: 'Grid', props: { title: 'Services' } });
+		const { page } = pageWith({
+			name: 'Grid',
+			props: {
+				title: 'Services',
+			},
+		});
+
 		const [grid] = page.containers;
 
 		expect(itemsOf(grid)).toEqual([]);
 	});
 
 	it('leaves the traversals safe on a Grid with no items', () => {
-		const { page } = pageWith({ name: 'Grid', props: { title: 'Services' } });
+		const { page } = pageWith({
+			name: 'Grid',
+			props: {
+				title: 'Services',
+			},
+		});
 
 		expect(() => findContainer(page, 'BoxAdguard')).not.toThrow();
 		expect(() => collectServiceHrefs(page.containers)).not.toThrow();
@@ -123,7 +152,10 @@ describe('containers that would throw while rendering', () => {
 	it('drops a BoxService with no img, which would throw during SSR', () => {
 		const { page, warn } = pageWith({
 			name: 'BoxService',
-			props: { title: 'Proxmox', href: 'https://proxmox.local:8006' },
+			props: {
+				title: 'Proxmox',
+				href: 'https://proxmox.local:8006',
+			},
 		});
 
 		expect(page.containers).toEqual([]);
@@ -133,7 +165,12 @@ describe('containers that would throw while rendering', () => {
 	it('drops a BoxService with no href', () => {
 		const { page, warn } = pageWith({
 			name: 'BoxService',
-			props: { title: 'Proxmox', img: { src: 'https://icons.local/p.svg' } },
+			props: {
+				title: 'Proxmox',
+				img: {
+					src: 'https://icons.local/p.svg',
+				},
+			},
 		});
 
 		expect(page.containers).toEqual([]);
@@ -143,21 +180,30 @@ describe('containers that would throw while rendering', () => {
 	it('drops a BoxService whose href is not a string', () => {
 		const { page } = pageWith({
 			name: 'BoxService',
-			props: { href: 42, img: { src: 'https://icons.local/p.svg' } },
+			props: {
+				href: 42,
+				img: {
+					src: 'https://icons.local/p.svg',
+				},
+			},
 		});
 
 		expect(page.containers).toEqual([]);
 	});
 
 	it('drops a BoxAdguard with no href', () => {
-		const { page, warn } = pageWith({ name: 'BoxAdguard' });
+		const { page, warn } = pageWith({
+			name: 'BoxAdguard',
+		});
 
 		expect(page.containers).toEqual([]);
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('href'));
 	});
 
 	it('keeps a BoxDate, which requires nothing', () => {
-		const { page } = pageWith({ name: 'BoxDate' });
+		const { page } = pageWith({
+			name: 'BoxDate',
+		});
 
 		expect(page.containers.map((c) => c.name)).toEqual(['BoxDate']);
 	});
@@ -166,7 +212,17 @@ describe('containers that would throw while rendering', () => {
 		const { page } = pageWith({
 			name: 'Grid',
 			props: {
-				items: [{ name: 'BoxService', props: { title: 'no img' } }, { name: 'BoxDate' }],
+				items: [
+					{
+						name: 'BoxService',
+						props: {
+							title: 'no img',
+						},
+					},
+					{
+						name: 'BoxDate',
+					},
+				],
 			},
 		});
 

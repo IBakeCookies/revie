@@ -7,7 +7,9 @@ import { spanOf } from '$lib/test/dom';
 const props = {
 	title: 'Proxmox',
 	href: 'https://proxmox.local:8006',
-	img: { src: '/favicon.svg' },
+	img: {
+		src: '/favicon.svg',
+	},
 };
 
 describe('box-service.svelte', () => {
@@ -25,14 +27,22 @@ describe('box-service.svelte', () => {
 		const img = screen.container.querySelector('img');
 
 		await expect
-			.element(screen.getByRole('heading', { level: 3 }))
+			.element(
+				screen.getByRole('heading', {
+					level: 3,
+				}),
+			)
 			.toHaveTextContent('Proxmox');
+
 		expect(img?.getAttribute('src')).toBe('/favicon.svg');
 		expect(img?.getAttribute('alt')).toBe('');
 	});
 
 	it('passes the column span as a custom property, because config cannot reach Tailwind', () => {
-		const screen = render(BoxService, { ...props, span: 6 });
+		const screen = render(BoxService, {
+			...props,
+			span: 6,
+		});
 
 		expect(spanOf(screen.container)).toBe('6');
 	});
@@ -51,7 +61,10 @@ describe('box-service.svelte', () => {
 	});
 
 	it('marks a reachable service as online', async () => {
-		const screen = render(BoxService, { ...props, isOnline: true });
+		const screen = render(BoxService, {
+			...props,
+			isOnline: true,
+		});
 
 		await expect
 			.element(screen.getByLabelText(m.service_status_online()))
@@ -59,7 +72,10 @@ describe('box-service.svelte', () => {
 	});
 
 	it('marks an unreachable service as offline', async () => {
-		const screen = render(BoxService, { ...props, isOnline: false });
+		const screen = render(BoxService, {
+			...props,
+			isOnline: false,
+		});
 
 		await expect
 			.element(screen.getByLabelText(m.service_status_offline()))

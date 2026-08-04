@@ -93,24 +93,14 @@
 				transparent 2px 2.4rem
 			),
 			/* rails: cyan, one tile = 3rem, never animated so x is free */
-				repeating-linear-gradient(
-					to right,
-					oklch(0.78 0.16 200 / 0.4) 0 2px,
-					transparent 2px 3rem
-				);
+				repeating-linear-gradient(to right, oklch(0.78 0.16 200 / 0.4) 0 2px, transparent 2px 3rem);
 		/* seed lever: rails are a static tile — x is free to offset per user */
 		background-position:
 			0 0,
 			var(--sw-grid-x, 0) 0;
 		transform: perspective(60vh) rotateX(68deg);
 		transform-origin: 50% 0%;
-		mask-image: linear-gradient(
-			to bottom,
-			transparent 0%,
-			black 12%,
-			black 85%,
-			transparent 100%
-		);
+		mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 85%, transparent 100%);
 		/* seamless one-tile loop (exactly one rung pitch) — phase via delay only */
 		animation: sw-grid-scroll 2.6s linear infinite;
 		animation-delay: var(--sw-grid-phase, 0s);

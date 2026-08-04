@@ -1,71 +1,150 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import ping from 'ping';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import net from 'node:net';
+import type { ConfigContainer } from '$lib/business/model/config';
 import { readConfig } from '$lib/business/model/config-source';
 import { POST } from './+server';
 
-vi.mock('ping', () => ({ default: { promise: { probe: vi.fn() } } }));
-vi.mock('$lib/business/model/config-source', () => ({ readConfig: vi.fn() }));
+vi.mock('$lib/business/model/config-source', () => ({
+	readConfig: vi.fn(),
+}));
 
-const probe = vi.mocked(ping.promise.probe);
+/* A real listener rather than a mocked socket: what the endpoint has to get right
+   is the port, and only an actual connect can tell an open one from a closed one.
+   Port 1 is privileged, so nothing is listening on it and the connect is refused. */
+const CLOSED_PORT = 1;
+const server = net.createServer();
+let openPort = 0;
 
 /** The handler only ever touches the request. */
 function event(body: BodyInit): Parameters<typeof POST>[0] {
 	return {
-		request: new Request('http://localhost/api/ping', { method: 'POST', body }),
+		request: new Request('http://localhost/api/ping', {
+			method: 'POST',
+			body,
+		}),
 	} as Parameters<typeof POST>[0];
 }
+
+function service(title: string, href: string): ConfigContainer {
+	return {
+		name: 'BoxService',
+		props: {
+			title,
+			href,
+			img: {
+				src: '',
+			},
+		},
+	};
+}
+
+beforeAll(async () => {
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+	openPort = (server.address() as net.AddressInfo).port;
+});
+
+afterAll(() => {
+	server.close();
+});
 
 beforeEach(() => {
 	vi.mocked(readConfig).mockResolvedValue({
 		pages: {
 			'/': {
 				containers: [
-					{
-						name: 'BoxService',
-						props: {
-							title: 'WLED',
-							href: 'http://wled.local:80',
-							img: { src: '' },
-						},
-					},
+					service('Listening', `http://127.0.0.1:${openPort}`),
+					service('Closed', `http://127.0.0.1:${CLOSED_PORT}`),
 				],
 			},
 		},
 	});
-
-	probe.mockResolvedValue({ alive: true } as Awaited<ReturnType<typeof probe>>);
 });
 
-describe('POST /api/ping', () => {
-	it('probes the hostname of a configured service', async () => {
-		const response = await POST(event(JSON.stringify({ href: 'http://wled.local:80' })));
+async function isAlive(href: string): Promise<unknown> {
+	return (
+		await POST(
+			event(
+				JSON.stringify({
+					href,
+				}),
+			),
+		)
+	).json();
+}
 
-		expect(await response.json()).toEqual({ isAlive: true });
-		expect(probe).toHaveBeenCalledWith('wled.local', expect.objectContaining({ timeout: 2 }));
+describe('POST /api/ping', () => {
+	it('reports a service that accepts a connection on its own port as online', async () => {
+		await expect(isAlive(`http://127.0.0.1:${openPort}`)).resolves.toEqual({
+			isAlive: true,
+		});
 	});
 
-	it('reports an unreachable service instead of failing', async () => {
-		probe.mockResolvedValue({ alive: false } as Awaited<ReturnType<typeof probe>>);
-
-		const response = await POST(event(JSON.stringify({ href: 'http://wled.local:80' })));
-
-		expect(await response.json()).toEqual({ isAlive: false });
+	it('reports a live host with a dead port as offline, not as up', async () => {
+		await expect(isAlive(`http://127.0.0.1:${CLOSED_PORT}`)).resolves.toEqual({
+			isAlive: false,
+		});
 	});
 
 	it('refuses a host that is not in the config, so the endpoint is not a port scanner', async () => {
 		await expect(
-			POST(event(JSON.stringify({ href: 'http://192.168.178.1' }))),
-		).rejects.toMatchObject({ status: 403 });
-		expect(probe).not.toHaveBeenCalled();
+			POST(
+				event(
+					JSON.stringify({
+						href: 'http://192.168.178.1',
+					}),
+				),
+			),
+		).rejects.toMatchObject({
+			status: 403,
+		});
+	});
+
+	it('refuses a configured host on a port no container names', async () => {
+		await expect(
+			POST(
+				event(
+					JSON.stringify({
+						href: 'http://127.0.0.1:9999',
+					}),
+				),
+			),
+		).rejects.toMatchObject({
+			status: 403,
+		});
 	});
 
 	it('rejects a body without an absolute URL', async () => {
-		await expect(POST(event(JSON.stringify({ href: 'wled.local' })))).rejects.toMatchObject({
+		await expect(
+			POST(
+				event(
+					JSON.stringify({
+						href: 'wled.local',
+					}),
+				),
+			),
+		).rejects.toMatchObject({
+			status: 400,
+		});
+	});
+
+	it('rejects a scheme with no port to connect to', async () => {
+		await expect(
+			POST(
+				event(
+					JSON.stringify({
+						href: 'mailto:someone@example.com',
+					}),
+				),
+			),
+		).rejects.toMatchObject({
 			status: 400,
 		});
 	});
 
 	it('rejects a body that is not JSON', async () => {
-		await expect(POST(event('not json'))).rejects.toMatchObject({ status: 400 });
+		await expect(POST(event('not json'))).rejects.toMatchObject({
+			status: 400,
+		});
 	});
 });

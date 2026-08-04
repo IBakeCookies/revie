@@ -72,7 +72,9 @@ export type Config = {
 	};
 };
 
-export const emptyConfig: Config = { pages: {} };
+export const emptyConfig: Config = {
+	pages: {},
+};
 
 export function isBoxService(item: ConfigContainer): item is ConfigContainer<'BoxService'> {
 	return item.name === 'BoxService';
@@ -113,7 +115,9 @@ const requiredProps: Record<ContainerName, (props: Record<string, unknown>) => s
 	{
 		BoxService: (props) => {
 			if (typeof props.title !== 'string') return 'title';
+
 			if (typeof props.href !== 'string') return 'href';
+
 			if (!isRecord(props.img) || typeof props.img.src !== 'string') return 'img.src';
 
 			return undefined;
@@ -183,7 +187,10 @@ function normalizeContainer(
 	// The one unavoidable assertion in the whole pipeline: the props come from JSON,
 	// and only the name validated above says which container they belong to. The
 	// guard above is what makes it safe rather than hopeful.
-	return { name: raw.name, props } as ConfigContainer;
+	return {
+		name: raw.name,
+		props,
+	} as ConfigContainer;
 }
 
 /**
@@ -214,7 +221,9 @@ export function normalizeConfig(raw: unknown): Config {
 		};
 	}
 
-	return { pages };
+	return {
+		pages,
+	};
 }
 
 function scanContainer(item: ConfigContainer, target: ContainerName): ConfigContainer | undefined {

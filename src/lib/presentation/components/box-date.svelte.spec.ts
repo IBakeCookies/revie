@@ -45,7 +45,9 @@ describe('box-date.svelte', () => {
 	});
 
 	it('passes the column span as a custom property', () => {
-		const screen = render(BoxDate, { span: 3 });
+		const screen = render(BoxDate, {
+			span: 3,
+		});
 
 		expect(spanOf(screen.container)).toBe('3');
 	});

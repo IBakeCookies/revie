@@ -5,20 +5,41 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('shows the dashboard title', async ({ page }) => {
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Revie Dashboard');
+	await expect(
+		page.getByRole('heading', {
+			level: 1,
+		}),
+	).toHaveText('Revie Dashboard');
 });
 
 test('renders the containers of the configured page at any nesting depth', async ({ page }) => {
-	await expect(page.getByRole('heading', { name: 'Services' })).toBeVisible();
+	await expect(
+		page.getByRole('heading', {
+			name: 'Services',
+		}),
+	).toBeVisible();
+
 	await expect(page.getByText('Reachable')).toBeVisible();
-	await expect(page.getByRole('link', { name: /Loopback/ })).toBeVisible();
-	await expect(page.getByRole('link', { name: /Nowhere/ })).toBeVisible();
+
+	await expect(
+		page.getByRole('link', {
+			name: /Loopback/,
+		}),
+	).toBeVisible();
+
+	await expect(
+		page.getByRole('link', {
+			name: /Nowhere/,
+		}),
+	).toBeVisible();
 });
 
 test('opens a service in a new tab without leaking the dashboard as referrer', async ({ page }) => {
-	const link = page.getByRole('link', { name: /Loopback/ });
+	const link = page.getByRole('link', {
+		name: /Loopback/,
+	});
 
-	await expect(link).toHaveAttribute('href', 'http://127.0.0.1:8080');
+	await expect(link).toHaveAttribute('href', 'http://127.0.0.1:4173');
 	await expect(link).toHaveAttribute('target', '_blank');
 	await expect(link).toHaveAttribute('rel', 'noreferrer');
 });

@@ -30,6 +30,12 @@ export async function useAsyncErrorAsValue<T>(
 		// throw things like "AdGuard responded with 401 Unauthorized" — so it wins.
 		const message = cause instanceof Error && cause.message ? cause.message : fallbackMessage;
 
-		return [{ message, cause }, null];
+		return [
+			{
+				message,
+				cause,
+			},
+			null,
+		];
 	}
 }

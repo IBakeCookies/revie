@@ -40,7 +40,10 @@ export async function readConfig(): Promise<Config> {
 		return cache?.config ?? emptyConfig;
 	}
 
-	cache = { mtimeMs, config: normalizeConfig(raw) };
+	cache = {
+		mtimeMs,
+		config: normalizeConfig(raw),
+	};
 
 	return cache.config;
 }

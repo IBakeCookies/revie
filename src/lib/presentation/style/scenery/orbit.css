@@ -13,11 +13,7 @@
 		position: absolute;
 		inset: 0;
 		background:
-			radial-gradient(
-				ellipse 30rem 9rem at 38% 90vh,
-				oklch(0.55 0.04 250 / 0.1),
-				transparent 70%
-			),
+			radial-gradient(ellipse 30rem 9rem at 38% 90vh, oklch(0.55 0.04 250 / 0.1), transparent 70%),
 			radial-gradient(
 				circle at 50% 178vh,
 				transparent 0 82vh,
@@ -93,16 +89,8 @@
 		inset: 0;
 		background-image:
 			/* far cloud banks, riding with the ground layer */
-			radial-gradient(
-				ellipse 9rem 2.5rem at 30% 88%,
-				oklch(0.92 0.01 240 / 0.09),
-				transparent 70%
-			),
-			radial-gradient(
-				ellipse 7rem 2rem at 72% 95%,
-				oklch(0.92 0.01 240 / 0.07),
-				transparent 70%
-			),
+			radial-gradient(ellipse 9rem 2.5rem at 30% 88%, oklch(0.92 0.01 240 / 0.09), transparent 70%),
+			radial-gradient(ellipse 7rem 2rem at 72% 95%, oklch(0.92 0.01 240 / 0.07), transparent 70%),
 			/* coastal metro, warm sodium (cluster at 18% 96%) */
 				radial-gradient(2.5px 2.5px at 18% 96%, oklch(0.87 0.12 75), transparent),
 			radial-gradient(1.5px 1.5px at 16.5% 95.2%, oklch(0.85 0.12 72 / 0.9), transparent),
@@ -129,16 +117,8 @@
 			radial-gradient(1px 1px at 44% 89.5%, oklch(0.9 0.04 235 / 0.6), transparent),
 			radial-gradient(1px 1px at 95% 93.5%, oklch(0.85 0.12 75 / 0.6), transparent),
 			/* glows pooling beneath the clusters */
-				radial-gradient(
-					ellipse 4.5rem 1.5rem at 18% 96%,
-					oklch(0.8 0.12 70 / 0.2),
-					transparent 70%
-				),
-			radial-gradient(
-				ellipse 5rem 1.7rem at 52% 91%,
-				oklch(0.8 0.12 70 / 0.22),
-				transparent 70%
-			),
+				radial-gradient(ellipse 4.5rem 1.5rem at 18% 96%, oklch(0.8 0.12 70 / 0.2), transparent 70%),
+			radial-gradient(ellipse 5rem 1.7rem at 52% 91%, oklch(0.8 0.12 70 / 0.22), transparent 70%),
 			radial-gradient(
 				ellipse 3.5rem 1.2rem at 86% 89%,
 				oklch(0.85 0.06 240 / 0.16),
@@ -180,16 +160,8 @@
 		position: absolute;
 		inset: 0;
 		background-image:
-			radial-gradient(
-				ellipse 12rem 3rem at 20% 92%,
-				oklch(0.9 0.008 245 / 0.13),
-				transparent 70%
-			),
-			radial-gradient(
-				ellipse 8rem 2.2rem at 45% 96%,
-				oklch(0.9 0.008 245 / 0.1),
-				transparent 70%
-			),
+			radial-gradient(ellipse 12rem 3rem at 20% 92%, oklch(0.9 0.008 245 / 0.13), transparent 70%),
+			radial-gradient(ellipse 8rem 2.2rem at 45% 96%, oklch(0.9 0.008 245 / 0.1), transparent 70%),
 			radial-gradient(
 				ellipse 14rem 3.2rem at 76% 89.5%,
 				oklch(0.9 0.008 245 / 0.12),

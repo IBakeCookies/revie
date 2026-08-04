@@ -44,7 +44,11 @@
 
 		<h3>{title}</h3>
 
+		<!-- `role="img"` is what makes the label count: `aria-label` is ignored on an
+		     element with no role and no text, so without it the dot's state reached nobody
+		     and colour was the only carrier. -->
 		<span
+			role="img"
 			class={[
 				'absolute top-4 right-4 ml-auto p-1 rounded-full',
 				isOnline === true ? 'bg-success' : isOnline === false ? 'bg-danger' : 'bg-primary',

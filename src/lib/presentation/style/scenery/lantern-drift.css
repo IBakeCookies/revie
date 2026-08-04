@@ -51,13 +51,7 @@
 		background-repeat: repeat-x;
 		background-size: 60rem 26rem;
 		background-position: 0 42%;
-		mask-image: linear-gradient(
-			to bottom,
-			transparent 45%,
-			black 50%,
-			black 78%,
-			transparent 90%
-		);
+		mask-image: linear-gradient(to bottom, transparent 45%, black 50%, black 78%, transparent 90%);
 		animation:
 			ld-drift 137s linear infinite,
 			ld-shimmer 9.5s ease-in-out infinite alternate;

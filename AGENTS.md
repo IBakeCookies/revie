@@ -23,15 +23,23 @@ gets exactly one home: architecture and invariants here, how-to in `README.md`, 
 npm run dev            # vite dev
 npm run check          # paraglide + svelte-check (expect 0 errors)
 npm run lint           # prettier + eslint + lint:deps (layer rules)
+npm run lint:fix       # eslint --fix; run BEFORE `format`, never after
 npm run lint:deps      # just the layer rules (also run by `lint`)
 npm run paraglide      # compile messages (also chained into prepare + check)
 npm run depgraph       # regenerate dependency-graph.svg (needs graphviz `dot`)
-npm run test:unit      # vitest, two projects: node + real chromium
+npm run test:unit      # vitest, three projects: node, real chromium, storybook
 npm run test:e2e       # playwright against a fixture config
+npm run test:e2e:ui    # the same suite in playwright's UI mode
+npm run storybook      # storybook dev on :6006
 npm run build && node build
 ```
 
-`npm run test:unit -- --run` for one-shot; bare `test:unit` watches.
+`npm run test:unit -- --run` for one-shot; bare `test:unit` watches. It writes coverage on
+every invocation (`coverage.enabled`), so a run is never just the assertions.
+
+The fix order is **`lint:fix` then `format`**, never the reverse: `prettier --check .` is the
+first clause of `npm run lint`, so prettier has to be the last tool to touch a file or the
+check clause fails on eslint's output.
 
 `paraglide` has its own script because [src/lib/paraglide/](src/lib/paraglide) is gitignored
 and **only the vite plugin regenerates it** — so anything that doesn't run vite
@@ -141,18 +149,29 @@ here is what they name:
   model directly puts orchestration in a file no `*.spec.ts` can reach. `import type` is
   fine — it is how a component types its props.
 
-Rules live in [.dependency-cruiser.cjs](.dependency-cruiser.cjs), shared with the
+Rules live in [.dependency-cruiser.cjs](.dependency-cruiser.cjs), kept in step with the
 `zenith` project so both stay consistent. `lint:deps` runs as part of `npm run lint`
-and is at **0 errors**; keep it there. Two deliberate differences from zenith's set:
+and is at **0 errors and 0 warnings**; keep it there. The file is zenith's, plus two
+rules that are each inert in the other repo — so it is a superset, not a byte-copy:
 
-- `no-circular` is `warn`, not `error`. `config-container` ↔ `grid` ↔ `sub-grid` is a
-  real cycle and an unavoidable one — config containers nest, so the renderer has to
-  recurse. Any _new_ cycle outside that trio is worth a look.
-- `presentation-not-to-business-model` is `error`, not `warn`. zenith keeps it at
-  warn because it has a backlog of pages still calling models directly; this repo has
-  none, so there is nothing to grandfather.
-- `leaf-not-to-upper-layers` is an addition. zenith has no `lib/utils`; this repo
-  does, so the leaf needs saying out loud.
+- `leaf-not-to-upper-layers` is ours. zenith has no `lib/utils`, so the leaf needs
+  saying out loud here.
+- `logger-imports-nothing` is zenith's, ported for comparability and inert here — its
+  `from.path` `^src/lib/logger[.]ts$` matches nothing. **Don't create a `logger.ts` to
+  give it something to match**; see the `console` note under Conventions.
+
+- `no-circular` is `error`, and `config-container` ↔ `grid` ↔ `sub-grid` is exempted **by
+  name** through `from.pathNot`. The cycle is real and unavoidable (config containers nest,
+  so the renderer recurses), but all three files have to be listed: dependency-cruiser
+  reports a cycle once, from whichever member is _not_ filtered out, so exempting only
+  `config-container` just moves the error to `grid` and `sub-grid`. A new cycle joining any
+  of the three to a module outside the trio still fails, reported from that outside module.
+- `no-orphans` is `error`. Its type-only `pathNot` is
+  `^src/lib/(presentation|business|data)/type(s)?/`. Worth knowing that this rule is
+  fragile by nature: [dom.ts](src/lib/test/dom.ts) and
+  [presentation/util/](src/lib/presentation/util/) are non-orphans **only** because specs and
+  components import them, so deleting the last importer now hard-fails `npm run lint` on a
+  change that looks unrelated.
 
 Two cruiser config notes, both non-obvious:
 
@@ -207,7 +226,8 @@ config.json ─(disk read, no caching)→ data/config.ts
   known props, so spreading config props into it would need an `any`. **Adding a component
   means editing both.**
 - `Grid` and `SubGrid` nest, so `config-container ↔ grid ↔ sub-grid` is a dependency cycle.
-  It's deliberate (recursion), which is why `no-circular` is a warning rather than an error.
+  It's deliberate (recursion), which is why `no-circular` exempts those three files by name
+  rather than being turned down to a warning.
   Any _new_ cycle outside that trio is worth a look.
 - Config is re-read whenever the file's mtime changes, so edits apply without a restart.
   Nothing in it reaches the Tailwind compiler — see Invariants.
@@ -223,7 +243,8 @@ finds nothing.
 ```
 cookies ─→ data/repository/appearance-repository.ts   the 3 cookie names, parsing, and ALL writes
         ─→ business/model/appearance.ts               every decision: does this theme still exist? mint a seed?
-        ─→ hooks.server.ts        replaces %theme% / %scenery-paused% in app.html  (classes)
+        ─→ hooks.server.ts        replaces %theme% / %scenery-paused% + the two
+                                  %theme.default*% in app.html                    (classes)
         ─→ +layout.server.ts      passes theme / seed / paused as INIT SEEDS
         ─→ ThemeStore             owns it from here; mirrors every change back to the cookie
         ─→ +layout.svelte         seed → sceneryStyle() → style attribute on .theme-scenery
@@ -236,9 +257,20 @@ appearance cookie's name and write belong in the repository, its rules in busine
 - The store reconciles **three** sources: the SSR payload, `document.cookie`, and
   `matchMedia`. Read the constructor comments in [theme-store.svelte.ts](src/lib/business/store/theme-store.svelte.ts)
   before touching it.
+- `prefers-reduced-motion` is **tracked**, not read once, and its `onMount` is
+  unconditional. [scenery/index.css](src/lib/presentation/style/scenery/index.css) pauses motion
+  under it with `!important` and no opt-out, so while the OS asks for it there is nothing a resume
+  could do — `sceneryMotionToggleable` hides the control rather than let it mislabel a state it
+  cannot change, and the OS can flip mid-session. The pause-state _seeding_ off that same query is
+  the part that stays one-shot (`initialSceneryPaused === undefined && query.matches`):
+  re-seeding on every `change` would overwrite a choice the user has made since.
 - [app.html](src/app.html) has an inline pre-paint script for the _first_ visit (no cookie yet)
-  on a dark-preferring or reduced-motion OS. It hardcodes the default dark theme's CSS class
-  — keep it in sync with `DEFAULT_DARK_THEME` in [theme.ts](src/lib/business/model/theme.ts).
+  on a dark-preferring or reduced-motion OS. It names no theme: `handleTheme` fills
+  `%theme.default%` / `%theme.default-dark%` with `JSON.stringify(getClassesToAdd(…))`, so the
+  catalogue stays the only definition. The script must `classList.remove(…)` / `.add(…)` rather
+  than assign `className` — a whole-attribute write wipes the `scenery-paused` class
+  `handleSceneryMotion` already stamped, and the block that would re-add it is gated on the
+  cookie being _absent_, which is false exactly when the server had reason to stamp it.
 - The scenery seed is minted **server-side** during the root layout load. It has to be: the
   server is the only place that can write it before the SSR'd `style` attribute, and a second
   mint would shift the scenery between server and client.
@@ -261,10 +293,20 @@ Things that break **silently** — no error, just wrong output.
   `extendTailwindMerge` in [style.ts](src/lib/utils/style.ts). If they drift, `cn()` stops
   recognising a spacing class as a conflict and silently keeps both.
 - **The import order in [app.css](src/lib/presentation/style/app.css) is the cascade order** and is
-  load-bearing: `scenery → tokens → base → themes`.
-- Those four style files are **ported from the `zenith` project** (`src/lib/presentation/style/`).
-  Keep them diffable against it so upstream theme work stays copy-pasteable. `zenith`'s
-  shadcn / tw-animate / fontsource imports are intentionally dropped here.
+  load-bearing: `scenery → tokens → base → themes`. There is a second, independent reason
+  beyond the cascade: the `@theme inline` block in tokens.css aliases utility names onto the
+  **seed** names that base.css declares, so tokens.css is read before its own targets exist.
+  Reorder it and the alias layer resolves to nothing.
+- **Never write `--color-x: var(--color-x)`.** The alias layer maps a `--color-*` utility name
+  onto an **unprefixed seed** (`--ty-primary`, `--line-soft`, …) declared in base.css and
+  overridden per theme in themes.css. A self-referential alias only appears to work because of
+  the import order above, and it makes the real declaration impossible to find. The two
+  exceptions are `--blur` and `--radius`, which Tailwind itself names.
+- Those four style files are **ported from the `zenith` project** (`src/lib/presentation/style/`)
+  and are kept diffable against it so upstream theme work stays copy-pasteable — 13 of the 17
+  shared `scenery/*.css` files are currently byte-identical to zenith's. `zenith`'s shadcn /
+  tw-animate / fontsource imports are intentionally dropped here, as are the 10 scenery files
+  belonging to themes this project doesn't carry.
 - **Tokens only, and never `dark:`.** Components name semantic classes from
   [tokens.css](src/lib/presentation/style/tokens.css) and nothing else — no raw palette class
   (`text-zinc-400`), including inside a class string built in `.ts`. And never the `dark:`
@@ -281,20 +323,20 @@ Things that break **silently** — no error, just wrong output.
   ([+layout.svelte](src/routes/+layout.svelte)): blurring there would blur the scenery behind
   the whole page. A control nested inside an already-blurred card needs none.
 - **A theme lives in three hand-edited places**, plus optionally a fourth:
-    1. the `ThemeName` union **and** the `themes` catalogue in
-       [theme.ts](src/lib/business/model/theme.ts) — 27 entries, and the two must agree
-    2. an `@custom-variant` in [tokens.css](src/lib/presentation/style/tokens.css)
-    3. a palette class in [themes.css](src/lib/presentation/style/themes.css) — **except** the two baseline
-       themes: `solid-light` and `solid-dark` (CSS class `dark`) live in
-       [base.css](src/lib/presentation/style/base.css) instead
-    4. optionally a [scenery](src/lib/presentation/style/scenery/) file
+  1. the `ThemeName` union **and** the `themes` catalogue in
+     [theme.ts](src/lib/business/model/theme.ts) — 27 entries, and the two must agree
+  2. an `@custom-variant` in [tokens.css](src/lib/presentation/style/tokens.css)
+  3. a palette class in [themes.css](src/lib/presentation/style/themes.css) — **except** the two baseline
+     themes: `solid-light` and `solid-dark` (CSS class `dark`) live in
+     [base.css](src/lib/presentation/style/base.css) instead
+  4. optionally a [scenery](src/lib/presentation/style/scenery/) file
 
-    Place 2 has its own carve-out: there are **26** `@custom-variant` rules for 27 themes, because
-    `solid-light` is the unprefixed `:root` palette and needs no variant to select it.
+  Place 2 has its own carve-out: there are **26** `@custom-variant` rules for 27 themes, because
+  `solid-light` is the unprefixed `:root` palette and needs no variant to select it.
 
-    The header-dropdown swatch is **not** one of them — it's generated from `theme.css`
-    ([+layout.svelte:118](src/routes/+layout.svelte#L118)), which is what keeps it matching the
-    real palette. Don't hand-write a swatch.
+  The header-dropdown swatch is **not** one of them — it's generated from `theme.css`
+  ([+layout.svelte:118](src/routes/+layout.svelte#L118)), which is what keeps it matching the
+  real palette. Don't hand-write a swatch.
 
 - **[scenery-seed.ts](src/lib/presentation/util/scenery-seed.ts) draws from two shared PRNG streams, so
   variable _position_ is an invariant within each stream** — `rnd` for everything up to
@@ -310,22 +352,47 @@ Things that break **silently** — no error, just wrong output.
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  16 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  17 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
 
 ## Conventions
 
-**Where a test belongs.** `*.spec.ts` runs in node, `*.svelte.spec.ts` in real Chromium
-(see the two vitest projects in [vite.config.ts](vite.config.ts)). Components and anything
-touching the DOM go in the browser project. Test files are not compiled as rune modules, so
-they cannot use `$state` / `$effect` — a store whose constructor registers effects has to be
-built inside a component.
+**Where a test belongs.** `*.spec.ts` runs in node, `*.svelte.spec.ts` in real Chromium, and
+`*.stories.svelte` runs in a third project through `@storybook/addon-vitest` — three projects
+in [vite.config.ts](vite.config.ts), not two. Components and anything touching the DOM go in
+the browser project. Test files are not compiled as rune modules, so they cannot use `$state` /
+`$effect` — a store whose constructor registers effects has to be built inside a component.
 
-**Components are tested, wrappers are not.** A wrapper reads a store and forwards props
+The `client` project's `exclude` is `src/lib/data/**` where zenith's is `src/lib/server/**`
+(there is no `src/lib/server/` here). That line is a **deliberate divergence, not drift** —
+copy zenith's over it and the six data-layer specs silently start running in real chromium.
+
+`coverage.exclude` **replaces** vitest's defaults rather than extending them, so
+`**/*.{test,spec}.ts` and `**/*.stories.svelte` have to be listed back or the test files are
+measured as source and inflate the number. No error, just a wrong figure. There are
+deliberately **no `thresholds`** — zenith sets none either, and a floor has to be pinned to a
+measured baseline rather than invented.
+
+**Every component has a story, and the story is a test.** Each file in
+`presentation/components/` has a `*.stories.svelte` beside it whose `play` functions assert
+real behaviour — they run in chromium as part of `npm run test:unit`, so a broken component
+fails the suite, not just the storybook UI. **The a11y addon is at `test: 'error'`, so axe runs
+against every story and a violation fails `npm run test:unit`.** Keep it there — it is the only
+automated a11y gate in the repo, and it earned its place immediately: turning it on surfaced a
+`link-name` violation no one had reported (box-adguard's anchor is empty whenever `stats` is
+undefined, so it sat in the tab order announcing nothing). Note axe only ever sees a story's
+**rest** state, so the states worth an a11y check have to exist as their own stories rather than
+being reached inside a `play` function. The one violation it cannot catch is `document-title`
+([roadmap.md](roadmap.md) #21) — no component owns `<svelte:head>`.
+
+**Wrappers get a story but no `*.svelte.spec.ts`.** A wrapper reads a store and forwards props
 ([box-service-wrapper.svelte](src/lib/presentation/components/box-service-wrapper.svelte),
-[box-adguard-wrapper.svelte](src/lib/presentation/components/box-adguard-wrapper.svelte)); the component
-beside it takes the same data as a plain prop and is tested directly.
+[box-adguard-wrapper.svelte](src/lib/presentation/components/box-adguard-wrapper.svelte)); the
+component beside it takes the same data as a plain prop and is tested directly, so a spec would
+duplicate it. The story is different — providing the store context is the only thing that
+proves the store→prop forwarding, which nothing else covers.
 
-**One e2e file per feature**, named after it (`e2e/can-change-theme.spec.ts`). Playwright
+**One e2e file per feature**, named after it (`e2e/can-change-theme.e2e.ts` — `*.e2e.ts`, so
+that `testMatch` separates them from the vitest specs). Playwright
 points the preview server at [e2e/fixture-config.json](e2e/fixture-config.json) via
 `DASHBOARD_CONFIG`, so the suite never depends on the services of the machine it runs on:
 one host that resolves, one that never does, an AdGuard instance on a closed port.
@@ -374,15 +441,32 @@ diff for the thing you were actually asked to do. The standing example is live: 
 spread `{...restProps}` onto real DOM nodes for callers that don't exist
 ([roadmap.md](roadmap.md) #22). Deleting code to satisfy this is progress, not lost work.
 
-**Style.** Tabs, single quotes, trailing commas where multiline, 100 cols, 4-wide tabs —
-prettier owns it, and `comma-dangle: always-multiline` in eslint names the same intent where a
-reader looks for rules. The two must stay in step: `prettier --check .` runs first in
-`npm run lint`, so a disagreement is unsatisfiable. Comments explain _why_, not _what_; the
-existing ones are the house style, match their density.
+**Style.** Tabs, single quotes, trailing commas where multiline, 100 cols, and **tabWidth left
+at prettier's default 2** — [prettier.config.js](prettier.config.js) owns it. `tabWidth` is not
+cosmetic under `useTabs`: it is what a tab counts as when prettier measures a line against
+`printWidth`, so it decides where the four ported style files wrap. It is omitted here for the
+same reason zenith omits it — that is what keeps an upstream paste from failing
+`prettier --check`. It was `4` until the zenith parity pass; don't put it back.
+
+The config lives in `prettier.config.js`, **not** `.prettierrc`. Don't reintroduce the latter:
+prettier's search finds it first and the first hit wins the _whole_ config with no merge, so
+every option in `prettier.config.js` would go silently dead. Same reason not to add a
+top-level `"prettier"` key to `package.json`.
+
+`comma-dangle: always-multiline`, `arrow-parens`, `eol-last` and `object-curly-newline`
+(`minProperties: 1`, so every object literal puts each property on its own line) are set in
+eslint, and `padding-line-between-statements` owns blank lines — the one formatting-adjacent
+rule prettier does not fight. All of them sit **after** `eslint-config-prettier` in
+[eslint.config.js](eslint.config.js), and that order is load-bearing: eslint-config-prettier
+turns those four rules off, so a block that sets them has to come later or the settings are
+dead. Prettier and eslint must stay in step regardless — `prettier --check .` runs first in
+`npm run lint`, so a disagreement is unsatisfiable.
+
+Comments explain _why_, not _what_; the existing ones are the house style, match their density.
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 32 items from three passes, each adversarially
+The open work lives in [roadmap.md](roadmap.md) — 26 open items from three passes, each adversarially
 verified against the code and ordered by what breaks soonest. Several are straight ports from
 `zenith`, which has already solved them; those items name the upstream files. It is its own file
 because it churns as items land, while this one is the architecture and should not. **Nothing in it
@@ -444,3 +528,51 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   contradicting the "registry is gone" one above it; the claim that a missing translation fails
   the build (it does not — see Invariants); and the unrecorded `solid-light` `@custom-variant`
   carve-out. [roadmap.md](roadmap.md) #29 is the fence that would have caught all of them.
+- **`/api/ping` opens a TCP connection to `host:port`; it does not ICMP the host.** The dot
+  claims a service is up, and ICMP only ever answered for the box — a dead service on a live
+  host stayed green and two boxes on one host could never disagree. The allowlist is keyed on
+  `host:port` for the same reason, so a configured host does not open its other ports. Don't
+  reintroduce the `ping` package: it also cost a fork+exec per unauthenticated POST, threw an
+  unhandled rejection when the binary was missing from a slim image, and kept the brackets on
+  an IPv6 literal (`new URL('http://[fd00::5]/').hostname`). `toEndpoint` strips them.
+- **`config.json` is gitignored; [config.example.json](config.example.json) is the tracked
+  one.** It is production's default read path _and_ the internal network map, so tracking it
+  meant a `git pull` during an update silently reverted the live dashboard.
+- **[box-date.svelte](src/lib/presentation/components/box-date.svelte)'s `Intl` formatter is at
+  instance scope.** The module body runs once per node process while the locale is per request,
+  so hoisting it back freezes every SSR response to the first visitor's locale.
+- **The zenith parity pass (2026-08-04) is settled; these are its decisions, not defaults.**
+  Tooling was brought in step with `zenith` in one pass. What was taken, and what was
+  deliberately refused:
+  - **Taken:** `prettier.config.js` at zenith's `tabWidth` accounting; `eslint-config-prettier`
+    - `svelte.configs.prettier` with the five rules zenith sets; zenith's cruiser rule set
+      (`no-circular` and `no-orphans` at `error`); the CSS seed-name migration; vitest coverage +
+      HTML reporters under `test-result/`; zenith's playwright shape; `.storybook/preview.ts`'s
+      theme toolbar and scenery mount; a story per component; `.github/workflows/ci.yml`.
+  - **Refused, with reasons that still hold:** `no-console: 'error'` and a `logger.ts` (the
+    injected `ErrorReporter` is this repo's sink seam, and a logger would be a second one
+    competing for the same job); `prettier-plugin-tailwindcss` (measured: 0 files changed at
+    this plugin/plugin-svelte pairing, because it does not sort classes in `.svelte`);
+    `@typescript-eslint/no-explicit-any: 'off'` and `ban-ts-comment: 'off'` (both are `error`
+    here at 0 violations — porting them is a pure loosening); zenith's `--strategy` on
+    paraglide, its `tsc -p tsconfig.worker.json`, and its `depcheck` script (our `lint`
+    already chains `lint:deps`, which zenith's does not).
+  - **Not attempted:** zenith's dependency **majors** — eslint 10, TypeScript 6, Vite 8,
+    svelte 5.56, dependency-cruiser 18. Those are version parity, not architecture, and the
+    `@eslint/compat` → `eslint/config` `includeIgnoreFile` move is gated on eslint 10.
+  - The vitest 4.x family **cross-peer-pins exact versions**, so `@vitest/coverage-v8` is
+    pinned to vitest's exact minor rather than caret-ranged. It moves as one unit or not at
+    all; npm's peer check makes any drift a loud `ERESOLVE`, not a silent mismatch.
+  - `.dependency-cruiser.cjs` is a **superset** of zenith's, not a copy — ours adds
+    `leaf-not-to-upper-layers` (zenith has no `lib/utils`) and carries zenith's inert
+    `logger-imports-nothing`. A byte-identical shared file would need a matching change in
+    zenith, which this pass deliberately did not touch.
+- **`src/lib/test/` is under no layer constraint.** No eslint layer block and no cruiser layer
+  rule matches it, so [dom.ts](src/lib/test/dom.ts) and
+  [adguard-store-harness.svelte](src/lib/test/adguard-store-harness.svelte) may import from any
+  layer with nothing to stop them. That is fine for test support and is why they live there
+  rather than under `presentation/` — but it means an import _from_ this directory into app code
+  would look legal and is not. The harness exists because `setContext` needs a component being
+  initialised, so a story wanting its own store has to mount one; setting the store from a
+  stories file instead gives every story on the autodocs page one shared context, and the last
+  play function to run decides what all of them show.

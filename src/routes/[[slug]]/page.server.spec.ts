@@ -4,16 +4,29 @@ import { readAdguardStats } from '$lib/business/model/adguard';
 import { readConfig } from '$lib/business/model/config-source';
 import { load } from './+page.server';
 
-vi.mock('$env/dynamic/private', () => ({ env: {} }));
-vi.mock('$lib/business/model/config-source', () => ({ readConfig: vi.fn() }));
-vi.mock('$lib/business/model/adguard', () => ({ readAdguardStats: vi.fn() }));
+vi.mock('$env/dynamic/private', () => ({
+	env: {},
+}));
+
+vi.mock('$lib/business/model/config-source', () => ({
+	readConfig: vi.fn(),
+}));
+
+vi.mock('$lib/business/model/adguard', () => ({
+	readAdguardStats: vi.fn(),
+}));
 
 const boxAdguard = {
 	name: 'BoxAdguard' as const,
-	props: { href: 'http://adguard.local' },
+	props: {
+		href: 'http://adguard.local',
+	},
 };
 
-const boxDate = { name: 'BoxDate' as const, props: {} };
+const boxDate = {
+	name: 'BoxDate' as const,
+	props: {},
+};
 
 // The domain shape, not AdGuard's wire shape: business hands the route the four
 // numbers a box renders. Turning the wire shape into this is tested next to it, in
@@ -26,12 +39,21 @@ const stats = {
 };
 
 function configWith(...containers: (typeof boxAdguard | typeof boxDate)[]) {
-	return { pages: { '/': { name: 'Home', containers } } };
+	return {
+		pages: {
+			'/': {
+				name: 'Home',
+				containers,
+			},
+		},
+	};
 }
 
 /** The load function only ever touches the URL. */
 function event(pathname: string): Parameters<typeof load>[0] {
-	return { url: new URL(`http://localhost${pathname}`) } as Parameters<typeof load>[0];
+	return {
+		url: new URL(`http://localhost${pathname}`),
+	} as Parameters<typeof load>[0];
 }
 
 beforeEach(() => {
@@ -48,13 +70,17 @@ describe('load', () => {
 	it('returns the containers of the configured page', async () => {
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxDate));
 
-		expect(await load(event('/'))).toMatchObject({ containers: [boxDate] });
+		expect(await load(event('/'))).toMatchObject({
+			containers: [boxDate],
+		});
 	});
 
 	it('fails with 404 when no page is configured for the path', async () => {
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxDate));
 
-		await expect(load(event('/nope'))).rejects.toMatchObject({ status: 404 });
+		await expect(load(event('/nope'))).rejects.toMatchObject({
+			status: 404,
+		});
 	});
 
 	it('loads AdGuard stats for the configured instance', async () => {
@@ -63,11 +89,13 @@ describe('load', () => {
 		expect(await load(event('/'))).toMatchObject({
 			adguard: stats,
 		});
+
 		expect(readAdguardStats).toHaveBeenCalledWith({
 			username: 'admin',
 			password: 'secret',
 			href: 'http://adguard.local',
 		});
+
 		expect(readAdguardStats).toHaveBeenCalledWith({
 			username: 'admin',
 			password: 'secret',
@@ -78,7 +106,10 @@ describe('load', () => {
 	it('skips AdGuard when the page has no such box', async () => {
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxDate));
 
-		expect(await load(event('/'))).toMatchObject({ adguard: null });
+		expect(await load(event('/'))).toMatchObject({
+			adguard: null,
+		});
+
 		expect(readAdguardStats).not.toHaveBeenCalled();
 	});
 
@@ -87,18 +118,27 @@ describe('load', () => {
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
 		env.ADGUARD_PASSWORD = '';
 
-		expect(await load(event('/'))).toMatchObject({ adguard: null });
+		expect(await load(event('/'))).toMatchObject({
+			adguard: null,
+		});
+
 		expect(readAdguardStats).not.toHaveBeenCalled();
 	});
 
 	it('renders the page without stats when AdGuard is unreachable', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
+
 		vi.mocked(readAdguardStats).mockResolvedValue([
-			{ message: 'Could not read AdGuard stats', cause: new Error('down') },
+			{
+				message: 'Could not read AdGuard stats',
+				cause: new Error('down'),
+			},
 			null,
 		]);
 
-		expect(await load(event('/'))).toMatchObject({ adguard: null });
+		expect(await load(event('/'))).toMatchObject({
+			adguard: null,
+		});
 	});
 });

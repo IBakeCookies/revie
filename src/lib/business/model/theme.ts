@@ -181,9 +181,10 @@ export const themes: ThemeItem[] = [
 	},
 ] as const;
 
-/* Defaults for first visit (no cookie). The pre-paint fallback in app.html's
-   inline script hardcodes the dark default's classes — keep it in sync. */
+/* Defaults for first visit (no cookie). hooks.server.ts injects both class
+   lists into app.html's pre-paint script, so this stays the only definition. */
 export const DEFAULT_THEME: ThemeName = 'fallow';
+
 export const DEFAULT_DARK_THEME: ThemeName = 'solid-dark';
 
 /* 32-bit scenery seed. The store only mints and persists the number;
