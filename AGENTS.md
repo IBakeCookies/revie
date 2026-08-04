@@ -466,8 +466,8 @@ Comments explain _why_, not _what_; the existing ones are the house style, match
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 26 open items from three passes, each adversarially
-verified against the code and ordered by what breaks soonest. Several are straight ports from
+The open work lives in [roadmap.md](roadmap.md) — 25 open items, all but #33 from three review
+passes and adversarially verified against the code, ordered by what breaks soonest. Several are straight ports from
 `zenith`, which has already solved them; those items name the upstream files. It is its own file
 because it churns as items land, while this one is the architecture and should not. **Nothing in it
 is fixed** — the section below is what is.

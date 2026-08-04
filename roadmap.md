@@ -13,9 +13,13 @@ has, the item says so and names the files to copy. Every finding was adversarial
 the code before it was written down. Ordered within each group by what breaks soonest, or by impact
 over effort. Effort is `S` / `M` / `L`.
 
-**Numbers are stable, so gaps mean landed.** 26 items are open; **1, 2, 3, 4, 6 and 7 are done** —
-the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and the
-rest of the numbering stays put so the cross-references below keep resolving.
+33 is the exception to all of that: it came from asking why nothing here proposes new service
+integrations, so it is the one item no review pass produced, and the one whose external API details
+are not verified against this repo. It says so in place.
+
+**Numbers are stable, so gaps mean landed.** 25 items are open; **1, 2, 3, 4, 6, 7, 31 and 32 are
+done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+the rest of the numbering stays put so the cross-references below keep resolving.
 
 ## Correctness
 
@@ -45,10 +49,11 @@ vitest project. See AGENTS.md's "Already done".)_
    failure in [+page.server.ts](src/routes/[[slug]]/+page.server.ts), which still logs and returns
    `null` — the error is available, it just isn't forwarded to the page yet. Two producers are
    already logging-and-swallowing: +page.server.ts:19-22 and :33-37.
-9. **Delete the browser cookie re-read in `ThemeStore`** (lines 88–96 + the `browser` import). The
-   same cookie was already resolved through the same `resolveThemeName` to produce `data.theme` in
-   the same request, so it can only ever equal what was handed in — while its early `return` makes
-   the blocks below look conditional when they aren't. Unverifiable until #30's rune harness exists.
+9. **Delete the browser cookie re-read in `ThemeStore`** (lines 99–109 + the `browser` import at
+   :2). The same cookie was already resolved through the same `resolveThemeName` to produce
+   `data.theme` in the same request, so it can only ever equal what was handed in — while its early
+   `return` makes the blocks below look conditional when they aren't. Unverifiable until #30's rune
+   harness exists.
 10. **`git rm --cached dps.js`** — unrelated gacha-game DPS math at the repo root that
     `npm run lint` currently walks. Same treatment for the two tracked inlang cache blobs
     (`project.inlang/cache/plugins/*`): `git rm --cached` them.
@@ -222,18 +227,20 @@ vitest project. See AGENTS.md's "Already done".)_
     app emits a title at all. Then add `@axe-core/playwright` and one `e2e/is-accessible.e2e.ts`
     scanning `/`, `/services`, `/nope` in both locales and with `colorScheme: 'dark'` (the
     `test.use` pattern exists at e2e/can-change-theme.e2e.ts:32-33).
-    _Two of the three component-level violations landed in the zenith parity pass_, once the
-    storybook a11y gate went to `test: 'error'` and every component got a story to run axe
-    against: `heading-order` (grid.svelte's subTitle was h5 under an h3 — now h4) and `link-name`
-    (box-adguard.svelte's anchor was empty whenever `stats` was undefined, so its accessible name
-    was `""`; it now carries an unconditional `aria-label={m.adguard_open()}`, which also replaces
-    the four-readings-run-together name in the populated case). The status dot's `aria-label` on a
-    role-less `<span>` was fixed the same way — it now has `role="img"`, without which the label
-    was ignored outright.
-    **What is left here is the page-level half:** `document-title` — no component story can catch
-    it, because no component owns `<svelte:head>`. The residual dot defect is also still open and
-    is WCAG 1.4.1 colour-only information, not a missing name: it wants a non-colour cue, not
-    another ARIA change.
+    _All three component-level violations landed in the zenith parity pass_ (verified 2026-08-04),
+    once the storybook a11y gate went to `test: 'error'` and every component got a story to run axe
+    against: `heading-order` (grid.svelte's subTitle was h5 under an h3 — now h4 at
+    grid.svelte:35, under the h3 at :29), `link-name` (box-adguard.svelte's anchor was empty
+    whenever `stats` was undefined, so its accessible name was `""`; it now carries an
+    unconditional `aria-label={m.adguard_open()}` at box-adguard.svelte:62, which also replaces the
+    four-readings-run-together name in the populated case), and the status dot's `aria-label` on a
+    role-less `<span>`, which was ignored outright until the `role="img"` now at
+    box-service.svelte:51.
+    **What is left here are the two axe cannot reach from a component story:** `document-title` —
+    no component owns `<svelte:head>`, and the only one in the app
+    ([+layout.svelte:61-63](src/routes/+layout.svelte#L61-L63)) still holds nothing but the
+    favicon — and the residual dot defect, which is WCAG 1.4.1 colour-only information rather than
+    a missing name: it wants a non-colour cue, not another ARIA change.
     _Port only the nav half:_ take zenith's `nav.svelte` `<nav>` wrapper and its
     `aria-current={isActive(link.href) ? 'page' : undefined}` compared against
     `deLocalizeUrl(page.url).pathname`. Zenith has no `banner` landmark either — its `<nav>` also
@@ -248,11 +255,9 @@ vitest project. See AGENTS.md's "Already done".)_
     `bg-<state> text-<state>-ink` over 9 fills and we have no `-ink` token, and its
     `hover-contrast.mjs` drives a shadcn button story we have no equivalent of.
     _Files:_ src/routes/+layout.svelte:61-63,82-100,
-    src/lib/presentation/components/grid.svelte:29,33,
-    src/lib/presentation/components/box-service.svelte:45,
-    src/lib/presentation/components/box-adguard.svelte:18-21,41,
-    src/lib/presentation/components/grid.svelte.spec.ts:35, e2e/is-accessible.e2e.ts (new),
-    e2e/can-navigate-between-pages.e2e.ts
+    src/lib/presentation/components/box-service.svelte:50-58 (the non-colour cue),
+    e2e/is-accessible.e2e.ts (new), e2e/can-navigate-between-pages.e2e.ts.
+    grid.svelte, box-adguard.svelte and grid.svelte.spec.ts are off this list — their half landed.
 
 ## Architecture & extensibility
 
@@ -377,6 +382,94 @@ vitest project. See AGENTS.md's "Already done".)_
     _Files:_ vite.config.ts:11-14, src/lib/presentation/components/box-adguard.svelte:24-34,
     src/lib/presentation/components/box-adguard.svelte.spec.ts
 
+## Service integrations
+
+Its own section rather than a fourth entry under Features, because prettier renumbers an ordered
+list to run sequentially from its first item: put 33 under Features and `prettier --check` rewrites
+it to 27, colliding with Ops. A heading breaks the list, which is what keeps the number stable —
+the same applies to a future 34.
+
+33. **Generalize the AdGuard path into a keyed stats provider, then add Pi-hole, Proxmox and the
+    rest** — `L`
+    Stats are hardcoded to one vendor at every layer: the literal `'BoxAdguard'` in
+    `CONTAINER_NAMES` (config.ts:15), one `findContainer(page, 'BoxAdguard')` in the load
+    (+page.server.ts:11), one global credential pair (+page.server.ts:17), and one `AdguardStats`
+    in the store (adguard-store.svelte.ts:12). A second integration is therefore not an addition,
+    it is a fourth copy of the three defects #16 and #17 already name. **Land those two first** —
+    they are what turns "AdGuard, singular" into "a provider, keyed by href, `Promise.all`'d inside
+    one 3s bound, TTL-cached".
+    _One container, not one per service._ Add `'BoxStats'` with a `provider` token
+    (`"provider": "pihole"`) rather than a dozen container names. A dozen names means a dozen
+    `requiredProps` entries (config.ts:114-131), a dozen branches before config-container.svelte's
+    `never` assert (:38-52), and a dozen components; a token keeps presentation at one component
+    and moves compile-time completeness to a `Record<ProviderName, Provider>` in
+    `data/repository/` — same guarantee, in the layer that owns the wire shapes. Decide one
+    wrinkle up front: `AdguardStats` is four named fields (business/type/adguard-stats.ts) rendered
+    through four paraglide messages, and business cannot pick a message per provider — it names no
+    component, and paraglide is presentation's. So business returns `{ key, value }[]` and
+    presentation holds a `Record<StatKey, (value) => string>` message map, complete the same way
+    `requiredProps` is.
+    _Credentials need a scheme, and that is the real work._ One pair cannot serve two Pi-holes.
+    Have the config entry name its variable instead of carrying the secret
+    (`"secret": "PIHOLE_MAIN"` → `DASHBOARD_SECRET_PIHOLE_MAIN` through `$env/dynamic/private`):
+    `config.example.json` is tracked, so a secret in the file format is a secret in someone's
+    repo. Keep the fetch server-only — the load hands the page derived numbers and nothing else,
+    and a provider written as a client store would ship the key — and keep the href config-only,
+    never a query param, which is the difference between a dashboard and an SSRF proxy
+    (`/api/ping`'s allowlist at api/ping/+server.ts:45 is the precedent).
+    _Self-signed TLS is what actually blocks Proxmox._ Proxmox on :8006, TrueNAS, Unifi and
+    Portainer all ship self-signed certs and Node's `fetch` rejects them with no per-request
+    escape hatch. Verified: both `fetch(` sites in src (service.ts:13, adguard.ts:33) pass no
+    dispatcher, and `undici` / `rejectUnauthorized` / `NODE_TLS_REJECT_UNAUTHORIZED` appear nowhere
+    in src or package.json. Either an `undici` `Agent` with `connect: { rejectUnauthorized: false }`
+    passed as a per-request `dispatcher` — which adds `undici` as a direct dependency, since Node
+    ships it internally but exports no module — or document that the operator installs a real cert.
+    Not `NODE_TLS_REJECT_UNAUTHORIZED=0`: it is process-global and silently unverifies every other
+    fetch. Either way it is a per-provider opt-in, so settle it before Proxmox rather than during.
+    _Order the providers by auth cost, not popularity._ Cheap first — one GET, one header, counters
+    that fit the box that already exists:
+    - **Uptime Kuma** — `/api/status-page/<slug>` plus `/api/status-page/heartbeat/<slug>`, no auth
+      on a public status page. Write this one first: it exercises the whole keyed refactor with no
+      credential scheme at all.
+    - **Pi-hole** — the direct AdGuard sibling, and most people run one or the other. Mind the v6
+      break: v5 is a single `GET /admin/api.php?summaryRaw&auth=<hash>`, v6 needs a session
+      (`POST /api/auth` → `X-FTL-SID`, then `/api/stats/summary`). Both are deployed in the wild.
+    - **Sonarr / Radarr / Prowlarr** — `/api/v3/queue`, `X-Api-Key` header, for a queue count.
+    - **Immich** (`/api/server/statistics`, `x-api-key`), **Paperless-ngx** (`/api/statistics/`,
+      `Authorization: Token`), **Gitea / Forgejo** (`/api/v1/…`, `Authorization: token`).
+    - **Jellyfin** — `/Sessions` with `X-Emby-Token`, for the active-stream count.
+    - **Glances** — `/api/4/cpu` and `/api/4/mem`, no auth by default: the generic "how is this
+      host doing" box, and the one that earns its place on a single-node setup.
+
+    Then the ones needing a handshake, an aggregation or the TLS decision: **Proxmox VE**
+    (`/api2/json/cluster/resources` with `Authorization: PVEAPIToken=…` — a token, no login
+    round-trip, but self-signed TLS and a flat resource list to aggregate), **Portainer**
+    (`/api/endpoints/<id>/docker/containers/json`, `X-API-Key`), **qBittorrent**
+    (`POST /api/v2/auth/login` for a cookie), **Transmission** (the 409 +
+    `X-Transmission-Session-Id` dance), **Unifi** (cookie login and self-signed),
+    **Nextcloud** (`/ocs/v2.php/apps/serverinfo/api/v1/info?format=json`, basic auth plus
+    `OCS-APIRequest: true`, XML otherwise), **Plex** (`/status/sessions`, token in the query and
+    XML unless `Accept: application/json`), **TrueNAS**, **Home Assistant** (bearer, but one entity
+    per number, so its config shape differs from every other provider here).
+    _Payoff:_ the demand is already in the config as dead click-throughs — README.md:50-53 links
+    Proxmox at `https://192.168.178.180:8006` as a plain `BoxService` whose only feedback is a
+    status dot, the same shape as the Whoogle entry #24 cites. Stats are the one thing a start page
+    shows that a browser bookmark cannot.
+    _Unverified on purpose:_ every endpoint and header above comes from the vendors' docs, not from
+    a live instance behind this code — unlike every other item here, so re-check each before
+    implementing it. Homepage's widget list is the working popularity ranking if this needs
+    extending.
+    _Also needs #8 or #23_ for a failure channel. Today an AdGuard failure is `console.warn` +
+    `return null` (+page.server.ts:19-22,33-37): an empty box with no stated reason, tolerable for
+    one optional widget and not for eight.
+    _Files:_ src/lib/business/model/config.ts:15,114-131, src/lib/business/model/stats.ts (new),
+    src/lib/data/repository/ (one file per provider),
+    src/lib/business/store/adguard-store.svelte.ts,
+    src/lib/presentation/components/box-stats.svelte (new),
+    src/lib/presentation/components/config-container.svelte:38-52,
+    src/routes/[[slug]]/+page.server.ts:10-40, messages/en.json, messages/de.json,
+    README.md:65-74, .env.example
+
 ## Ops & DX
 
 27. **Ship a production invocation that actually loads `.env`, and document the AdGuard contract** —
@@ -487,53 +580,22 @@ vitest project. See AGENTS.md's "Already done".)_
 ## Upstream drift (the `zenith` ports)
 
 Everything else portable from zenith maps onto an item above — see #10, #11, #18, #21, #28. The
-app.html and reduced-motion ports (#3, #4) have landed. These two are new.
+app.html and reduced-motion ports (#3, #4) have landed, and so have both items this section held.
 
-31. **Retire the self-referential `--color-x: var(--color-x)` idiom in `tokens.css`** — `M`
-    17 `@theme` entries alias themselves: the four `--color-ty-*` (tokens.css:98-101),
-    `--color-line-soft` (:111), `--color-danger|-warning|-success|-info` with their `-strong` pairs
-    (:117-124), and `--color-brand|-strong` (:126-127). `--blur` (:88) and `--radius` (:95) stay —
-    they are the two documented exceptions and zenith keeps them too. Rename the other 15 to alias
-    the **unprefixed** name upstream uses (`--color-danger: var(--danger)`) and rename the matching
-    declarations in base.css and themes.css. Safe: the only raw `var()` uses outside `style/` are
-    +layout.svelte:124,126, which already name `--surface-page` / `--primary`, and the generated
-    utility names (`bg-danger`, `text-ty-primary`) don't change. tokens.css:104-111 already does it
-    the right way for surfaces and borders, so this finishes a job rather than starting one.
-    _Payoff:_ diffability against zenith, which AGENTS.md asserts as an invariant and this breaks.
-    Measured with `diff`: themes.css has **230** ours-only lines today, **125** after these 15
-    renames. Getting to ~35 needs five more that are not `@theme` entries at all —
-    `--color-mind|-mind-strong|-body|-flow|-mixed`, another 90 lines — which tokens.css:128-131
-    claims it leaves alone so "those files stay a straight copy of upstream". They don't. The
-    remainder is prettier at `tabWidth: 4` and not worth a config override.
-    _Not a silent-breakage risk, and don't write it up as one._ Measured in the shipped CSS: the
-    self-reference sits inside `@layer theme{…}` while base.css's real
-    `--color-danger: var(--color-red-600)` is **unlayered** (`:root, .solid-light`), and an unlayered
-    declaration outranks a layered one whatever the source order — tailwind emits the whole `@theme`
-    block at the `@import 'tailwindcss'` position, not at tokens.css's. Rebuilt with app.css's import
-    order flipped: byte-identical for every `--color-*`. It is a confusing idiom and 105 lines of
-    diff noise; that is the whole case.
-    _Files:_ src/lib/presentation/style/tokens.css:98-127,
-    src/lib/presentation/style/base.css, src/lib/presentation/style/themes.css
+_(#31 — "retire the self-referential `--color-x: var(--color-x)` idiom" — landed. All 15 `@theme`
+entries now alias the unprefixed upstream seed (`--color-danger: var(--danger)`), base.css declares
+those seeds, and no `--color-*` declaration is left in base.css or themes.css. Only `--blur`
+(tokens.css:95) and `--radius` (:102) still self-reference, which is the documented carve-out in
+AGENTS.md's Invariants. The five non-`@theme` accents the item wanted next are in too:
+`--mind`/`--mind-strong`/`--body`/`--flow`/`--mixed` are declared under the upstream names in
+base.css:110-114 and :203-207, deliberately unmapped to utilities.)_
 
-32. **Port zenith's `.storybook/preview.ts`** — `S`
-    Copy it over [.storybook/preview.ts](.storybook/preview.ts) (14 lines, controls matchers only).
-    Two edits: `presentation/utils/scenery-seed` → `presentation/util/scenery-seed` and the same for
-    `scenery-time`, since this repo's directory is singular. Then `npm run format` — though far less
-    of a rewrite now that `prettier.config.js` is `trailingComma: 'all'`, which upstream already matches.
-    Set `a11y: { test: 'todo' }`, not upstream's `'error'`. Everything it imports already exists here
-    under the same name — `themes`, `DEFAULT_THEME`, `getClassesToAdd`, `ThemeName`, `sceneryStyle`,
-    `dataSceneryStyle` — and the `.theme-scenery` + `theme-helper-1..4` DOM its `mountScenery()`
-    builds is byte-for-byte +layout.svelte:69-78. Skip its `viteFinal`: nothing here reads
-    `$env/dynamic/public`, so upstream's env stub is dead weight.
-    _Payoff:_ answers the open question in #7 ("theme classes live on `<html>`, so a story renders
-    unstyled") with a file that already works, and makes "does this need `backdrop-blur`?" — now an
-    invariant in AGENTS.md — a question a story can answer, over the real decorative layer at a fixed
-    seed. `'error'` would be dishonest twice: there is no storybook vitest project yet
-    (vite.config.ts defines only `client` and `server`, where zenith wires `storybookTest`), so
-    nothing consumes the parameter; and two of #21's three live axe violations are component-level, so
-    the first two stories would fail for a defect they didn't introduce. Flip to `'error'` when #21
-    lands **and** #7's third bullet has settled the runner.
-    _Files:_ .storybook/preview.ts, #7
+_(#32 — "port zenith's `.storybook/preview.ts`" — landed in the zenith parity pass. The file is the
+theme toolbar over the catalogue plus `mountScenery()` at a fixed `SCENERY_SEED = 42`, on the
+singular `presentation/util/` paths, with the controls matchers. Both of the item's caveats were
+overtaken: the storybook vitest project exists, so `a11y: { test: 'error' }` is consumed rather than
+dishonest, and it is set to `'error'` — see AGENTS.md's Conventions, which now treats that gate as
+the repo's only automated a11y check.)_
 
 ## Sequencing
 
@@ -546,10 +608,11 @@ The order that matters, beyond the group ranking:
   meaningless dot (`POLL_INTERVAL_MS` 15min). Move that entry to a bookmark.
 - **#17 before #16** — #17 changes the load's return type to a record, rippling into
   page.svelte:9-18.
+- **#16 and #17 before #33** — a second stats provider inherits AdGuard's single-value store, its
+  uncached serial await and its one global credential pair unless those two land first. #33 is the
+  generalization they set up, not a parallel track.
 - **#30 before #9** — the `ThemeStore` edit is unverifiable without a rune harness.
-- **#32 before #7's first story** — without the theme decorator every story renders unstyled, which
-  is #7's own third bullet.
-- **#7 and #21 are complementary**, not substitutes. `@storybook/addon-a11y` is installed
-  (package.json:29) and globs zero stories (.storybook/main.ts:4), but landmarks, heading order
-  across the config recursion, and the 27 theme palettes only exist on the composed,
+- **#21 still needs its own axe pass**, even though the storybook gate now runs. `addon-a11y` globs
+  every story (.storybook/main.ts:4) at `test: 'error'`, but landmarks, heading order across the
+  config recursion, `document-title` and the 27 theme palettes only exist on the composed,
   server-rendered page — which only the axe e2e audit sees.
