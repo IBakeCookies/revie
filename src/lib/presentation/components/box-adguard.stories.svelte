@@ -3,6 +3,16 @@
 	import { expect } from 'storybook/test';
 	import BoxAdguard from '$lib/presentation/components/box-adguard.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
+
+	// Built from the same locale the component reads, so a render in the wrong locale cannot
+	// pass by matching a hardcoded string.
+	const counts = new Intl.NumberFormat(getLocale());
+	const millis = new Intl.NumberFormat(getLocale(), {
+		style: 'unit',
+		unit: 'millisecond',
+		unitDisplay: 'narrow',
+	});
 
 	const { Story } = defineMeta({
 		title: 'Components/Box Adguard',
@@ -33,42 +43,22 @@
 		await expect(link).toHaveAttribute('target', '_blank');
 		await expect(link).toHaveAttribute('rel', 'noreferrer');
 
-		// Asserted through `m` rather than a literal, because a hardcoded string here
-		// would be a second copy of messages/en.json that nothing keeps in step.
-		await expect(
-			canvas.getByText(
-				m.adguard_dns_queries({
-					count: 1234,
-				}),
-			),
-		).toBeInTheDocument();
+		// Labels asserted through `m` rather than a literal, because a hardcoded string here
+		// would be a second copy of messages/en.json that nothing keeps in step. The pairing
+		// is the claim: a label sitting next to the wrong number is the failure to catch.
+		const tiles = [...canvasElement.querySelectorAll('dl > div')];
 
 		await expect(
-			canvas.getByText(
-				m.adguard_blocked({
-					count: 56,
-				}),
-			),
-		).toBeInTheDocument();
-
-		await expect(
-			canvas.getByText(
-				m.adguard_delay({
-					milliseconds: 12,
-				}),
-			),
-		).toBeInTheDocument();
-
-		await expect(
-			canvas.getByText(
-				m.adguard_top_blocked_domain({
-					domain: 'ads.example.com',
-				}),
-				{
-					exact: true,
-				},
-			),
-		).toBeInTheDocument();
+			tiles.map((tile) => [
+				tile.querySelector('dt')?.textContent,
+				tile.querySelector('dd')?.textContent,
+			]),
+		).toEqual([
+			[m.adguard_dns_queries(), counts.format(1234)],
+			[m.adguard_blocked(), counts.format(56)],
+			[m.adguard_delay(), millis.format(12)],
+			[m.adguard_top_blocked_domain(), 'ads.example.com'],
+		]);
 
 		// The card is a translucent inset surface, so it carries its own backdrop-blur —
 		// without it the theme's background image shows through unfrosted.
@@ -83,16 +73,11 @@
 
 		// Each reading is keyed by a semantic border token from tokens.css. A raw palette
 		// class (border-red-400) would look right in one theme and wrong in the other 26.
-		const readings = [...canvasElement.querySelectorAll('p')];
+		const accents = ['border-l-success', 'border-l-danger', 'border-l-info', 'border-l-warning'];
 
-		await expect(readings).toHaveLength(4);
-
-		await expect(readings.map((p) => p.className.split(' ').at(-1))).toEqual([
-			'border-success',
-			'border-danger',
-			'border-info',
-			'border-warning',
-		]);
+		for (const [index, accent] of accents.entries()) {
+			await expect(tiles[index]).toHaveClass(accent);
+		}
 	}}
 />
 
@@ -114,8 +99,8 @@
 	}}
 />
 
-<!-- A quiet DNS resolver reports zeros, not nothing: every reading is interpolated, so a
-     falsy count must still render rather than collapse the row. -->
+<!-- A quiet DNS resolver reports zeros, not nothing: every reading is formatted, so a falsy
+     count must still render as a zero rather than collapse the tile. -->
 <Story
 	name="Zero traffic"
 	args={{
@@ -126,24 +111,15 @@
 			topBlockedDomain: '',
 		},
 	}}
-	play={async ({ canvas, canvasElement }) => {
-		await expect(canvasElement.querySelectorAll('p')).toHaveLength(4);
-
-		await expect(
-			canvas.getByText(
-				m.adguard_dns_queries({
-					count: 0,
-				}),
-			),
-		).toBeInTheDocument();
-
-		await expect(
-			canvas.getByText(
-				m.adguard_delay({
-					milliseconds: 0,
-				}),
-			),
-		).toBeInTheDocument();
+	play={async ({ canvasElement }) => {
+		// Read off the `dd`s rather than by text: the two zero counts are the same string,
+		// so a text query could not tell a rendered tile from a missing one.
+		await expect([...canvasElement.querySelectorAll('dd')].map((dd) => dd.textContent)).toEqual([
+			counts.format(0),
+			counts.format(0),
+			millis.format(0),
+			'',
+		]);
 	}}
 />
 

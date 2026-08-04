@@ -3,6 +3,11 @@
 	import { expect, waitFor } from 'storybook/test';
 	import BoxAdguardWrapper from '$lib/presentation/components/box-adguard-wrapper.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
+
+	// Built from the same locale the box reads, so a render in the wrong locale cannot pass
+	// by matching a hardcoded string.
+	const counts = new Intl.NumberFormat(getLocale());
 
 	const healthy = {
 		dnsQueries: 1234,
@@ -38,26 +43,17 @@
 	name="Store holds stats"
 	play={async ({ args, canvas, canvasElement }) => {
 		await waitFor(async () => {
-			await expect(canvasElement.querySelectorAll('p')).toHaveLength(4);
+			await expect(canvasElement.querySelectorAll('dd')).toHaveLength(4);
 		});
 
-		// Asserted through `m` rather than a literal, so this is not a second copy of
-		// messages/en.json that nothing keeps in step.
-		await expect(
-			canvas.getByText(
-				m.adguard_dns_queries({
-					count: healthy.dnsQueries,
-				}),
-			),
-		).toBeInTheDocument();
+		// Labels asserted through `m` rather than a literal, so this is not a second copy of
+		// messages/en.json that nothing keeps in step. The values are what prove the store's
+		// stats reached the box, so both halves of a reading are checked.
+		await expect(canvas.getByText(m.adguard_dns_queries())).toBeInTheDocument();
+		await expect(canvas.getByText(counts.format(healthy.dnsQueries))).toBeInTheDocument();
 
-		await expect(
-			canvas.getByText(
-				m.adguard_top_blocked_domain({
-					domain: healthy.topBlockedDomain,
-				}),
-			),
-		).toBeInTheDocument();
+		await expect(canvas.getByText(m.adguard_top_blocked_domain())).toBeInTheDocument();
+		await expect(canvas.getByText(healthy.topBlockedDomain)).toBeInTheDocument();
 
 		const link = canvas.getByRole('link');
 
@@ -126,7 +122,7 @@
 		arrivingStats = healthy;
 
 		await waitFor(async () => {
-			await expect(canvasElement.querySelectorAll('p')).toHaveLength(4);
+			await expect(canvasElement.querySelectorAll('dd')).toHaveLength(4);
 		});
 
 		await expect(canvas.getByRole('link')).toHaveStyle({

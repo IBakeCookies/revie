@@ -1,9 +1,14 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { expect } from 'storybook/test';
+	import { expect, waitFor } from 'storybook/test';
+	import icon from '$lib/presentation/assets/favicon.svg';
 	import BoxService from '$lib/presentation/components/box-service.svelte';
 	import { m } from '$lib/paraglide/messages';
 
+	/* The app's own icon, imported rather than spelled as a path: vite inlines it as a
+	   data URI, so every story that wants a LOADED icon gets one with no fetch to wait
+	   on. `/favicon.svg` used to sit here and 404, which put these stories in the
+	   letter-fallback state that "Icon unavailable" below exists to show. */
 	const { Story } = defineMeta({
 		title: 'Components/Box Service',
 		component: BoxService,
@@ -12,7 +17,7 @@
 			title: 'Proxmox',
 			href: 'https://proxmox.local:8006',
 			img: {
-				src: '/favicon.svg',
+				src: icon,
 			},
 			span: 4,
 		},
@@ -32,7 +37,11 @@
 			}),
 		).toHaveTextContent(args.title);
 
-		await expect(canvas.getByLabelText(m.service_status_unknown())).toHaveClass('bg-primary');
+		await expect(canvas.getByLabelText(m.service_status_unknown())).toHaveClass('bg-ty-ghost');
+
+		// Which machine a tile points at is the second thing an operator wants after
+		// the name, and it is the only way two boxes on one host tell each other apart.
+		await expect(canvas.getByText('proxmox.local:8006')).toBeInTheDocument();
 
 		const box = canvasElement.querySelector('a');
 
@@ -82,6 +91,36 @@
 		await expect(link).toHaveAttribute('href', args.href);
 		await expect(link).toHaveAttribute('target', '_blank');
 		await expect(link).toHaveAttribute('rel', 'noreferrer');
+	}}
+/>
+
+<!-- Its own story rather than a step inside a play function: axe only ever sees a
+     story's rest state, and this is the state where the icon is a letter rather than
+     an image — the one that has to stay hidden from assistive tech. -->
+<Story
+	name="Icon unavailable"
+	args={{
+		img: {
+			src: '/no-such-icon.svg',
+		},
+		isOnline: true,
+	}}
+	play={async ({ canvas, canvasElement }) => {
+		// the CDNs config.example.json names need a route out of the LAN; without
+		// this the tile carried the browser's broken-image glyph, which reads as a
+		// rendering fault rather than as a missing icon
+		// waitFor, and not on the default 1s: the swap waits on the image's error
+		// event, and under a full parallel run that took longer than a second.
+		await waitFor(
+			async () => {
+				await expect(canvas.getByText('P')).toBeInTheDocument();
+			},
+			{
+				timeout: 5000,
+			},
+		);
+
+		await expect(canvasElement.querySelector('img')).toBeNull();
 	}}
 />
 

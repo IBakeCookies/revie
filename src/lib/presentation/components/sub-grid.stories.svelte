@@ -29,7 +29,7 @@
 </script>
 
 <!-- The nested half of the config-container ↔ grid ↔ sub-grid recursion: it is a
-     Grid with tighter scenery, and every child arrives back through
+     Grid with its surface switched off, and every child arrives back through
      config-container rather than being named here. -->
 <Story
 	name="Nested boxes"
@@ -47,26 +47,39 @@
 		// reaches config-container instead of stopping at the wrapper.
 		await expect(inner?.childElementCount).toBe(2);
 
-		// The whole point of the component: it hands Grid a tighter padding, radius
-		// and gap, and `cn()` has to let the later value win. This only holds while
-		// the `@theme` spacing scale stays mirrored in `extendTailwindMerge` — if
-		// they drift, tailwind-merge stops seeing these as conflicts and keeps both.
-		await expect(box).toHaveClass('rounded-md');
-		await expect(box).not.toHaveClass('rounded-2xl');
-		await expect(box).toHaveClass('p-box-md');
-		await expect(box).not.toHaveClass('p-box-xl');
-		await expect(inner).toHaveClass('gap-grid-xs');
-		await expect(inner).not.toHaveClass('gap-grid-lg');
+		// The whole point of the component: a group is not a second card, so Grid's
+		// fill and shadow have to lose the `cn()` merge.
+		await expect(box).toHaveClass('bg-transparent');
+		await expect(box).not.toHaveClass('bg-surface-card');
+		// No `.not` for `shadow-card`: tailwind-merge reads it as a shadow *colour*
+		// (its value comes from a `--shadow-*` token, not a t-shirt size), so it
+		// survives the merge and `shadow-none`'s later declaration is what wins.
+		await expect(box).toHaveClass('shadow-none');
 
-		// `bg-surface-card` is translucent in all 27 themes, so the nested surface
-		// needs its own blur — overriding the radius must not cost it Grid's.
-		await expect(box).toHaveClass('backdrop-blur');
+		// Nothing to blur once there is no surface — and a blur here would make the
+		// element a backdrop root, cutting the children off from the scenery.
+		await expect(box).toHaveClass('backdrop-blur-none');
+		await expect(box).not.toHaveClass('backdrop-blur');
+
+		// What carries the grouping instead: a left rail, and padding on that side
+		// only. Plus the tighter inner gap. This holds while the `@theme` spacing
+		// scale stays mirrored in `extendTailwindMerge` — if they drift,
+		// tailwind-merge stops seeing these as conflicts and keeps both.
+		// Transparent on every side, then the rail colour back on the left one — the
+		// `.not` is Grid's own all-sides border losing the merge.
+		await expect(box).toHaveClass('border-transparent');
+		await expect(box).toHaveClass('border-l-line-strong');
+		await expect(box).not.toHaveClass('border-line-strong');
+		await expect(box).toHaveClass('pl-box-md');
+		await expect(box).not.toHaveClass('p-box-xl');
+		await expect(inner).toHaveClass('gap-grid-sm');
+		await expect(inner).not.toHaveClass('gap-grid-lg');
 	}}
 />
 
 <!-- A grid written before its children: normalizeConfig defaults `items` to []
      rather than dropping the container, so this state is reachable from a real
-     config and must render as an empty surface, not throw. -->
+     config and must render empty, not throw. -->
 <Story
 	name="Empty"
 	args={{
@@ -77,9 +90,8 @@
 		await expect(canvasElement.querySelector('.grid-cols-12')?.childElementCount).toBe(0);
 		await expect(canvas.queryByRole('heading')).not.toBeInTheDocument();
 
-		// The surface still has to be a surface, and `--span` still has to be there:
-		// an unset custom property makes `grid-column` invalid at computed-value
-		// time, which drops the whole column declaration.
+		// `--span` still has to be there: an unset custom property makes `grid-column`
+		// invalid at computed-value time, which drops the whole column declaration.
 		await expect(canvasElement.querySelector('div')).toHaveStyle({
 			'--span': '6',
 		});

@@ -1,6 +1,7 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect } from 'storybook/test';
+	import icon from '$lib/presentation/assets/favicon.svg';
 	import ConfigContainer from '$lib/presentation/components/config-container.svelte';
 
 	const { Story } = defineMeta({
@@ -75,10 +76,10 @@
 	}}
 />
 
-<!-- SubGrid is Grid with tighter spacing, and the only thing separating the two
-     branches. It relies on `cn()` recognising p-box-* / gap-grid-* as conflicts —
-     if the @theme spacing scale and extendTailwindMerge drift, both survive and
-     the nested grid silently keeps the outer padding. -->
+<!-- SubGrid is Grid with its surface switched off and tighter gaps, which is all
+     that separates the two branches. It relies on `cn()` recognising p-* / gap-grid-*
+     as conflicts — if the @theme spacing scale and extendTailwindMerge drift, both
+     survive and the group silently keeps the outer card's padding. -->
 <Story
 	name="Sub grid"
 	args={{
@@ -94,12 +95,18 @@
 	play={async ({ canvasElement }) => {
 		const subGrid = canvasElement.querySelector('div');
 
-		await expect(subGrid).toHaveClass('p-box-md');
+		// The padding is a left rail now, so Grid's own p-box-xl has to lose to `p-0`.
+		await expect(subGrid).toHaveClass('pl-box-md');
 		await expect(subGrid).not.toHaveClass('p-box-xl');
+
+		// A group draws no surface of its own — with Grid's fill and blur still on, a
+		// SubGrid was a second card inside the card it sits in.
+		await expect(subGrid).not.toHaveClass('bg-surface-card');
+		await expect(subGrid).not.toHaveClass('backdrop-blur');
 
 		const inner = subGrid?.querySelector('.grid');
 
-		await expect(inner).toHaveClass('gap-grid-xs');
+		await expect(inner).toHaveClass('gap-grid-sm');
 		await expect(inner).not.toHaveClass('gap-grid-lg');
 	}}
 />
@@ -149,7 +156,7 @@
 				title: 'Jellyfin',
 				href: 'http://jellyfin.local:8096',
 				img: {
-					src: '/favicon.png',
+					src: icon,
 				},
 				span: 3,
 			},
@@ -174,7 +181,7 @@
 		// green dot here would claim a service is reachable on no evidence.
 		const dot = canvasElement.querySelector('span.rounded-full');
 
-		await expect(dot).toHaveClass('bg-primary');
+		await expect(dot).toHaveClass('bg-ty-ghost');
 		await expect(dot).not.toHaveClass('bg-success');
 	}}
 />

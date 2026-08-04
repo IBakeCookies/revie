@@ -218,32 +218,33 @@ vitest project. See AGENTS.md's "Already done".)_
     src/routes/+layout.server.ts:21
 
 21. **Fix the page's accessibility skeleton and land one axe e2e audit** — `M`
-    In +layout.svelte: move `<header>` (:85) out of `<main>` (:82, closing :177) so it maps to
-    `banner` instead of `generic` — the IntersectionObserver sentinel at :83 must move with it and
-    the header currently inherits `main`'s `p-box-xl`; wrap the page links (:96-100) in `<nav>` and
-    add `aria-current="page"` (needs `import { page } from '$app/state'`, which the layout does not
-    have today); add a `<title>` to the `<svelte:head>` block (:61-63, currently only the favicon)
-    composed from `m.app_title()` plus the configured page name from `data.pages` — no page in the
-    app emits a title at all. Then add `@axe-core/playwright` and one `e2e/is-accessible.e2e.ts`
-    scanning `/`, `/services`, `/nope` in both locales and with `colorScheme: 'dark'` (the
-    `test.use` pattern exists at e2e/can-change-theme.e2e.ts:32-33).
+    In +layout.svelte: move `<header>` (:106) out of `<main>` (:103, closing :213) so it maps to
+    `banner` instead of `generic` — the IntersectionObserver sentinel at :104 must move with it and
+    the header currently inherits `main`'s `p-page-sm md:p-page-md xl:p-page` ramp. Then add
+    `@axe-core/playwright` and one `e2e/is-accessible.e2e.ts` scanning `/`, `/services`, `/nope` in
+    both locales and with `colorScheme: 'dark'` (the `test.use` pattern exists at
+    e2e/can-change-theme.e2e.ts:32-33).
     _All three component-level violations landed in the zenith parity pass_ (verified 2026-08-04),
     once the storybook a11y gate went to `test: 'error'` and every component got a story to run axe
     against: `heading-order` (grid.svelte's subTitle was h5 under an h3 — now h4 at
-    grid.svelte:35, under the h3 at :29), `link-name` (box-adguard.svelte's anchor was empty
+    grid.svelte:41, under the h3 at :34), `link-name` (box-adguard.svelte's anchor was empty
     whenever `stats` was undefined, so its accessible name was `""`; it now carries an
-    unconditional `aria-label={m.adguard_open()}` at box-adguard.svelte:62, which also replaces the
+    unconditional `aria-label={m.adguard_open()}` at box-adguard.svelte:79, which also replaces the
     four-readings-run-together name in the populated case), and the status dot's `aria-label` on a
     role-less `<span>`, which was ignored outright until the `role="img"` now at
-    box-service.svelte:51.
-    **What is left here are the two axe cannot reach from a component story:** `document-title` —
-    no component owns `<svelte:head>`, and the only one in the app
-    ([+layout.svelte:61-63](src/routes/+layout.svelte#L61-L63)) still holds nothing but the
-    favicon — and the residual dot defect, which is WCAG 1.4.1 colour-only information rather than
-    a missing name: it wants a non-colour cue, not another ARIA change.
-    _Port only the nav half:_ take zenith's `nav.svelte` `<nav>` wrapper and its
-    `aria-current={isActive(link.href) ? 'page' : undefined}` compared against
-    `deLocalizeUrl(page.url).pathname`. Zenith has no `banner` landmark either — its `<nav>` also
+    box-service.svelte:73.
+    _The nav and `<title>` halves landed in the design pass_ (verified 2026-08-05): the page links
+    sit in a `<nav>` (+layout.svelte:117) with `aria-current="page"` (:121) off `page` from
+    `$app/state`, and `<svelte:head>` (:76-79) composes the title from the configured page name
+    plus `m.app_title()` (:77). That closes `document-title` **for the app but not for the gate** —
+    the title lives in the root layout, which no component story mounts, so axe in storybook still
+    cannot see it and only the e2e audit above can.
+    **What is left is what no component story can reach:** the `banner` landmark, the title (e2e
+    only, above), and the residual dot defect, which is WCAG 1.4.1 colour-only information rather
+    than a missing name: it wants a non-colour cue, not another ARIA change.
+    _Zenith's nav half is what was ported_ — its `<nav>` wrapper and its
+    `aria-current={isActive(link.href) ? 'page' : undefined}`, compared here against
+    `page.url.pathname`. Zenith has no `banner` landmark either — its `<nav>` also
     sits inside `<main>` — and its `<title>` comes from an 89-line `seo-head.svelte` built on
     canonical/hreflang/OG/JSON-LD and a `PUBLIC_SITE_URL`, which is the wrong shape for a noindex
     private dashboard. Do adopt the one idea zenith's `scripts/` teaches — both its contrast tools
@@ -254,8 +255,8 @@ vitest project. See AGENTS.md's "Already done".)_
     at 6. Don't create a `scripts/` directory for it: zenith's `ink-contrast.mjs` measures
     `bg-<state> text-<state>-ink` over 9 fills and we have no `-ink` token, and its
     `hover-contrast.mjs` drives a shadcn button story we have no equivalent of.
-    _Files:_ src/routes/+layout.svelte:61-63,82-100,
-    src/lib/presentation/components/box-service.svelte:50-58 (the non-colour cue),
+    _Files:_ src/routes/+layout.svelte:103-106 (the `banner` move; its `<nav>` and `<title>` are
+    done), src/lib/presentation/components/box-service.svelte:72-80 (the non-colour cue),
     e2e/is-accessible.e2e.ts (new), e2e/can-navigate-between-pages.e2e.ts.
     grid.svelte, box-adguard.svelte and grid.svelte.spec.ts are off this list — their half landed.
 

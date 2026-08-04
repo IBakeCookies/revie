@@ -2,12 +2,30 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect, spyOn } from 'storybook/test';
 	import type { ConfigContainer } from '$lib/business/model/config';
+	import icon from '$lib/presentation/assets/favicon.svg';
 	import Page from '$lib/presentation/components/page.svelte';
+	import { m } from '$lib/paraglide/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	const ADGUARD_HREF = 'http://adguard.test:3000';
 
-	/* A 1x1 gif, so no story waits on a file the browser has to go and fetch. */
-	const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+	/* Built from the same locale the box reads, so a render in the wrong locale cannot
+	   pass by matching a hardcoded string. */
+	const counts = new Intl.NumberFormat(getLocale());
+	const millis = new Intl.NumberFormat(getLocale(), {
+		style: 'unit',
+		unit: 'millisecond',
+		unitDisplay: 'narrow',
+	});
+
+	/* Named rather than inlined into `args`, so the play function asserts against the
+	   payload the page was handed instead of a second copy of the numbers. */
+	const stats = {
+		dnsQueries: 1234,
+		numBlockedFiltering: 88,
+		avgProcessingTimeMs: 12,
+		topBlockedDomain: 'ads.example.com',
+	};
 
 	/* Shaped like normalized config, not like component props: a service nested inside
 	   a grid is what makes the recursion and the href collection do any work. */
@@ -26,7 +44,7 @@
 							href: 'http://jellyfin.test:8096',
 							span: 6,
 							img: {
-								src: PIXEL,
+								src: icon,
 							},
 						},
 					},
@@ -54,12 +72,7 @@
 		tags: ['autodocs'],
 		args: {
 			containers,
-			adguard: {
-				dnsQueries: 1234,
-				numBlockedFiltering: 88,
-				avgProcessingTimeMs: 12,
-				topBlockedDomain: 'ads.example.com',
-			},
+			adguard: stats,
 		},
 		// The poll starts from this component's $effect at mount, so the stub has to be
 		// installed before the story renders — one put up inside `play` arrives after the
@@ -109,9 +122,21 @@
 
 		// The four readings exist only because `setAdguardStore(() => adguard ?? undefined)`
 		// put the SSR payload somewhere the wrapper could read it — `stats` is passed to
-		// nothing along the way.
-		await expect(canvasElement.querySelectorAll(`a[href="${ADGUARD_HREF}"] p`)).toHaveLength(4);
-		await expect(canvas.getByText('DNS queries: 1234')).toBeInTheDocument();
+		// nothing along the way. Asserting the label/value pairs is what proves the payload
+		// itself arrived: four empty tiles would satisfy a count of the labels alone.
+		const tiles = [...canvasElement.querySelectorAll(`a[href="${ADGUARD_HREF}"] dl > div`)];
+
+		await expect(
+			tiles.map((tile) => [
+				tile.querySelector('dt')?.textContent,
+				tile.querySelector('dd')?.textContent,
+			]),
+		).toEqual([
+			[m.adguard_dns_queries(), counts.format(stats.dnsQueries)],
+			[m.adguard_blocked(), counts.format(stats.numBlockedFiltering)],
+			[m.adguard_delay(), millis.format(stats.avgProcessingTimeMs)],
+			[m.adguard_top_blocked_domain(), stats.topBlockedDomain],
+		]);
 
 		// The other store: the dot only leaves "status unknown" once the poll this
 		// component starts has resolved a probe into the services store.
@@ -130,8 +155,11 @@
 	}}
 	play={async ({ canvas, canvasElement }) => {
 		await expect(canvasElement.querySelector(`a[href="${ADGUARD_HREF}"]`)).toBeInTheDocument();
+		// The unavailable line in place of the readings: no tile list at all, and the one
+		// remaining <p> in the box is that line.
+		await expect(canvasElement.querySelectorAll(`a[href="${ADGUARD_HREF}"] dl`)).toHaveLength(0);
 		await expect(canvasElement.querySelectorAll(`a[href="${ADGUARD_HREF}"] p`)).toHaveLength(1);
-		await expect(canvas.queryByText(/DNS queries/)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(m.adguard_dns_queries())).not.toBeInTheDocument();
 
 		// A missing read must not take its siblings with it — grid, service and the
 		// service's own probe are all unaffected.

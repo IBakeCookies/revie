@@ -111,10 +111,14 @@
 		title: undefined,
 		items: [],
 	}}
-	play={async ({ canvas }) => {
+	play={async ({ canvas, canvasElement }) => {
 		// By role, not by tag: a tag-pinned selector keeps passing while silently
 		// covering nothing the next time a heading level moves.
 		await expect(canvas.queryAllByRole('heading')).toHaveLength(0);
+
+		// The wrapper holding the headings carries the gap below them, so it must not
+		// render either — a grid given neither used to start with a blank strip.
+		await expect(canvasElement.querySelector('div')?.firstElementChild).toHaveClass('grid');
 	}}
 />
 
@@ -129,15 +133,18 @@
 		await expect(canvas.getByText('Smart Home')).toBeInTheDocument();
 		await expect(canvas.getByText('Lights')).toBeInTheDocument();
 
-		const subGrid = canvas.getByText('Smart Home').parentElement;
+		// The headings live in their own wrapper now, so reach the sub-grid root by the
+		// column class every Grid carries rather than by counting hops.
+		const subGrid = canvas.getByText('Smart Home').closest('.col-span-12');
 
-		// SubGrid's own padding has to WIN the cn() merge — otherwise every nesting
+		// SubGrid's own spacing has to WIN the cn() merge — otherwise every nesting
 		// level is spaced like a top-level card and the tree loses its hierarchy.
-		await expect(subGrid).toHaveClass('p-box-md');
+		await expect(subGrid).toHaveClass('pl-box-md');
 		await expect(subGrid).not.toHaveClass('p-box-xl');
 
-		// A nested card is still translucent, and still sits over the scenery.
-		await expect(subGrid).toHaveClass('backdrop-blur');
+		// A nested group draws no card of its own, so nothing is left to blur.
+		await expect(subGrid).toHaveClass('bg-transparent');
+		await expect(subGrid).toHaveClass('backdrop-blur-none');
 	}}
 />
 

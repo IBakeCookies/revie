@@ -1,6 +1,7 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect, fn, waitFor } from 'storybook/test';
+	import icon from '$lib/presentation/assets/favicon.svg';
 	import BoxServiceWrapper from '$lib/presentation/components/box-service-wrapper.svelte';
 
 	/* The store's ErrorReporter defaults to console.error. Injecting a spy is the
@@ -16,7 +17,7 @@
 			title: 'Pi-hole',
 			href: 'http://unprobed.local:8080',
 			img: {
-				src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"/>',
+				src: icon,
 			},
 			span: 4,
 		},
@@ -97,7 +98,7 @@
 		const dot = canvasElement.querySelector('[aria-label]');
 
 		await expect(dot).toHaveAttribute('aria-label', 'status unknown');
-		await expect(dot).toHaveClass('bg-primary');
+		await expect(dot).toHaveClass('bg-ty-ghost');
 	}}
 />
 

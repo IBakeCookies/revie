@@ -303,10 +303,12 @@ Things that break **silently** — no error, just wrong output.
   the import order above, and it makes the real declaration impossible to find. The two
   exceptions are `--blur` and `--radius`, which Tailwind itself names.
 - Those four style files are **ported from the `zenith` project** (`src/lib/presentation/style/`)
-  and are kept diffable against it so upstream theme work stays copy-pasteable — 13 of the 17
-  shared `scenery/*.css` files are currently byte-identical to zenith's. `zenith`'s shadcn /
-  tw-animate / fontsource imports are intentionally dropped here, as are the 10 scenery files
-  belonging to themes this project doesn't carry.
+  and are kept diffable against it so upstream theme work stays copy-pasteable — 16 of the 17
+  shared `scenery/*.css` files are currently byte-identical to zenith's, `index.css` being the
+  one exception because its `@import` list is per-project. The directory holds **18**: `revie.css`
+  is this app's own scenery and has no zenith counterpart, so it is not one of the shared files.
+  `zenith`'s shadcn / tw-animate / fontsource imports are intentionally dropped here, as are the
+  10 scenery files belonging to themes this project doesn't carry.
 - **Tokens only, and never `dark:`.** Components name semantic classes from
   [tokens.css](src/lib/presentation/style/tokens.css) and nothing else — no raw palette class
   (`text-zinc-400`), including inside a class string built in `.ts`. And never the `dark:`
@@ -328,11 +330,14 @@ Things that break **silently** — no error, just wrong output.
   A control nested inside an already-blurred card needs none — `backdrop-filter` makes an
   element a **backdrop root**, so a nested blur cannot reach the scenery anyway; that is why
   [dropdown.svelte](src/lib/presentation/components/dropdown.svelte)'s trigger carries none
-  (it only ever sits in the blurred header). The five components that CAN be top-level in a
-  config keep theirs, because config decides whether they are nested and no component can know.
+  (it only ever sits in the blurred header). Four of the five containers a config can name keep
+  theirs, because config decides whether they are nested and no component can know. `SubGrid` is
+  the exception and not a counter-example: it can still be top-level, but it draws no surface at
+  all, so `backdrop-blur-none` is there because there is nothing of its own to blur.
 - **On the dark glass themes, nesting gets LIGHTER — `--surface-inset` is a white veil.** All
-  14 of them pair `--surface-card: oklch(1 0 0 / ~0.06)` with `--surface-inset:
-oklch(1 0 0 / 0.1)`, so `Grid` → `SubGrid` → box brightens monotonically. It was a **black**
+  15 of them pair `--surface-card: oklch(1 0 0 / ~0.06)` with `--surface-inset:
+oklch(1 0 0 / 0.1)`, so the ladder that renders is card → inset and brightens with depth. Two
+  steps, not three: `SubGrid` sits between them and draws no surface. It was a **black**
   veil at `0.15`–`0.35` until 2026-08-04, which inverted the elevation: the box read as a hole
   punched through the two cards above it, and a top-level `BoxDate` / `BoxAdguard` on the page
   vanished outright. The light themes are the other way round on purpose — deeper is slightly
@@ -370,6 +375,10 @@ oklch(1 0 0 / 0.1)`, so `Grid` → `SubGrid` → box brightens monotonically. It
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
   18 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  All 18 are **parameter-free**: the four AdGuard keys are labels and `Intl.NumberFormat` formats
+  the readings themselves ([box-adguard.svelte](src/lib/presentation/components/box-adguard.svelte)),
+  so the parameter typecheck has nothing to check today and a missing translation is the only way
+  a message can go wrong.
 
 ## Conventions
 
@@ -399,7 +408,7 @@ automated a11y gate in the repo, and it earned its place immediately: turning it
 undefined, so it sat in the tab order announcing nothing). Note axe only ever sees a story's
 **rest** state, so the states worth an a11y check have to exist as their own stories rather than
 being reached inside a `play` function. The one violation it cannot catch is `document-title`
-([roadmap.md](roadmap.md) #21) — no component owns `<svelte:head>`.
+([roadmap.md](roadmap.md) #21) — the `<title>` lives in the root layout, which no story mounts.
 
 **Wrappers get a story but no `*.svelte.spec.ts`.** A wrapper reads a store and forwards props
 ([box-service-wrapper.svelte](src/lib/presentation/components/box-service-wrapper.svelte),
@@ -616,6 +625,15 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
     `leaf-not-to-upper-layers` (zenith has no `lib/utils`) and carries zenith's inert
     `logger-imports-nothing`. A byte-identical shared file would need a matching change in
     zenith, which this pass deliberately did not touch.
+  - **`themes.css` and `tokens.css` now diverge from zenith by one theme, on purpose: `fallow`
+    out, `revie` in.** `fallow` is zenith's own signature palette, so carrying it here shipped
+    another project's brand; `revie` takes its slot in all three hand-edited places plus a
+    `scenery/revie.css` zenith has no counterpart for, and the catalogue is still 27 entries with
+    26 `@custom-variant` rules. The first-visit defaults moved with it: `DEFAULT_THEME` is
+    `glass-light` and `DEFAULT_DARK_THEME` is `revie`. `revie` **cannot** be the light default —
+    its `css` is `['revie', 'dark']`, so stamping it on a light-preferring OS is the wrong first
+    paint; the light branch gets the frosted light theme nearest it instead. Everything else
+    still pastes from upstream; a paste that reintroduces `fallow` is the one thing to reject.
 - **`src/lib/test/` is under no layer constraint.** No eslint layer block and no cruiser layer
   rule matches it, so [dom.ts](src/lib/test/dom.ts) and
   [adguard-store-harness.svelte](src/lib/test/adguard-store-harness.svelte) may import from any

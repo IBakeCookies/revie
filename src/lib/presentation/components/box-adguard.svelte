@@ -4,6 +4,7 @@
 	import type { AdguardStats } from '$lib/business/type/adguard-stats';
 	import { cn, spanStyle } from '$lib/utils/style';
 	import { m } from '$lib/paraglide/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	export type Props = {
 		/** Base URL of the AdGuard Home instance. Credentials come from the environment. */
@@ -15,35 +16,49 @@
 
 	let { href, stats, span, ...restProps }: Props = $props();
 
-	const items = $derived.by(() => {
+	// Instance scope, not module scope, for the same reason as box-date's formatter:
+	// the module body runs once per node process while the locale is per request.
+	// The unit style carries the `ms` so no message has to spell it.
+	const counts = new Intl.NumberFormat(getLocale());
+	const millis = new Intl.NumberFormat(getLocale(), {
+		style: 'unit',
+		unit: 'millisecond',
+		unitDisplay: 'narrow',
+	});
+
+	const readings = $derived.by(() => {
 		if (!stats) {
 			return [];
 		}
 
+		// `wide` is the domain reading, and the only thing that differs about it: it is
+		// the one value that is not a number, so it takes the row to itself and a
+		// smaller size. At the size the counts are set it would truncate to three
+		// characters in a quarter-width tile.
 		return [
 			{
-				text: m.adguard_dns_queries({
-					count: stats.dnsQueries,
-				}),
-				class: 'border-success',
+				label: m.adguard_dns_queries(),
+				value: counts.format(stats.dnsQueries),
+				accent: 'border-l-success',
+				wide: false,
 			},
 			{
-				text: m.adguard_blocked({
-					count: stats.numBlockedFiltering,
-				}),
-				class: 'border-danger',
+				label: m.adguard_blocked(),
+				value: counts.format(stats.numBlockedFiltering),
+				accent: 'border-l-danger',
+				wide: false,
 			},
 			{
-				text: m.adguard_delay({
-					milliseconds: stats.avgProcessingTimeMs,
-				}),
-				class: 'border-info',
+				label: m.adguard_delay(),
+				value: millis.format(stats.avgProcessingTimeMs),
+				accent: 'border-l-info',
+				wide: false,
 			},
 			{
-				text: m.adguard_top_blocked_domain({
-					domain: stats.topBlockedDomain,
-				}),
-				class: 'border-warning',
+				label: m.adguard_top_blocked_domain(),
+				value: stats.topBlockedDomain,
+				accent: 'border-l-warning',
+				wide: true,
 			},
 		];
 	});
@@ -61,27 +76,40 @@
 	aria-label={m.adguard_open()}
 	style={spanStyle(span)}
 	class={cn(
-		'@container/box-adguard col-span-12 xl:col-span-(--span) block rounded-md bg-surface-inset backdrop-blur p-box-md border border-transparent hover:border-line-strong transition-colors',
+		'@container/box-adguard bg-surface-inset border-line-soft hover:border-line-strong focus-visible:ring-ring col-span-12 block rounded-lg border p-box-md backdrop-blur transition focus-visible:ring-2 focus-visible:outline-none xl:col-span-(--span)',
 		restProps.class,
 	)}
 >
-	<div class="grid gap-grid-xs grid-cols-1 @2xl:grid-cols-2">
-		{#each items as item (item.text)}
-			<p
-				class={['@2xl/box-adguard:p-box-md bg-surface-card p-box-xs rounded-md border', item.class]}
-			>
-				{item.text}
-			</p>
-		{/each}
-
+	{#if stats}
+		<!-- A label/value pair per reading, so the number is the thing that carries: the
+		     readings used to be four full sentences, which is prose in a box rather than a
+		     dashboard. The accent edge keys each one to its meaning. -->
+		<dl class="grid grid-cols-2 gap-grid-xs @2xl/box-adguard:grid-cols-3">
+			{#each readings as reading (reading.label)}
+				<div
+					class={[
+						'bg-surface-card flex min-w-0 flex-col gap-text-3xs rounded-md border-l-2 p-box-sm',
+						reading.accent,
+						reading.wide && 'col-span-2 @2xl/box-adguard:col-span-3',
+					]}
+				>
+					<dt class="text-ty-silent truncate text-2xs tracking-wider uppercase">{reading.label}</dt>
+					<dd
+						class={['truncate font-semibold', reading.wide ? 'text-base' : 'text-xl tabular-nums']}
+					>
+						{reading.value}
+					</dd>
+				</div>
+			{/each}
+		</dl>
+	{:else}
 		<!-- Without this the box was a padded rectangle with nothing in it, which reads as a
 		     layout bug rather than as an unreachable AdGuard. -->
-		{#if !stats}
-			<p
-				class="@2xl/box-adguard:p-box-md bg-surface-card p-box-xs rounded-md border border-danger @2xl:col-span-2"
-			>
-				{m.adguard_unavailable()}
-			</p>
-		{/if}
-	</div>
+		<p
+			class="bg-surface-card border-danger text-ty-secondary flex items-center justify-center gap-text-xs rounded-md border px-box-md py-box-lg"
+		>
+			<span class="bg-danger size-2 shrink-0 rounded-full" aria-hidden="true"></span>
+			{m.adguard_unavailable()}
+		</p>
+	{/if}
 </a>

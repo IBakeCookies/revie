@@ -21,21 +21,35 @@
 	{...restProps}
 	style={spanStyle(span)}
 	class={cn(
-		'p-box-xl col-span-12 xl:col-span-(--span) bg-surface-card border-line-strong shadow-card backdrop-blur rounded-2xl border',
+		'bg-surface-card border-line-strong shadow-card col-span-12 rounded-2xl border p-box-xl backdrop-blur xl:col-span-(--span)',
 		restProps.class,
 	)}
 >
-	{#if title}
-		<h3 class="text-2xl">{title}</h3>
+	<!-- The gap below the headings belongs to the headings, not to the items grid: a
+	     grid the config gave neither a title nor a subtitle used to carry the margin
+	     anyway and started with a blank strip. -->
+	{#if title || subTitle}
+		<div class="mb-text-md flex flex-col gap-text-3xs">
+			{#if title}
+				<!-- h2, not h3: the layout's app title is the page's only h1, so a card
+				     titled h3 skipped a level on every real page. The storybook a11y gate
+				     cannot see that one — no story mounts the layout, so h3 was the
+				     story's first heading and passed. The size is a class, so the visual
+				     step is unchanged. -->
+				<h2 class="text-xl font-semibold tracking-tight">{title}</h2>
+			{/if}
+
+			{#if subTitle}
+				<!-- h3, which is also what a BoxService title is: a repeat of a level is
+				     not a skip, so a group label above its boxes passes either way. Set as
+				     a section label rather than a smaller title — it is what carries the
+				     grouping now that SubGrid draws no surface of its own. -->
+				<h3 class="text-ty-silent text-2xs font-semibold tracking-wider uppercase">{subTitle}</h3>
+			{/if}
+		</div>
 	{/if}
 
-	{#if subTitle}
-		<!-- h4, not h5: skipping a level is a heading-order violation. The size is a
-		     class, so the visual step is unchanged. -->
-		<h4 class="text-lg text-ty-secondary">{subTitle}</h4>
-	{/if}
-
-	<div class={cn('grid grid-cols-12 gap-grid-lg mt-text-md', gridClass)}>
+	<div class={cn('grid grid-cols-12 gap-grid-lg', gridClass)}>
 		{#each items as item, index (index)}
 			<ConfigContainerView container={item} />
 		{/each}

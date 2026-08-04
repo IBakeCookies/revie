@@ -3,7 +3,9 @@
 	import { m } from '$lib/paraglide/messages';
 </script>
 
-<div class="col-span-12 p-box-xl text-center bg-surface-inset backdrop-blur rounded-md">
-	<h2 class="text-2xl font-bold">{page.status}</h2>
+<div
+	class="bg-surface-inset border-line-soft col-span-12 flex flex-col items-center gap-text-2xs rounded-lg border px-box-md py-empty-state text-center backdrop-blur"
+>
+	<h2 class="text-ty-silent text-4xl font-semibold tabular-nums">{page.status}</h2>
 	<p class="text-ty-secondary">{page.error?.message ?? m.error_unknown()}</p>
 </div>

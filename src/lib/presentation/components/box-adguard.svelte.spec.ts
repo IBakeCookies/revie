@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import BoxAdguard from '$lib/presentation/components/box-adguard.svelte';
 import { m } from '$lib/paraglide/messages';
+import { getLocale } from '$lib/paraglide/runtime';
 import { spanOf } from '$lib/test/dom';
 
 const href = 'http://adguard.local';
@@ -34,48 +35,29 @@ describe('box-adguard.svelte', () => {
 			stats,
 		});
 
-		await expect
-			.element(
-				screen.getByText(
-					m.adguard_dns_queries({
-						count: 1234,
-					}),
-				),
-			)
-			.toBeInTheDocument();
+		// Built from the same locale the component reads, so a render in the wrong locale
+		// cannot pass by matching a hardcoded string.
+		const counts = new Intl.NumberFormat(getLocale());
 
-		await expect
-			.element(
-				screen.getByText(
-					m.adguard_blocked({
-						count: 56,
-					}),
-				),
-			)
-			.toBeInTheDocument();
+		const millis = new Intl.NumberFormat(getLocale(), {
+			style: 'unit',
+			unit: 'millisecond',
+			unitDisplay: 'narrow',
+		});
 
-		await expect
-			.element(
-				screen.getByText(
-					m.adguard_delay({
-						milliseconds: 12,
-					}),
-				),
-			)
-			.toBeInTheDocument();
+		const tiles = [...screen.container.querySelectorAll('dl > div')];
 
-		await expect
-			.element(
-				screen.getByText(
-					m.adguard_top_blocked_domain({
-						domain: 'ads.example.com',
-					}),
-					{
-						exact: true,
-					},
-				),
-			)
-			.toBeInTheDocument();
+		expect(
+			tiles.map((tile) => [
+				tile.querySelector('dt')?.textContent,
+				tile.querySelector('dd')?.textContent,
+			]),
+		).toEqual([
+			[m.adguard_dns_queries(), counts.format(stats.dnsQueries)],
+			[m.adguard_blocked(), counts.format(stats.numBlockedFiltering)],
+			[m.adguard_delay(), millis.format(stats.avgProcessingTimeMs)],
+			[m.adguard_top_blocked_domain(), stats.topBlockedDomain],
+		]);
 	});
 
 	it('says so when AdGuard could not be reached', async () => {

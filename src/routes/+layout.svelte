@@ -39,8 +39,23 @@
 
 	// Shared affordances for every menu row: --surface-hover and --ring are both
 	// themed, so this stays token-only. Display/layout classes stay per call site.
+	// Rounded, because the panel is: a square-cornered hover fill inside a rounded
+	// border reads as a clipping bug on the first and last row.
 	const menuItem =
-		'py-text-xs px-box-md cursor-pointer w-full text-left hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
+		'py-text-xs px-box-md cursor-pointer w-full text-left rounded-md hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
+
+	// The page's own name first, so a browser tab and a bookmark say which page they
+	// are — nothing in the app owned <title> before, which is the one axe violation
+	// no component story can cover.
+	const pageName = $derived(
+		data.pages.find((page) => page.path === currentPage.url.pathname)?.name,
+	);
+
+	// Derived, not inlined into the style attribute beside dataSceneryStyle: the seed
+	// vars only change on a reroll, while sceneryNow ticks every minute — and two of
+	// them (meridian's ribbons, dunes' ridges) are whole SVG data URIs, rebuilt on
+	// every tick for an identical result if the two share one expression.
+	const sceneryVars = $derived(sceneryStyle(themeStore.scenerySeed));
 
 	onMount(() => {
 		sceneryNow = new Date();
@@ -65,6 +80,7 @@
 </script>
 
 <svelte:head>
+	<title>{pageName ? `${pageName} · ${m.app_title()}` : m.app_title()}</title>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
@@ -72,11 +88,7 @@
      default; a theme opts in by styling the helpers in style/scenery/. The
      seeded vars vary each theme's arrangement per user (utils/scenery-seed.ts);
      the data vars carry the clock-driven themes' state (utils/scenery-time.ts). -->
-<div
-	class="theme-scenery"
-	aria-hidden="true"
-	style="{sceneryStyle(themeStore.scenerySeed)}; {dataSceneryStyle(sceneryNow)}"
->
+<div class="theme-scenery" aria-hidden="true" style="{sceneryVars}; {dataSceneryStyle(sceneryNow)}">
 	<div class="theme-helper-1"></div>
 	<div class="theme-helper-2"></div>
 	<div class="theme-helper-3"></div>
@@ -88,38 +100,53 @@
      the line-art themes (meridian, city-windows, orbit) that erases the art
      exactly where the page covers it. Each translucent surface blurs its own
      footprint instead, so the gaps between cards keep the scenery crisp. -->
-<main class="flex flex-col min-h-screen p-box-xl">
+<!-- The page padding runs the responsive ramp the --spacer-page-* tokens were added
+     for and nothing used: one flat 24px spent 12% of a 390px phone's width before a
+     card's own padding even started, and left a desktop tighter than its cards. -->
+<main class="flex min-h-screen flex-col p-page-sm md:p-page-md xl:p-page">
 	<div bind:this={sentinel}></div>
 
 	<header
 		class={cn(
-			'bg-surface-card border-line-strong shadow-card backdrop-blur flex-wrap w-full sticky top-0 z-10 rounded-b-2xl border px-box-lg py-box-md max-w-screen-2xl mx-auto flex items-center',
+			'bg-surface-card border-line-strong shadow-card sticky top-0 z-10 mx-auto flex w-full max-w-screen-2xl flex-wrap items-center gap-x-text-lg gap-y-text-xs rounded-b-2xl border px-box-lg py-box-md backdrop-blur',
 			{
 				'rounded-t-2xl': !isNavAtTheTop,
 				'border-t-transparent': isNavAtTheTop,
 			},
 		)}
 	>
-		<h1 class="font-bold text-2xl">{m.app_title()}</h1>
+		<h1 class="text-xl font-bold tracking-tight sm:text-2xl">{m.app_title()}</h1>
 
-		{#each data.pages as page (page.path)}
-			<a
-				href={page.path}
-				aria-current={currentPage.url.pathname === page.path ? 'page' : undefined}
-				class={cn(
-					'ml-text-md rounded-md hover:text-ty-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-					{
-						'font-bold': currentPage.url.pathname === page.path,
-						'text-ty-secondary': currentPage.url.pathname !== page.path,
-					},
-				)}
+		<nav class="flex items-center gap-text-2xs">
+			{#each data.pages as page (page.path)}
+				<a
+					href={page.path}
+					aria-current={currentPage.url.pathname === page.path ? 'page' : undefined}
+					class={cn(
+						'hover:text-ty-primary focus-visible:ring-ring rounded-md px-box-2xs py-text-3xs transition-colors focus-visible:ring-2 focus-visible:outline-none',
+						{
+							'bg-surface-hover text-ty-primary font-semibold':
+								currentPage.url.pathname === page.path,
+							'text-ty-secondary': currentPage.url.pathname !== page.path,
+						},
+					)}
+				>
+					{page.name}
+				</a>
+			{/each}
+		</nav>
+
+		<!-- A full row of its own until the title, the nav and both menus fit on one
+		     line: the three of them together overflow a phone, and letting the flex
+		     wrap decide left the menus stranded mid-row under the heading. -->
+		<div class="ml-auto flex w-full items-center justify-end gap-text-md sm:w-auto">
+			<!-- flex-1 only while the menus have a row to themselves: two equal buttons
+			     filling a phone's width read as a control bar, where two content-width
+			     ones adrift in the middle of it read as leftovers. -->
+			<Dropdown
+				class="flex-1 sm:flex-none"
+				panelClass="nice-scrollbar max-h-[min(80vh,32rem)] overflow-y-auto"
 			>
-				{page.name}
-			</a>
-		{/each}
-
-		<div class="ml-auto flex items-center gap-text-md">
-			<Dropdown panelClass="nice-scrollbar max-h-[min(80vh,32rem)] overflow-y-auto">
 				{#snippet trigger()}
 					{m.theme_label()}
 				{/snippet}
@@ -164,7 +191,7 @@
 				{/if}
 			</Dropdown>
 
-			<Dropdown>
+			<Dropdown class="flex-1 sm:flex-none">
 				{#snippet trigger()}
 					{m.language_label()}
 				{/snippet}
@@ -183,7 +210,7 @@
 		</div>
 	</header>
 
-	<div class="grid grid-cols-12 gap-grid-lg mt-grid-lg max-w-screen-2xl mx-auto w-full">
+	<div class="mx-auto mt-grid-lg grid w-full max-w-screen-2xl grid-cols-12 gap-grid-lg">
 		{@render children()}
 	</div>
 </main>

@@ -46,7 +46,9 @@
 {:else if container.name === 'BoxDate'}
 	<BoxDate {...container.props} />
 {:else}
-	<p class="col-span-12 bg-surface-inset text-ty-secondary p-box-md rounded-md">
+	<p
+		class="bg-surface-inset border-danger text-ty-secondary col-span-12 rounded-lg border p-box-md backdrop-blur"
+	>
 		{unhandled(container)}
 	</p>
 {/if}
