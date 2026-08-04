@@ -359,6 +359,13 @@ export function sceneryStyle(seed: number): string {
 		'--sw-grid-x': rem2(0, 3),
 		'--sw-grid-phase': sec2(-2.6, 0),
 		'--sw-haze-phase': sec2(-8, 0),
+
+		/* revie: the dot-grid is static, so both axes are free within its 2rem
+		   tile; the sweep is a transform loop and the link lights only fade, so
+		   both of those take a phase and nothing else */
+		'--revie-grid': tile2(2, 2),
+		'--revie-sweep-phase': sec2(-26, 0),
+		'--revie-blink-phase': sec2(-7, 0),
 	};
 
 	return Object.entries({

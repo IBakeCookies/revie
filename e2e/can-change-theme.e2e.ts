@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('starts on the default theme when nothing was stored', async ({ page }) => {
-	await expect(page.locator('html')).toHaveClass(/fallow/);
+	await expect(page.locator('html')).toHaveClass(/glass-light/);
 });
 
 test('switches the theme and drops the classes of the previous one', async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe('with an operating system that prefers dark', () => {
 		await expect(page.locator('html')).toHaveClass(/dark/);
 		// the pre-paint script swaps the classes it owns rather than assigning
 		// className, so the light default's has to be gone
-		await expect(page.locator('html')).not.toHaveClass(/fallow/);
+		await expect(page.locator('html')).not.toHaveClass(/glass-light/);
 	});
 });
 
@@ -102,7 +102,7 @@ test.describe('with an operating system that asks for reduced motion', () => {
 
 		await expect(page.locator('html')).toHaveClass(/dark/);
 		await expect(page.locator('html')).toHaveClass(/scenery-paused/);
-		await expect(page.locator('html')).not.toHaveClass(/fallow/);
+		await expect(page.locator('html')).not.toHaveClass(/glass-light/);
 	});
 });
 

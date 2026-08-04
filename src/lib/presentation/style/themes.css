@@ -417,36 +417,40 @@
 	--mixed: oklch(0.55 0.12 290);
 }
 
-.fallow {
-	/* the namesake: a field at rest — straw-gold stubble, quiet green regrowth,
-	   a wide pale sky. Rest is not idleness; it is how the ground yields again. */
+.revie {
+	/* The app's own theme: the dashboard as a quiet control room. A graphite-blue
+	   ground lit from the corners, frosted cards, and the status-green of a service
+	   that answers as the only strong colour — the same green the online dot uses,
+	   which is this app's one signal. Scenery is a schematic dot-grid, a slow poll
+	   sweep and two link lights — see scenery/revie.css.
+
+	   The one theme here that is not zenith's, so it declares only what this app
+	   maps to a utility; zenith's --mind/--body/--flow/--mixed are left to base.css
+	   because there is no upstream palette to stay diffable against. */
 	--background-image:
-		radial-gradient(ellipse 100% 55% at 50% -12%, oklch(0.94 0.025 225 / 0.55), transparent 68%),
-		radial-gradient(ellipse 85% 45% at 12% 112%, oklch(0.72 0.1 115 / 0.32), transparent 65%),
-		radial-gradient(ellipse 90% 50% at 88% 110%, oklch(0.82 0.1 90 / 0.45), transparent 65%),
-		linear-gradient(oklch(0.96 0.012 220), oklch(0.93 0.03 100));
+		radial-gradient(ellipse 70% 50% at 12% -8%, oklch(0.5 0.1 175 / 0.18), transparent 68%),
+		radial-gradient(ellipse 65% 45% at 92% 6%, oklch(0.45 0.09 255 / 0.16), transparent 70%),
+		radial-gradient(ellipse 85% 55% at 50% 112%, oklch(0.42 0.08 200 / 0.2), transparent 68%),
+		linear-gradient(oklch(0.19 0.022 240), oklch(0.13 0.018 235));
 
-	--radius: 1rem;
+	--radius: 0.875rem;
 
-	--surface-page: oklch(0.95 0.02 105);
-	--surface-card: oklch(1 0 0 / 0.55);
-	--surface-inset: oklch(0.45 0.06 110 / 0.08);
-	--ty-primary: oklch(0.31 0.045 130);
+	--surface-page: oklch(0.16 0.02 240);
+	/* dark glass: nesting brightens, never darkens — see AGENTS.md */
+	--surface-card: oklch(1 0 0 / 0.06);
+	--surface-inset: oklch(1 0 0 / 0.1);
+	--ty-primary: oklch(0.97 0.008 200);
 
-	--input: oklch(1 0 0 / 0.6);
-	--border: oklch(0.45 0.07 115 / 0.25);
+	--input: oklch(1 0 0 / 0.09);
+	--border: oklch(0.85 0.03 200 / 0.16);
 
-	/* quiet field green */
-	--primary: oklch(0.55 0.11 130);
-	--primary-foreground: var(--color-white);
+	/* status green */
+	--primary: oklch(0.78 0.16 165);
+	--primary-foreground: oklch(0.19 0.04 190);
+	--ring: oklch(0.78 0.16 165 / 0.5);
 
-	--brand: oklch(0.52 0.1 125);
-	--brand-strong: oklch(0.44 0.1 128);
-	/* straw gold */
-	--flow: oklch(0.65 0.13 85);
-	/* spruce teal — keeps body distinct from the field-green primary */
-	--body: oklch(0.5 0.12 175);
-	--mixed: oklch(0.55 0.11 310);
+	--brand: oklch(0.75 0.15 168);
+	--brand-strong: oklch(0.84 0.12 168);
 }
 
 .lantern-drift {

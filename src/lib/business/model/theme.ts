@@ -8,7 +8,7 @@
  */
 
 export type ThemeName =
-	| 'fallow'
+	| 'revie'
 	| 'solid-light'
 	| 'solid-dark'
 	| 'glass-light'
@@ -45,9 +45,9 @@ export interface ThemeItem {
 
 export const themes: ThemeItem[] = [
 	{
-		name: 'fallow',
-		label: 'Fallow',
-		css: ['fallow'],
+		name: 'revie',
+		label: 'Revie',
+		css: ['revie', 'dark'],
 	},
 	{
 		name: 'solid-light',
@@ -182,10 +182,12 @@ export const themes: ThemeItem[] = [
 ] as const;
 
 /* Defaults for first visit (no cookie). hooks.server.ts injects both class
-   lists into app.html's pre-paint script, so this stays the only definition. */
-export const DEFAULT_THEME: ThemeName = 'fallow';
+   lists into app.html's pre-paint script, so this stays the only definition.
+   `revie` is this app's own theme and is dark, so it can only be the dark
+   default; a light-preferring OS gets the frosted light theme nearest to it. */
+export const DEFAULT_THEME: ThemeName = 'glass-light';
 
-export const DEFAULT_DARK_THEME: ThemeName = 'solid-dark';
+export const DEFAULT_DARK_THEME: ThemeName = 'revie';
 
 /* 32-bit scenery seed. The store only mints and persists the number;
    mapping it to CSS vars is presentation's job (utils/scenery-seed.ts). */
