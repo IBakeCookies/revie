@@ -4,6 +4,7 @@
 	import '$lib/presentation/style/app.css';
 	import favicon from '$lib/presentation/assets/favicon.svg';
 	import { onMount } from 'svelte';
+	import { page as currentPage } from '$app/state';
 	import { cn } from '$lib/utils/style';
 	import { setThemeStore } from '$lib/business/store/theme-store.svelte';
 	import { sceneryStyle } from '$lib/presentation/util/scenery-seed';
@@ -35,6 +36,11 @@
 		en: m.language_en,
 		de: m.language_de,
 	};
+
+	// Shared affordances for every menu row: --surface-hover and --ring are both
+	// themed, so this stays token-only. Display/layout classes stay per call site.
+	const menuItem =
+		'py-text-xs px-box-md cursor-pointer w-full text-left hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
 	onMount(() => {
 		sceneryNow = new Date();
@@ -97,7 +103,17 @@
 		<h1 class="font-bold text-2xl">{m.app_title()}</h1>
 
 		{#each data.pages as page (page.path)}
-			<a href={page.path} class="ml-text-md">
+			<a
+				href={page.path}
+				aria-current={currentPage.url.pathname === page.path ? 'page' : undefined}
+				class={cn(
+					'ml-text-md rounded-md hover:text-ty-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+					{
+						'font-bold': currentPage.url.pathname === page.path,
+						'text-ty-secondary': currentPage.url.pathname !== page.path,
+					},
+				)}
+			>
 				{page.name}
 			</a>
 		{/each}
@@ -110,12 +126,9 @@
 
 				{#each themeStore.themes as theme (theme.name)}
 					<button
-						class={cn(
-							'py-text-xs px-box-md cursor-pointer flex w-full items-center gap-text-xs text-left',
-							{
-								'font-bold': themeStore.theme === theme.name,
-							},
-						)}
+						class={cn(menuItem, 'flex items-center gap-text-xs', {
+							'font-bold': themeStore.theme === theme.name,
+						})}
 						onclick={() => themeStore.switchTheme(theme.name)}
 					>
 						<!-- the theme's own classes scope its CSS vars to the swatch, so
@@ -137,10 +150,7 @@
 
 				<!-- the seed and the motion flag are appearance too, and the cookies
 				     behind them are what let the server stamp the right scenery -->
-				<button
-					class="py-text-xs px-box-md cursor-pointer block w-full text-left"
-					onclick={() => themeStore.rerollScenery()}
-				>
+				<button class={cn(menuItem, 'block')} onclick={() => themeStore.rerollScenery()}>
 					{m.theme_reroll_scenery()}
 				</button>
 
@@ -148,10 +158,7 @@
 				     matter what the cookie says, so the control would only mislabel a
 				     state it cannot change -->
 				{#if themeStore.sceneryMotionToggleable}
-					<button
-						class="py-text-xs px-box-md cursor-pointer block w-full text-left"
-						onclick={() => themeStore.toggleSceneryMotion()}
-					>
+					<button class={cn(menuItem, 'block')} onclick={() => themeStore.toggleSceneryMotion()}>
 						{themeStore.sceneryPaused ? m.theme_resume_animations() : m.theme_pause_animations()}
 					</button>
 				{/if}
@@ -164,7 +171,7 @@
 
 				{#each locales as locale (locale)}
 					<button
-						class={cn('py-text-xs px-box-md cursor-pointer block w-full text-left', {
+						class={cn(menuItem, 'block', {
 							'font-bold': getLocale() === locale,
 						})}
 						onclick={() => setLocale(locale)}
@@ -176,9 +183,7 @@
 		</div>
 	</header>
 
-	<div
-		class="grid grid-cols-12 gap-grid-lg mt-grid-lg border-line-strong p-box-xl max-w-screen-2xl mx-auto w-full rounded-2xl border"
-	>
+	<div class="grid grid-cols-12 gap-grid-lg mt-grid-lg max-w-screen-2xl mx-auto w-full">
 		{@render children()}
 	</div>
 </main>
