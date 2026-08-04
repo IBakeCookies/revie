@@ -77,8 +77,11 @@
 	<div class="theme-helper-4"></div>
 </div>
 
-<!-- No backdrop-blur here: it would blur the theme scenery behind the whole
-     page. Each translucent surface blurs what sits behind IT instead. -->
+<!-- No backdrop-blur on <main> or on the content wrapper below: a blurred
+     full-width rectangle averages the scenery inside it to a flat wash, and on
+     the line-art themes (meridian, city-windows, orbit) that erases the art
+     exactly where the page covers it. Each translucent surface blurs its own
+     footprint instead, so the gaps between cards keep the scenery crisp. -->
 <main class="flex flex-col min-h-screen p-box-xl">
 	<div bind:this={sentinel}></div>
 

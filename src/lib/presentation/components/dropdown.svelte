@@ -16,9 +16,7 @@
 </script>
 
 <div {...restProps} class={cn('group relative z-1', restProps.class)}>
-	<button
-		class="bg-surface-card border-line-strong backdrop-blur py-box-xs px-box-lg rounded-md border"
-	>
+	<button class="bg-surface-card border-line-strong py-box-xs px-box-lg rounded-md border">
 		{@render trigger()}
 	</button>
 

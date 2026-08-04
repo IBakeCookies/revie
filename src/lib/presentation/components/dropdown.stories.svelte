@@ -19,13 +19,10 @@
 <Story
 	name="Closed"
 	play={async ({ canvas }) => {
-		// The trigger sits on the page as a translucent card, so it carries its own
-		// backdrop-blur; without it the theme's scenery shows through unfrosted.
 		const trigger = canvas.getByRole('button', {
 			name: 'Theme',
 		});
 
-		await expect(trigger).toHaveClass('backdrop-blur');
 		await expect(trigger).toHaveClass('bg-surface-card');
 
 		// `invisible` hides the panel, it does not remove it — the options are in the
@@ -120,7 +117,7 @@
 <!-- The real theme list is 27 entries, so it passes a scroll cap through `panelClass`.
      The panel itself is `bg-popover` — an opaque surface, unlike the trigger's card —
      because it floats over arbitrary content and has to stay readable on the glass
-     themes; opaque is also why it needs no backdrop-blur of its own. -->
+     themes. -->
 <Story
 	name="Capped theme list"
 	args={{

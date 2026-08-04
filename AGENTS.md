@@ -319,9 +319,26 @@ Things that break **silently** — no error, just wrong output.
   `--surface-card` / `--surface-inset` declarations in
   [themes.css](src/lib/presentation/style/themes.css) are translucent (`color-mix` or `/ 0.x`),
   none opaque — so without it the theme's background image shows through unblurred while every
-  card around it is frosted. The page wrapper is the deliberate exception and says so in place
-  ([+layout.svelte](src/routes/+layout.svelte)): blurring there would blur the scenery behind
-  the whole page. A control nested inside an already-blurred card needs none.
+  card around it is frosted. So the blur goes on the **surface**, never on a layout wrapper:
+  `<main>` and the content wrapper around `{@render children()}` both stay unblurred, and say
+  so in place ([+layout.svelte](src/routes/+layout.svelte)). Measured on the six worst dark
+  glass themes — a full-width blurred rectangle averages the scenery inside it to a flat wash,
+  which erases meridian's ribbons, city-windows' towers and orbit's planet limb wherever the
+  page covers them, while a per-surface blur leaves the scenery crisp in the gaps between cards.
+  A control nested inside an already-blurred card needs none — `backdrop-filter` makes an
+  element a **backdrop root**, so a nested blur cannot reach the scenery anyway; that is why
+  [dropdown.svelte](src/lib/presentation/components/dropdown.svelte)'s trigger carries none
+  (it only ever sits in the blurred header). The five components that CAN be top-level in a
+  config keep theirs, because config decides whether they are nested and no component can know.
+- **On the dark glass themes, nesting gets LIGHTER — `--surface-inset` is a white veil.** All
+  14 of them pair `--surface-card: oklch(1 0 0 / ~0.06)` with `--surface-inset:
+oklch(1 0 0 / 0.1)`, so `Grid` → `SubGrid` → box brightens monotonically. It was a **black**
+  veil at `0.15`–`0.35` until 2026-08-04, which inverted the elevation: the box read as a hole
+  punched through the two cards above it, and a top-level `BoxDate` / `BoxAdguard` on the page
+  vanished outright. The light themes are the other way round on purpose — deeper is slightly
+  darker there (`oklch(0 0 0 / 0.05)`, or a hued veil at `0.07`–`0.1`) — so this flip applies
+  to dark themes only. `.dark` in [base.css](src/lib/presentation/style/base.css) is opaque and
+  already brightens with depth.
 - **A theme lives in three hand-edited places**, plus optionally a fourth:
   1. the `ThemeName` union **and** the `themes` catalogue in
      [theme.ts](src/lib/business/model/theme.ts) — 27 entries, and the two must agree

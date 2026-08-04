@@ -30,7 +30,7 @@
 
 	--surface-page: oklch(0 0 0);
 	--surface-card: oklch(1 0 0 / 0.05);
-	--surface-inset: oklch(0 0 0 / 0.15);
+	--surface-inset: oklch(1 0 0 / 0.1);
 
 	/* inputs sit on translucent cards — opaque black reads too heavy here */
 	--input: oklch(1 0 0 / 0.1);
@@ -51,7 +51,7 @@
 
 	--surface-page: oklch(0.15 0.03 255);
 	--surface-card: oklch(1 0 0 / 0.06);
-	--surface-inset: oklch(0 0 0 / 0.2);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.97 0.01 190);
 
 	--input: oklch(1 0 0 / 0.12);
@@ -100,7 +100,7 @@
 
 	--surface-page: oklch(0.18 0.045 315);
 	--surface-card: oklch(1 0.02 85 / 0.06);
-	--surface-inset: oklch(0 0 0 / 0.22);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.96 0.02 85);
 
 	--input: oklch(1 0 0 / 0.1);
@@ -132,7 +132,7 @@
 
 	--surface-page: oklch(0.12 0.014 155);
 	--surface-card: oklch(0.85 0.2 145 / 0.05);
-	--surface-inset: oklch(0 0 0 / 0.35);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.87 0.19 145);
 
 	--input: oklch(0.85 0.2 145 / 0.08);
@@ -175,7 +175,7 @@
 
 	--surface-page: oklch(0.4 0.09 256);
 	--surface-card: oklch(1 0 0 / 0.07);
-	--surface-inset: oklch(0 0 0 / 0.16);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.98 0.008 240);
 
 	--input: oklch(1 0 0 / 0.12);
@@ -271,7 +271,7 @@
 .abyss {
 	--surface-page: oklch(0.11 0.022 245);
 	--surface-card: oklch(0.75 0.1 210 / 0.06);
-	--surface-inset: oklch(0 0 0 / 0.3);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.95 0.015 210);
 
 	--input: oklch(1 0 0 / 0.09);
@@ -331,7 +331,7 @@
 
 	--surface-page: oklch(0.16 0 0);
 	--surface-card: oklch(1 0 0 / 0.05);
-	--surface-inset: oklch(0 0 0 / 0.3);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.97 0 0);
 
 	--input: oklch(1 0 0 / 0.09);
@@ -372,7 +372,7 @@
 
 	--surface-page: oklch(0.17 0.012 45);
 	--surface-card: oklch(0.85 0.08 55 / 0.06);
-	--surface-inset: oklch(0 0 0 / 0.3);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.96 0.012 60);
 
 	--input: oklch(1 0 0 / 0.09);
@@ -486,7 +486,7 @@
 	--surface-page: oklch(0.12 0.03 240);
 	/* lantern-lit river glass — translucent so the water glows through */
 	--surface-card: oklch(1 0 0 / 0.07);
-	--surface-inset: oklch(0 0 0 / 0.3);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.97 0.014 82);
 
 	--input: oklch(1 0 0 / 0.09);
@@ -572,7 +572,7 @@
 	--surface-page: oklch(0.09 0.025 245);
 	/* deep-space glass */
 	--surface-card: oklch(1 0 0 / 0.06);
-	--surface-inset: oklch(0 0 0 / 0.3);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.95 0.015 240);
 
 	--input: oklch(1 0 0 / 0.08);
@@ -653,7 +653,7 @@
 	--surface-page: oklch(0.1 0.05 320);
 	/* dusk glass */
 	--surface-card: oklch(1 0 0 / 0.06);
-	--surface-inset: oklch(0 0 0 / 0.3);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.96 0.02 40);
 
 	--input: oklch(1 0 0 / 0.08);
@@ -720,7 +720,7 @@
 	--surface-page: oklch(0.13 0.02 265);
 	/* station-window glass */
 	--surface-card: oklch(1 0 0 / 0.06);
-	--surface-inset: oklch(0 0 0 / 0.28);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.96 0.008 230);
 
 	--input: oklch(1 0 0 / 0.09);
@@ -828,7 +828,7 @@
 	--surface-page: oklch(0.14 0.028 275);
 	/* held-breath glass */
 	--surface-card: oklch(1 0 0 / 0.055);
-	--surface-inset: oklch(0 0 0 / 0.28);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.94 0.01 220);
 
 	--input: oklch(1 0 0 / 0.09);
@@ -860,7 +860,7 @@
 	--surface-page: oklch(0.15 0.03 268);
 	/* high-rise glass */
 	--surface-card: oklch(1 0 0 / 0.06);
-	--surface-inset: oklch(0 0 0 / 0.26);
+	--surface-inset: oklch(1 0 0 / 0.1);
 	--ty-primary: oklch(0.95 0.01 85);
 
 	--input: oklch(1 0 0 / 0.09);
