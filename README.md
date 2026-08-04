@@ -96,8 +96,11 @@ only probes hosts that appear in `config.json`; anything else is rejected.
 Every piece of user-facing text goes through Paraglide. The catalogues live in
 [`messages/`](messages) — `en` is the base locale, `de` is translated. Add a key to
 both files and use `m.<key>()`; the compiler regenerates `src/lib/paraglide` on every
-vite run and typechecks the parameters, so a missing translation fails the build
-instead of the page.
+vite run and typechecks the message parameters.
+
+Add the key to **both** catalogues, though — a missing translation fails nothing. For a
+locale lacking a key the compiler emits `const de_<key> = en_<key>;` and succeeds, so the
+German page silently renders English.
 
 The locale is kept in a cookie and switched from the header dropdown. Page names come
 from `config.json` and are shown as written.
@@ -113,9 +116,9 @@ npm run test:unit  # vitest (node + browser)
 npm run test:e2e   # playwright
 ```
 
-`lint:deps` is part of `lint` and is at zero; the open work is listed in
-[AGENTS.md](AGENTS.md), which is also where the architecture, the invariants that break
-silently, and the roadmap live.
+`lint:deps` is part of `lint` and is at zero. The open work is in
+[roadmap.md](roadmap.md); [AGENTS.md](AGENTS.md) is the architecture and the invariants that
+break silently.
 
 ### Where a test belongs
 

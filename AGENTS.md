@@ -4,16 +4,27 @@ Revie Dashboard — a self-hosted start page for home services. SvelteKit 2 + Sv
 runes, Tailwind 4, Paraglide i18n, `adapter-node`. Every box on the page comes from
 `config.json`, which is **read from disk at runtime**, not bundled.
 
-This file is the architecture and the traps. [README.md](README.md) is how to run and
-configure it — don't duplicate that here.
+This file is the architecture and the traps. Everything else lives in one of three:
+
+| File                     | What it is                                                    |
+| ------------------------ | ------------------------------------------------------------- |
+| [README.md](README.md)   | How to run and configure it — user-facing                     |
+| [roadmap.md](roadmap.md) | What is still broken or missing; churns as items land         |
+| [CLAUDE.md](CLAUDE.md)   | Five lines that `@`-import this file, so the two cannot drift |
+
+Don't add a fifth top-level `.md`, and don't duplicate one of these here. Durable knowledge
+gets exactly one home: architecture and invariants here, how-to in `README.md`, open work in
+`roadmap.md`. A rule with two homes is the drift the last cleanup was about — see
+"Already done".
 
 ## Commands
 
 ```sh
 npm run dev            # vite dev
-npm run check          # svelte-check (expect 0 errors)
+npm run check          # paraglide + svelte-check (expect 0 errors)
 npm run lint           # prettier + eslint + lint:deps (layer rules)
 npm run lint:deps      # just the layer rules (also run by `lint`)
+npm run paraglide      # compile messages (also chained into prepare + check)
 npm run depgraph       # regenerate dependency-graph.svg (needs graphviz `dot`)
 npm run test:unit      # vitest, two projects: node + real chromium
 npm run test:e2e       # playwright against a fixture config
@@ -21,6 +32,15 @@ npm run build && node build
 ```
 
 `npm run test:unit -- --run` for one-shot; bare `test:unit` watches.
+
+`paraglide` has its own script because [src/lib/paraglide/](src/lib/paraglide) is gitignored
+and **only the vite plugin regenerates it** — so anything that doesn't run vite
+(`svelte-check`, a fresh clone, CI) sees unresolved modules until the compiler has run.
+Measured: delete the directory and `npm run check` reports 13 errors in 9 files, 0 after one
+compile. That is why it is chained into `prepare` and `check`; don't un-chain it. Don't pass
+`--strategy` there either — [vite.config.ts](vite.config.ts) passes none, and paraglide 2.x
+has no config file for it, so a strategy would have to be spelled in both places
+([roadmap.md](roadmap.md) #26).
 
 ## Architecture
 
@@ -87,16 +107,39 @@ data, it's the render tree — every level of the `grid` → `config-container` 
 needs its own subtree, so a store would remove zero prop passing and add a lookup.
 The store rule is for **fetched or mutable** data; static structure travels as props.
 
-The rules are enforced twice, on purpose:
+The rules are enforced three ways, on purpose, and the three catch different things:
 
 1. **The `$` prefix** on data-layer exports
    ([appearance-repository.ts](src/lib/data/repository/appearance-repository.ts)) is a
    compile-time tripwire: `$` is reserved for runes inside `.svelte` / `.svelte.ts`,
    so naming a data function there is a build error (`dollar_prefix_invalid`). It
-   makes the violation loud at the moment you write it.
-2. **`npm run lint:deps`** is the actual fence. The tripwire is bypassable —
-   `import * as` walks straight around it. A naming convention can only discourage;
-   a rule catches.
+   makes the violation loud at the moment you write it, and it is bypassable —
+   `import * as` walks straight around it.
+2. **`no-restricted-imports`** in [eslint.config.js](eslint.config.js), one block per
+   layer, matching the `$lib/…` **specifier string**. It is the only one of the three
+   that sees a **type-only** crossing inside a `.svelte` file: the svelte compiler
+   strips `import type` before dependency-cruiser parses the component, so no edge
+   exists to flag. Measured — a component doing
+   `import type { StoredAppearance } from '$lib/data/repository/appearance-repository'`
+   leaves `depcruise src` at 0 errors while eslint reports it. That is why these blocks
+   are `error`, and why a persisted type reaches a component through business.
+3. **`npm run lint:deps`** resolves modules to disk, so it catches what a string match
+   cannot: a relative crossing and a dynamic `import()`.
+
+`no-restricted-imports` is **not additive** across flat-config blocks — the last block
+matching a file wins the whole rule — so each layer block restates the relative-import
+ban alongside its own patterns. Delete that line from one block and relative imports are
+silently unbanned for that subtree only.
+
+The rule messages in [.dependency-cruiser.cjs](.dependency-cruiser.cjs) cite two labels, so
+here is what they name:
+
+- **R1 — layers point one way.** The table above: `data → business → presentation`, never
+  upward. Whatever a read needs in order to be interpreted is passed in as a parameter, not
+  imported from the layer above.
+- **R2 — a read ends at a store.** A route or component uses `business/store`; calling a
+  model directly puts orchestration in a file no `*.spec.ts` can reach. `import type` is
+  fine — it is how a component types its props.
 
 Rules live in [.dependency-cruiser.cjs](.dependency-cruiser.cjs), shared with the
 `zenith` project so both stay consistent. `lint:deps` runs as part of `npm run lint`
@@ -136,7 +179,7 @@ whoever holds the state, not to the innermost function.
 - `AppError.cause` is the original thrown value, **for the log only** — never render it.
 - A thrown `Error`'s own message wins over the fallback, because the repositories throw the
   specific one (`AdGuard responded with 401 Unauthorized`).
-- **A layer must not swallow.** [business/service.ts](src/lib/business/service.ts) returns
+- **A layer must not swallow.** [business/model/service.ts](src/lib/business/model/service.ts) returns
   `Result<boolean>` and does not log: a probe that _fails_ is not a service that is _down_,
   and only the caller knows whether to keep the last known value, toast, or ignore it.
 - Reporting is presentation's job, injected: `ServicesStore` takes an
@@ -150,7 +193,8 @@ whoever holds the state, not to the innermost function.
 carries its props.
 
 ```
-config.json ─(disk, mtime-cached)→ server/config.ts
+config.json ─(disk read, no caching)→ data/config.ts
+            ─(mtime cache)→ business/model/config-source.ts   readConfig
             ─(validate + drop bad)→ business/model/config.ts  normalizeConfig
             ─(page data)→ [[slug]]/+page.server.ts
             ─(recurse)→ page.svelte → config-container.svelte → the component
@@ -178,7 +222,7 @@ finds nothing.
 
 ```
 cookies ─→ data/repository/appearance-repository.ts   the 3 cookie names, parsing, and ALL writes
-        ─→ business/appearance.ts                     every decision: does this theme still exist? mint a seed?
+        ─→ business/model/appearance.ts               every decision: does this theme still exist? mint a seed?
         ─→ hooks.server.ts        replaces %theme% / %scenery-paused% in app.html  (classes)
         ─→ +layout.server.ts      passes theme / seed / paused as INIT SEEDS
         ─→ ThemeStore             owns it from here; mirrors every change back to the cookie
@@ -221,6 +265,21 @@ Things that break **silently** — no error, just wrong output.
 - Those four style files are **ported from the `zenith` project** (`src/lib/presentation/style/`).
   Keep them diffable against it so upstream theme work stays copy-pasteable. `zenith`'s
   shadcn / tw-animate / fontsource imports are intentionally dropped here.
+- **Tokens only, and never `dark:`.** Components name semantic classes from
+  [tokens.css](src/lib/presentation/style/tokens.css) and nothing else — no raw palette class
+  (`text-zinc-400`), including inside a class string built in `.ts`. And never the `dark:`
+  variant. It does match (`@custom-variant dark`, tokens.css:9) and that is the problem: a
+  **binary** across 27 distinct palettes bakes one hardcoded dark look into the themes that
+  stamp `dark`, which themes.css then contradicts per theme, and does nothing at all on the
+  other 25. A light/dark difference comes from a token the themes already swap. Both hold
+  today at 0 violations — written down because the first one costs nothing to break.
+- **A translucent surface sitting on the page needs `backdrop-blur`.** All 50
+  `--surface-card` / `--surface-inset` declarations in
+  [themes.css](src/lib/presentation/style/themes.css) are translucent (`color-mix` or `/ 0.x`),
+  none opaque — so without it the theme's background image shows through unblurred while every
+  card around it is frosted. The page wrapper is the deliberate exception and says so in place
+  ([+layout.svelte](src/routes/+layout.svelte)): blurring there would blur the scenery behind
+  the whole page. A control nested inside an already-blurred card needs none.
 - **A theme lives in three hand-edited places**, plus optionally a fourth:
     1. the `ThemeName` union **and** the `themes` catalogue in
        [theme.ts](src/lib/business/model/theme.ts) — 27 entries, and the two must agree
@@ -229,6 +288,9 @@ Things that break **silently** — no error, just wrong output.
        themes: `solid-light` and `solid-dark` (CSS class `dark`) live in
        [base.css](src/lib/presentation/style/base.css) instead
     4. optionally a [scenery](src/lib/presentation/style/scenery/) file
+
+    Place 2 has its own carve-out: there are **26** `@custom-variant` rules for 27 themes, because
+    `solid-light` is the unprefixed `:root` palette and needs no variant to select it.
 
     The header-dropdown swatch is **not** one of them — it's generated from `theme.css`
     ([+layout.svelte:118](src/routes/+layout.svelte#L118)), which is what keeps it matching the
@@ -239,13 +301,16 @@ Things that break **silently** — no error, just wrong output.
   `--meridian-ribbons`, `rnd2 = mulberry32(seed ^ 0x9e3779b9)` for everything added after
   (there is also an independent local stream inside `dunesRidgesUrl`). Inserting a variable
   reshuffles the later ones **in that same stream** for every existing user. Append only
-  within a stream, or re-seed per theme group and make ordering local (Roadmap).
+  within a stream, or re-seed per theme group and make ordering local ([roadmap.md](roadmap.md) #11).
 - Every read of a stored theme must go through `resolveThemeName()`. Cookies outlive deploys;
   a cookie naming a deleted theme resolves to no CSS classes and the app renders unstyled.
 - Paraglide **regenerates `src/lib/paraglide/` on every vite run** and typechecks message
-  parameters, so a missing translation fails the build rather than the page. That directory is
-  gitignored — never edit it. Add keys to **both** [messages/en.json](messages/en.json) (base)
-  and [messages/de.json](messages/de.json); currently 16 keys, in sync.
+  _parameters_ — but a **missing translation fails nothing**. For a locale lacking a key the
+  compiler emits `const de_<key> = en_<key>;` and succeeds, so a German page silently renders
+  English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
+  checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
+  [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
+  16 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
 
 ## Conventions
 
@@ -265,98 +330,72 @@ points the preview server at [e2e/fixture-config.json](e2e/fixture-config.json) 
 `DASHBOARD_CONFIG`, so the suite never depends on the services of the machine it runs on:
 one host that resolves, one that never does, an AdGuard instance on a closed port.
 
-**Style.** Tabs, single quotes, no trailing commas, 100 cols, 4-wide tabs — prettier owns
-it. Comments explain _why_, not _what_; the existing ones are the house style, match their
-density.
+**Code.** Named exports only; a default export is for a Svelte component, or for a root
+`*.config.*` / `.storybook/` / `*.stories.*` file whose tool dictates it. Import through
+`$lib`, never a relative path — including a sibling. Two exemptions, each because the alias
+genuinely does not resolve: `./$types` (generated per route by `svelte-kit sync`) and a
+route-sibling spec importing the route file itself (`./+server`, `./+page.server`); `e2e/` and
+`.storybook/` are exempt wholesale, as neither runs through vite's aliases. `const` over
+`let`, early returns over nesting (`max-depth` 3, `no-else-return`). All of it is
+[eslint.config.js](eslint.config.js)'s job, at 0 violations — the rules are there so the next
+file doesn't start the drift.
+
+**A test with no assertion fails** — `expect.requireAssertions` is on
+([vite.config.ts](vite.config.ts)). A spec that builds a fixture and forgets to assert is a
+green test that proves nothing, which is worse than no test.
+
+**`console` has exactly four homes, and no lint rule guards them yet.**
+`business/model/config.ts` (4 warns), `business/model/config-source.ts` (2 errors),
+`business/store/service-store.svelte.ts` (the default `ErrorReporter`), and
+`[[slug]]/+page.server.ts` (2 — the operator channel). Measured: a global `no-console` reports
+10, the tenth being `dps.js`, which [roadmap.md](roadmap.md) #10 deletes. Six of the nine
+are #23's work — they are diagnostics a framework-free model should be **returning**, not
+printing — and the reporter is #8's. Don't add a fifth home, and don't reach for zenith's
+`no-console: 'error'` + a `logger.ts` to force the issue: the sink seam here is the injected
+`ErrorReporter` recorded under "Already done", and a logger module would be a second,
+competing seam for the same job. Turn the rule on once #23 and #8 land, with
+`+page.server.ts` and the default reporter exempted.
+
+**One definition per concept.** If you catch yourself writing "mirrors", "same as" or "keep in
+sync with", export the thing instead. This repo has exactly two exceptions, both documented
+above as load-bearing because **no export can span the two sides**: the five container names in
+`business/model/config.ts` versus `config-container.svelte`'s `if/else` chain (a component held
+in a variable has no statically known props), and the `@theme` spacing scale versus
+`extendTailwindMerge` in `style.ts` (one side is CSS). Anything else that reads "keep in sync"
+is a bug waiting, not a convention.
+
+**Build the simplest thing that does what was asked.** No abstraction for a second caller that
+doesn't exist; extract on the _second_ real duplication. Complexity needs a reachable failure
+to justify it — if you can't name the inputs and the wrong outcome, the branch doesn't go in;
+"defensive" is not a reason. Comments earn their length: a paragraph defending a decision
+usually means the decision is too clever. When you notice something unrelated, say it rather
+than fix it — a finding reported costs a sentence, a finding fixed costs a review and a bigger
+diff for the thing you were actually asked to do. The standing example is live: six components
+spread `{...restProps}` onto real DOM nodes for callers that don't exist
+([roadmap.md](roadmap.md) #22). Deleting code to satisfy this is progress, not lost work.
+
+**Style.** Tabs, single quotes, trailing commas where multiline, 100 cols, 4-wide tabs —
+prettier owns it, and `comma-dangle: always-multiline` in eslint names the same intent where a
+reader looks for rules. The two must stay in step: `prettier --check .` runs first in
+`npm run lint`, so a disagreement is unsatisfiable. Comments explain _why_, not _what_; the
+existing ones are the house style, match their density.
 
 ## Roadmap
 
-Findings from a full architecture review, adversarially verified against the code. Ordered by
-what breaks soonest. **Nothing below is fixed** — see "Already done" at the end for what is.
+The open work lives in [roadmap.md](roadmap.md) — 32 items from three passes, each adversarially
+verified against the code and ordered by what breaks soonest. Several are straight ports from
+`zenith`, which has already solved them; those items name the upstream files. It is its own file
+because it churns as items land, while this one is the architecture and should not. **Nothing in it
+is fixed** — the section below is what is.
 
-### Correctness
-
-1. **`config.json` is git-tracked and is also production's default read path.** A `git pull`
-   or `checkout .` during an update silently reverts the live dashboard, and the file holds
-   the internal network map. Gitignore it, commit `config.example.json`.
-2. **Status dots measure the wrong thing** — `/api/ping` discards the port and probes ICMP,
-   so a dead service on a live host stays green, and two boxes on one host always agree.
-   Replacing `ping.promise.probe` with `net.connect({host, port})` keyed on `host:port` fixes
-   that _and_ drops the `ping` dependency, the fork+exec per unauthenticated POST, an
-   unhandled rejection when the `ping` binary is missing from a slim image, and an IPv6 bug
-   (`new URL('http://[fd00::5]/').hostname` keeps the brackets).
-3. **[app.html](src/app.html) destroys the server-stamped `scenery-paused` class** —
-   `className = 'dark'` is a whole-attribute write, and the block that would re-add it is
-   gated on the cookie being _absent_, which is false exactly when the server had reason to
-   stamp it. Use `classList.remove(…)` / `add(…)`.
-4. **"Resume animations" is dead under `prefers-reduced-motion`** — the CSS pauses with
-   `!important` and no opt-out, so the button flips its label and nothing moves. Don't render
-   it when the query matches.
-5. **No keyboard path to any appearance control** — the dropdowns are hover-only, so
-   `visibility: hidden` keeps all 27 theme buttons, both locales, reroll and the motion toggle
-   out of the tab order. Two classes fix it: `group-focus-within:visible group-focus-within:opacity-100`.
-   Note [e2e/dropdown.ts](e2e/dropdown.ts) hardcodes `.hover()`, so no current test can catch this.
-6. **box-date builds its `Intl` formatter at module scope from `getLocale()`**
-   ([box-date.svelte](src/lib/presentation/components/box-date.svelte)) — the module body runs once per node
-   process while the locale is per-request, so every SSR response is frozen to the first
-   visitor's locale. Move it to instance scope.
-
-### Storybook
-
-7. **Storybook is installed with zero stories** — 8 devDeps, `.storybook/main.ts` +
-   `preview.ts`, two npm scripts, and `main.ts` globs `../src/**/*.stories.@(js|ts|svelte)`
-   which currently matches nothing. Write the stories rather than deleting the install.
-   Good order, cheapest first: [box-date](src/lib/presentation/components/box-date.svelte) (no props) →
-   [box-service](src/lib/presentation/components/box-service.svelte) (one story per `isOnline` state:
-   `true` / `false` / `null`) → [box-adguard](src/lib/presentation/components/box-adguard.svelte) (with and
-   without `stats`) → [dropdown](src/lib/presentation/components/dropdown.svelte) →
-   [grid](src/lib/presentation/components/grid.svelte) / [sub-grid](src/lib/presentation/components/sub-grid.svelte)
-   (nested containers; the interesting one). Notes for whoever picks this up:
-    - Use the presentational components, **not** the wrappers — wrappers need a store in
-      context, the components take plain props. This is the same split the unit tests already
-      use, so the specs are the reference for prop shapes.
-    - Theme classes live on `<html>`, so a story renders unstyled unless `.storybook/preview.ts`
-      stamps a theme class on the root. Add a global decorator or a theme toolbar there.
-    - `@storybook/addon-vitest` overlaps the existing vitest-browser project. Decide whether
-      stories replace the component specs or sit beside them before adding more.
-    - `eslint-plugin-storybook` is installed but not referenced in
-      [eslint.config.js](eslint.config.js) — add it when the first story lands.
-
-### Cleanup
-
-8. **Wire a toast store into the `ErrorReporter` seam.** `ServicesStore` already accepts one
-   and defaults to `console.error`, so a failed ping is reported rather than swallowed — but
-   nothing shows it to the user yet. A `ToastStore` in `business/store/`, set in
-   [+layout.svelte](src/routes/+layout.svelte), then `setServicesStore(toasts.report)` in
-   [page.svelte](src/lib/presentation/components/page.svelte). `AppError.message` is guaranteed renderable,
-   so the toast body is `error.message` and nothing else. Do the same for the AdGuard failure
-   in [+page.server.ts](src/routes/[[slug]]/+page.server.ts), which still logs and returns
-   `null` — the error is available, it just isn't forwarded to the page yet.
-9. **Delete the browser cookie re-read in `ThemeStore`** (lines 88–96 + the `browser` import).
-   The same cookie was already resolved through the same `resolveThemeName` to produce
-   `data.theme` in the same request, so it can only ever equal what was handed in — while its
-   early `return` makes the blocks below look conditional when they aren't.
-10. **`git rm --cached dps.js`** — unrelated gacha-game DPS math at the repo root that
-    `npm run lint` currently walks.
-11. **Re-seed scenery per theme group** so variable order stops being global. That deletes the
-    second PRNG stream, the "must stay last" guard, and the call-count preservation in
-    `dunesRidgesUrl`. Don't pin current output with a golden test — that freezes the invariant
-    instead of removing it.
-12. **Two missing config warnings**: a non-integer `span` is dropped silently and falls back to
-    full width, and a `defaults` key naming an unknown component never matches and never warns.
-13. **[src/hooks.ts](src/hooks.ts) is inert** — `reroute` de-localizes for route _matching_, then
-    the load reads the still-localized path, so `GET /de/services` 404s. Unreachable today (the
-    paraglide strategy has no `"url"`), but adding `"url"` for shareable language links makes
-    _every_ page 404 in German. Delete it, or use `config.pages[deLocalizeUrl(url).pathname]`.
-
-### Already done
+## Already done
 
 Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
 
 - **The two stores go through business.** `theme-store` uses
-  [business/appearance.ts](src/lib/business/appearance.ts) (`readClientTheme`, `updateTheme`,
-  `updateScenerySeed`, `updateSceneryMotion`) and `service-store` uses
-  [business/service.ts](src/lib/business/service.ts). Neither imports a repository. The
+  [business/model/appearance.ts](src/lib/business/model/appearance.ts) (`readClientTheme`,
+  `updateTheme`, `updateScenerySeed`, `updateSceneryMotion`) and `service-store` uses
+  [business/model/service.ts](src/lib/business/model/service.ts). Neither imports a repository. The
   business writers narrow to `ThemeName` on purpose — that's why they aren't pass-throughs.
 - **`Result<T>` / `AppError` replaced the old error tuple.** The old shape set `message` only
   on the non-`Error` branch, so every real failure was `message: undefined` and unrenderable.
@@ -371,7 +410,10 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
 - **The registry is gone; the schema replaced it.** `business/component-registry.ts`
   used to map config names to component types via `ComponentProps`, which made the
   config format a derivative of component internals. Business now declares the schema
-  and names no component. Don't reintroduce a `ComponentProps`-derived container type.
+  and names no component. Don't reintroduce a `ComponentProps`-derived container type,
+  and don't reintroduce `ComponentRegistry` / `ComponentName` — neither name exists in
+  `src/` any more. A side effect worth keeping: the five Svelte components no longer
+  leak into the `/api/ping` server bundle.
 - **`BoxService.title` is required**, in the schema and in `requiredProps`. It was
   optional in the derived type while the component demanded it, so a title-less entry
   passed validation and rendered an empty heading.
@@ -381,7 +423,7 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
 - **`readAdguardStats` and `readConfig` are business functions.** Route server files
   may not reach `src/lib/data` — see the layer rule.
 - **`normalizeContainer` guards required props.** `requiredProps` is a
-  `Record<ComponentName, …>`, so registering a component without deciding what it needs is a
+  `Record<ContainerName, …>`, so registering a container without deciding what it needs is a
   compile error. `items` is set unconditionally for `Grid`/`SubGrid` — a grid written before
   its children renders empty instead of throwing in `findContainer` on the next page load.
   A container missing a required prop is dropped with a warning; its siblings and its parent
@@ -394,7 +436,11 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
 - **The AdGuard fetch is bounded** at 3s via `AbortSignal.timeout`. Without it, the page load
   awaited undici's defaults: 10s for a box that is switched off, 300s for one that answers the
   SYN then goes quiet.
-- **The component registry is type-only.** `ComponentRegistry` is an interface over
-  `import type` components, and the runtime name check reads a
-  `Record<ComponentName, true>` — so it cannot drift from the interface, and the five Svelte
-  components no longer leak into `utils/config.ts` or the `/api/ping` server bundle.
+- **The docs were corrected against the code**, so don't restore the old wording from memory or
+  from an older checkout. What changed: the seven module paths the `refactor(layers)` commit
+  stranded (three were 404 links); the render-pipeline diagram, which named a `server/config.ts`
+  that never existed and put the mtime cache in the wrong layer; `Record<ComponentName, …>` →
+  `Record<ContainerName, …>`; a phantom `ComponentRegistry` bullet in this very section,
+  contradicting the "registry is gone" one above it; the claim that a missing translation fails
+  the build (it does not — see Invariants); and the unrecorded `solid-light` `@custom-variant`
+  carve-out. [roadmap.md](roadmap.md) #29 is the fence that would have caught all of them.

@@ -1,7 +1,7 @@
 /**
  * Reading the dashboard config file. I/O only — no validation, no shaping, no
  * caching. What the bytes MEAN is business's problem, in
- * `business/config-source.ts`; this layer fetches them and hands back whatever
+ * `business/model/config-source.ts`; this layer fetches them and hands back whatever
  * happened.
  *
  * The file lives outside `static/` on purpose: it is data read at runtime, not a
