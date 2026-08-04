@@ -6,7 +6,7 @@ import {
 	randomScenerySeed,
 	resolveThemeName,
 	themes,
-} from './theme';
+} from '$lib/business/model/theme';
 
 describe('theme catalogue', () => {
 	it('has a unique, non-empty identifier and class list per theme', () => {

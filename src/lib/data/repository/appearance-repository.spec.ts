@@ -5,7 +5,7 @@ import {
 	$updateSceneryMotion,
 	$updateScenerySeed,
 	$updateTheme,
-} from './appearance-repository';
+} from '$lib/data/repository/appearance-repository';
 
 /** Stands in for `event.cookies` (server) — the read path's whole contract. */
 const from = (jar: Record<string, string>) => ({ get: (name: string) => jar[name] });
