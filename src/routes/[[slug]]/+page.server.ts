@@ -30,8 +30,11 @@ async function loadAdguardStats(page: ConfigPage): Promise<AdguardStats | null> 
 
 	// The box renders empty rather than the page failing; the error is logged here
 	// because nothing forwards it to the client yet (see the toast roadmap item).
+	// Not `err.cause`: an unreachable box is the ordinary case, and a bounded fetch's
+	// timeout arrives as a DOMException whose stack is ten frames of undici internals
+	// naming neither AdGuard nor the host. The href is what an operator needs.
 	if (err) {
-		console.error(err.message, err.cause ?? '');
+		console.error(`Could not read AdGuard stats from ${container.props.href}:`, err.message);
 
 		return null;
 	}
