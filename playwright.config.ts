@@ -9,11 +9,19 @@ const testTimeout = 60 * 1000;
 // `testDir` is set — so a relative path writes the report inside the directory
 // being scanned for tests.
 const outputDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'test-result/e2e');
+// IPv4, spelled out, and it has to match `href` on the fixture's Loopback service: that
+// service IS this server, and `/api/ping` TCP-connects to the literal address the config
+// names. `vite preview` otherwise binds the *hostname* `localhost`, which resolves to ::1
+// on a machine whose /etc/hosts maps it — GitHub's runners do — and then the browser
+// follows that resolution and loads the page while the probe gets ECONNREFUSED, so the
+// online dot goes red on CI only. `url` rather than `port` because `port` implies
+// localhost; it does not set `baseURL` the way `port` does, hence `use.baseURL` below.
+const previewUrl = 'http://127.0.0.1:4173';
 
 export default defineConfig({
 	webServer: {
-		command: 'npm run build && npm run preview',
-		port: 4173,
+		command: `npm run build && npm run preview -- --host ${new URL(previewUrl).hostname}`,
+		url: previewUrl,
 		timeout: serverTimeout,
 		// The dashboard renders whatever config it is pointed at, so the tests bring
 		// their own instead of depending on the services of the machine they run on.
@@ -41,6 +49,7 @@ export default defineConfig({
 		],
 	],
 	use: {
+		baseURL: previewUrl,
 		trace: 'retain-on-failure',
 		video: 'retain-on-failure',
 	},

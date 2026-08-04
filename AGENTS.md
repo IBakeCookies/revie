@@ -414,6 +414,18 @@ points the preview server at [e2e/fixture-config.json](e2e/fixture-config.json) 
 `DASHBOARD_CONFIG`, so the suite never depends on the services of the machine it runs on:
 one host that resolves, one that never does, an AdGuard instance on a closed port.
 
+The host that resolves is the preview server itself, which is why
+[playwright.config.ts](playwright.config.ts) pins **IPv4 on both sides** — `--host 127.0.0.1`,
+`webServer.url`, and `use.baseURL` all spell the same literal as the fixture's `href`. Left
+unpinned, `vite preview` binds the hostname `localhost`, which resolves to `::1` wherever
+/etc/hosts maps it (GitHub's runners do) — the browser follows and the page loads, while
+`/api/ping` TCP-connects to the literal `127.0.0.1` the config names and gets ECONNREFUSED,
+so `marks a reachable service as online` failed on CI and only on CI. Measured: bind preview
+to `::1`, and `POST /api/ping {"href":"http://127.0.0.1:4173"}` answers `{"isAlive":false}`
+while `GET /` over `[::1]` answers 200. Note `url` does **not** seed `baseURL` the way `port`
+does; drop the explicit `use.baseURL` and every `page.goto('/')` fails with "Cannot navigate
+to invalid URL".
+
 **Code.** Named exports only; a default export is for a Svelte component, or for a root
 `*.config.*` / `.storybook/` / `*.stories.*` file whose tool dictates it. Import through
 `$lib`, never a relative path — including a sibling. Two exemptions, each because the alias
