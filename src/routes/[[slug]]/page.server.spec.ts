@@ -10,7 +10,7 @@ vi.mock('$lib/business/model/adguard', () => ({ readAdguardStats: vi.fn() }));
 
 const boxAdguard = {
 	name: 'BoxAdguard' as const,
-	props: { href: 'http://adguard.local' }
+	props: { href: 'http://adguard.local' },
 };
 
 const boxDate = { name: 'BoxDate' as const, props: {} };
@@ -22,7 +22,7 @@ const stats = {
 	dnsQueries: 1234,
 	numBlockedFiltering: 56,
 	avgProcessingTimeMs: 12,
-	topBlockedDomain: 'ads.example.com'
+	topBlockedDomain: 'ads.example.com',
 };
 
 function configWith(...containers: (typeof boxAdguard | typeof boxDate)[]) {
@@ -61,17 +61,17 @@ describe('load', () => {
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
 
 		expect(await load(event('/'))).toMatchObject({
-			adguard: stats
+			adguard: stats,
 		});
 		expect(readAdguardStats).toHaveBeenCalledWith({
 			username: 'admin',
 			password: 'secret',
-			href: 'http://adguard.local'
+			href: 'http://adguard.local',
 		});
 		expect(readAdguardStats).toHaveBeenCalledWith({
 			username: 'admin',
 			password: 'secret',
-			href: 'http://adguard.local'
+			href: 'http://adguard.local',
 		});
 	});
 
@@ -96,7 +96,7 @@ describe('load', () => {
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
 		vi.mocked(readAdguardStats).mockResolvedValue([
 			{ message: 'Could not read AdGuard stats', cause: new Error('down') },
-			null
+			null,
 		]);
 
 		expect(await load(event('/'))).toMatchObject({ adguard: null });

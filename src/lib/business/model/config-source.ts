@@ -3,7 +3,7 @@
  * layer, validated, and cached until the file changes.
  *
  * Server-only, because it reaches the filesystem — which is exactly why it is kept
- * apart from `business/config.ts`. That module is the browser-safe model (types,
+ * apart from `business/model/config.ts`. That module is the browser-safe model (types,
  * guards, queries) and is imported by components and by the polling helper; if the
  * two lived together, every client bundle would try to pull in `node:fs` and
  * `$env/dynamic/private`.

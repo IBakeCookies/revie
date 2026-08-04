@@ -32,6 +32,6 @@ export function dataSceneryStyle(now: Date): string {
 		`--sundial-alt: ${alt.toFixed(3)}`,
 		`--sundial-vis: ${vis.toFixed(3)}`,
 		`--tide-level: ${tide.toFixed(3)}`,
-		`--city-dark: ${dark.toFixed(3)}`
+		`--city-dark: ${dark.toFixed(3)}`,
 	].join('; ');
 }

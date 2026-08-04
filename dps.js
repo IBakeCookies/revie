@@ -17,5 +17,5 @@ console.log({
 	carlotta,
 	cartethyia,
 	jinhsi,
-	jiyan
+	jiyan,
 });

@@ -21,7 +21,7 @@ export type Result<T> = [AppError, null] | [null, T];
 export async function useAsyncErrorAsValue<T>(
 	cb: () => Promise<T>,
 	/** Used only when the thrown value carries no message of its own. */
-	fallbackMessage = 'An unknown error occurred'
+	fallbackMessage = 'An unknown error occurred',
 ): Promise<Result<T>> {
 	try {
 		return [null, await cb()];

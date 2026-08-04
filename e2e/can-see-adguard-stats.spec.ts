@@ -14,7 +14,7 @@ test('links to the configured AdGuard instance', async ({ page }) => {
 });
 
 test('renders an empty box instead of failing the page when AdGuard is unreachable', async ({
-	page
+	page,
 }) => {
 	const box = page.locator(`a[href="${ADGUARD_HREF}"]`);
 

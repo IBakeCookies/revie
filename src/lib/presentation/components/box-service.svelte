@@ -22,7 +22,7 @@
 			? m.service_status_unknown()
 			: isOnline
 				? m.service_status_online()
-				: m.service_status_offline()
+				: m.service_status_offline(),
 	);
 </script>
 
@@ -34,7 +34,7 @@
 	style={spanStyle(span)}
 	class={cn(
 		'@container/box-service bg-surface-inset backdrop-blur border border-transparent cursor-pointer rounded-md p-box-md relative hover:border-line-strong transition-colors col-span-12 xl:col-span-(--span)',
-		restProps.class
+		restProps.class,
 	)}
 >
 	<div
@@ -47,7 +47,7 @@
 		<span
 			class={[
 				'absolute top-4 right-4 ml-auto p-1 rounded-full',
-				isOnline === true ? 'bg-success' : isOnline === false ? 'bg-danger' : 'bg-primary'
+				isOnline === true ? 'bg-success' : isOnline === false ? 'bg-danger' : 'bg-primary',
 			]}
 			aria-label={statusLabel}
 		>

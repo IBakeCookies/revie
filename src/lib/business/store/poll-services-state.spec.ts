@@ -12,12 +12,12 @@ const containers: ConfigContainer[] = [
 			items: [
 				{
 					name: 'BoxService',
-					props: { title: 'Proxmox', href: 'https://proxmox.local', img: { src: '' } }
-				}
-			]
-		}
+					props: { title: 'Proxmox', href: 'https://proxmox.local', img: { src: '' } },
+				},
+			],
+		},
 	},
-	{ name: 'BoxDate', props: {} }
+	{ name: 'BoxDate', props: {} },
 ];
 
 function fakeStore(): ServicesStore {

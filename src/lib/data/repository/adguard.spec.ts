@@ -4,14 +4,14 @@ import { getAdguardStats } from '$lib/data/repository/adguard';
 const input = {
 	username: 'admin',
 	password: 'secret',
-	href: 'http://adguard.local'
+	href: 'http://adguard.local',
 };
 
 const stats = {
 	num_dns_queries: 1,
 	num_blocked_filtering: 0,
 	avg_processing_time: 0,
-	top_blocked_domains: []
+	top_blocked_domains: [],
 };
 
 function stubFetch(response: Partial<Response>): ReturnType<typeof vi.fn> {
@@ -38,9 +38,9 @@ describe('getAdguardStats', () => {
 			'http://adguard.local/control/stats',
 			expect.objectContaining({
 				headers: expect.objectContaining({
-					Authorization: `Basic ${Buffer.from('admin:secret').toString('base64')}`
-				})
-			})
+					Authorization: `Basic ${Buffer.from('admin:secret').toString('base64')}`,
+				}),
+			}),
 		);
 	});
 
@@ -68,7 +68,7 @@ describe('getAdguardStats', () => {
 			ok: false,
 			status: 403,
 			statusText: 'Forbidden',
-			json: async () => ({})
+			json: async () => ({}),
 		});
 
 		const [err, res] = await getAdguardStats(input);
@@ -82,7 +82,7 @@ describe('getAdguardStats', () => {
 			'fetch',
 			vi.fn(async () => {
 				throw new Error('ECONNREFUSED');
-			})
+			}),
 		);
 
 		const [err] = await getAdguardStats(input);

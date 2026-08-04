@@ -25,7 +25,7 @@ const REQUEST_TIMEOUT_MS = 3000;
 export async function getAdguardStats({
 	username,
 	password,
-	href
+	href,
 }: GetAdguardStatsInput): Promise<Result<GetAdguardStatsOutput>> {
 	const base64 = Buffer.from(`${username}:${password}`).toString('base64');
 
@@ -33,9 +33,9 @@ export async function getAdguardStats({
 		const raw = await fetch(`${href}/control/stats`, {
 			headers: {
 				Authorization: `Basic ${base64}`,
-				'Content-type': 'application/json'
+				'Content-type': 'application/json',
 			},
-			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
 		});
 
 		// fetch only rejects on network errors, so an auth failure would otherwise

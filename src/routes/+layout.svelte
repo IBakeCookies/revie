@@ -33,7 +33,7 @@
 	// catalogue (business/model/theme.ts), as it does upstream in zenith.
 	const localeLabels: Record<Locale, () => string> = {
 		en: m.language_en,
-		de: m.language_de
+		de: m.language_de,
 	};
 
 	onMount(() => {
@@ -87,8 +87,8 @@
 			'bg-surface-card border-line-strong shadow-card backdrop-blur flex-wrap w-full sticky top-0 z-10 rounded-b-2xl border px-box-lg py-box-md max-w-screen-2xl mx-auto flex items-center',
 			{
 				'rounded-t-2xl': !isNavAtTheTop,
-				'border-t-transparent': isNavAtTheTop
-			}
+				'border-t-transparent': isNavAtTheTop,
+			},
 		)}
 	>
 		<h1 class="font-bold text-2xl">{m.app_title()}</h1>
@@ -109,7 +109,7 @@
 					<button
 						class={cn(
 							'py-text-xs px-box-md cursor-pointer flex w-full items-center gap-text-xs text-left',
-							{ 'font-bold': themeStore.theme === theme.name }
+							{ 'font-bold': themeStore.theme === theme.name },
 						)}
 						onclick={() => themeStore.switchTheme(theme.name)}
 					>
@@ -117,7 +117,7 @@
 						     the two slices always match themes.css -->
 						<span
 							class="{theme.css.join(
-								' '
+								' ',
 							)} border-line-strong flex h-3.5 w-3.5 shrink-0 overflow-hidden rounded-full border"
 							aria-hidden="true"
 						>
@@ -158,7 +158,7 @@
 				{#each locales as locale (locale)}
 					<button
 						class={cn('py-text-xs px-box-md cursor-pointer block w-full text-left', {
-							'font-bold': getLocale() === locale
+							'font-bold': getLocale() === locale,
 						})}
 						onclick={() => setLocale(locale)}
 					>

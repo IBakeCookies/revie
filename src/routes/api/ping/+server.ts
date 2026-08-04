@@ -47,7 +47,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const { alive } = await ping.promise.probe(hostname, {
 		timeout: PING_TIMEOUT_SECONDS,
-		deadline: PING_TIMEOUT_SECONDS + 1
+		deadline: PING_TIMEOUT_SECONDS + 1,
 	});
 
 	return json({ isAlive: alive });

@@ -16,7 +16,7 @@
 		year: 'numeric',
 		hour: '2-digit',
 		minute: '2-digit',
-		second: '2-digit'
+		second: '2-digit',
 	});
 
 	let { span, ...restProps }: Props = $props();
@@ -38,7 +38,7 @@
 	style={spanStyle(span)}
 	class={cn(
 		'col-span-12 xl:col-span-(--span) p-box-md text-xl text-center bg-surface-inset backdrop-blur rounded-md',
-		restProps.class
+		restProps.class,
 	)}
 >
 	{currentDate}

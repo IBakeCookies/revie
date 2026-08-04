@@ -37,11 +37,11 @@ const customTwMerge = extendTailwindMerge({
 				'page',
 				'section',
 				'section-lg',
-				'empty-state'
-			]
+				'empty-state',
+			],
 		},
-		conflictingClassGroups: {}
-	}
+		conflictingClassGroups: {},
+	},
 });
 
 export function cn(...inputs: ClassValue[]): string {

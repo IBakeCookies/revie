@@ -8,7 +8,7 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 		event.request = request;
 
 		return resolve(event, {
-			transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale)
+			transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale),
 		});
 	});
 
@@ -17,7 +17,7 @@ const handleTheme: Handle = ({ event, resolve }) => {
 
 	// The placeholder always has to be replaced, otherwise it ends up in the markup.
 	return resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('%theme%', themeClass)
+		transformPageChunk: ({ html }) => html.replace('%theme%', themeClass),
 	});
 };
 
@@ -29,7 +29,7 @@ const handleSceneryMotion: Handle = ({ event, resolve }) => {
 		: '';
 
 	return resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('%scenery-paused%', sceneryPausedClass)
+		transformPageChunk: ({ html }) => html.replace('%scenery-paused%', sceneryPausedClass),
 	});
 };
 

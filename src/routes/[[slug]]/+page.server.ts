@@ -25,7 +25,7 @@ async function loadAdguardStats(page: ConfigPage): Promise<AdguardStats | null> 
 	const [err, stats] = await readAdguardStats({
 		username: ADGUARD_USERNAME,
 		password: ADGUARD_PASSWORD,
-		href: container.props.href
+		href: container.props.href,
 	});
 
 	// The box renders empty rather than the page failing; the error is logged here
@@ -49,6 +49,6 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	return {
 		containers: page.containers,
-		adguard: await loadAdguardStats(page)
+		adguard: await loadAdguardStats(page),
 	};
 };

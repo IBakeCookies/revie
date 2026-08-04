@@ -24,16 +24,16 @@
 			{ text: m.adguard_dns_queries({ count: stats.dnsQueries }), class: 'border-success' },
 			{
 				text: m.adguard_blocked({ count: stats.numBlockedFiltering }),
-				class: 'border-danger'
+				class: 'border-danger',
 			},
 			{
 				text: m.adguard_delay({ milliseconds: stats.avgProcessingTimeMs }),
-				class: 'border-info'
+				class: 'border-info',
 			},
 			{
 				text: m.adguard_top_blocked_domain({ domain: stats.topBlockedDomain }),
-				class: 'border-warning'
-			}
+				class: 'border-warning',
+			},
 		];
 	});
 </script>
@@ -46,7 +46,7 @@
 	style={spanStyle(span)}
 	class={cn(
 		'@container/box-adguard col-span-12 xl:col-span-(--span) block rounded-md bg-surface-inset backdrop-blur p-box-md border border-transparent hover:border-line-strong transition-colors',
-		restProps.class
+		restProps.class,
 	)}
 >
 	<div class="grid gap-grid-xs grid-cols-1 @2xl:grid-cols-2">
@@ -54,7 +54,7 @@
 			<p
 				class={[
 					'@2xl/box-adguard:p-box-md bg-surface-card p-box-xs rounded-md border',
-					item.class
+					item.class,
 				]}
 			>
 				{item.text}

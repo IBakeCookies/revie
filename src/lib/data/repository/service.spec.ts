@@ -19,15 +19,15 @@ describe('getServiceState', () => {
 			'/api/ping',
 			expect.objectContaining({
 				method: 'POST',
-				body: JSON.stringify({ href: 'http://wled.local' })
-			})
+				body: JSON.stringify({ href: 'http://wled.local' }),
+			}),
 		);
 	});
 
 	it('reports a rejected ping as an error', async () => {
 		vi.stubGlobal(
 			'fetch',
-			vi.fn(async () => ({ ok: false, status: 403, statusText: 'Forbidden' }))
+			vi.fn(async () => ({ ok: false, status: 403, statusText: 'Forbidden' })),
 		);
 
 		const [err, res] = await getServiceState('http://not-configured.local');

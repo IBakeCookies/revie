@@ -25,12 +25,12 @@ export function transformAdguardStats(data: GetAdguardStatsOutput): AdguardStats
 		numBlockedFiltering: data.num_blocked_filtering,
 		// AdGuard reports seconds, the box shows milliseconds
 		avgProcessingTimeMs: Math.round(data.avg_processing_time * 1000),
-		topBlockedDomain: topBlockedDomain ?? '–'
+		topBlockedDomain: topBlockedDomain ?? '–',
 	};
 }
 
 export async function readAdguardStats(
-	input: ReadAdguardStatsInput
+	input: ReadAdguardStatsInput,
 ): Promise<Result<AdguardStats>> {
 	const [err, raw] = await getAdguardStats(input);
 

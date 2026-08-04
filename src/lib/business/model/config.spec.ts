@@ -5,12 +5,12 @@ import {
 	findContainer,
 	isBoxAdguard,
 	isGrid,
-	normalizeConfig
+	normalizeConfig,
 } from '$lib/business/model/config';
 
 const rawConfig = {
 	defaults: {
-		BoxService: { span: 6 }
+		BoxService: { span: 6 },
 	},
 	pages: {
 		'/': {
@@ -29,28 +29,28 @@ const rawConfig = {
 									items: [
 										{
 											name: 'BoxAdguard',
-											props: { href: 'http://adguard.local' }
+											props: { href: 'http://adguard.local' },
 										},
 										{
 											name: 'BoxService',
 											props: {
 												title: 'Proxmox',
 												href: 'https://proxmox.local:8006',
-												img: { src: 'https://icons.local/proxmox.svg' }
-											}
-										}
-									]
-								}
+												img: { src: 'https://icons.local/proxmox.svg' },
+											},
+										},
+									],
+								},
 							},
 							{ name: 'NotAComponent' },
-							'not a container'
-						]
-					}
-				}
-			]
+							'not a container',
+						],
+					},
+				},
+			],
 		},
-		'/broken': 'not a page'
-	}
+		'/broken': 'not a page',
+	},
 };
 
 const config = normalizeConfig(rawConfig);
@@ -123,7 +123,7 @@ describe('containers that would throw while rendering', () => {
 	it('drops a BoxService with no img, which would throw during SSR', () => {
 		const { page, warn } = pageWith({
 			name: 'BoxService',
-			props: { title: 'Proxmox', href: 'https://proxmox.local:8006' }
+			props: { title: 'Proxmox', href: 'https://proxmox.local:8006' },
 		});
 
 		expect(page.containers).toEqual([]);
@@ -133,7 +133,7 @@ describe('containers that would throw while rendering', () => {
 	it('drops a BoxService with no href', () => {
 		const { page, warn } = pageWith({
 			name: 'BoxService',
-			props: { title: 'Proxmox', img: { src: 'https://icons.local/p.svg' } }
+			props: { title: 'Proxmox', img: { src: 'https://icons.local/p.svg' } },
 		});
 
 		expect(page.containers).toEqual([]);
@@ -143,7 +143,7 @@ describe('containers that would throw while rendering', () => {
 	it('drops a BoxService whose href is not a string', () => {
 		const { page } = pageWith({
 			name: 'BoxService',
-			props: { href: 42, img: { src: 'https://icons.local/p.svg' } }
+			props: { href: 42, img: { src: 'https://icons.local/p.svg' } },
 		});
 
 		expect(page.containers).toEqual([]);
@@ -166,8 +166,8 @@ describe('containers that would throw while rendering', () => {
 		const { page } = pageWith({
 			name: 'Grid',
 			props: {
-				items: [{ name: 'BoxService', props: { title: 'no img' } }, { name: 'BoxDate' }]
-			}
+				items: [{ name: 'BoxService', props: { title: 'no img' } }, { name: 'BoxDate' }],
+			},
 		});
 
 		expect(itemsOf(page.containers[0]).map((c) => c.name)).toEqual(['BoxDate']);
