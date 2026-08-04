@@ -88,8 +88,10 @@
 	name="Store has no stats"
 	play={async ({ args, canvas, canvasElement }) => {
 		await waitFor(async () => {
-			await expect(canvasElement.querySelectorAll('p')).toHaveLength(0);
+			await expect(canvasElement.querySelectorAll('p')).toHaveLength(1);
 		});
+
+		await expect(canvas.getByText(m.adguard_unavailable())).toBeInTheDocument();
 
 		const link = canvas.getByRole('link');
 
@@ -118,7 +120,7 @@
 		arrivingStats = undefined;
 
 		await waitFor(async () => {
-			await expect(canvasElement.querySelectorAll('p')).toHaveLength(0);
+			await expect(canvasElement.querySelectorAll('p')).toHaveLength(1);
 		});
 
 		arrivingStats = healthy;

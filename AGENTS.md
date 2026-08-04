@@ -369,7 +369,7 @@ oklch(1 0 0 / 0.1)`, so `Grid` → `SubGrid` → box brightens monotonically. It
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  17 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  18 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
 
 ## Conventions
 

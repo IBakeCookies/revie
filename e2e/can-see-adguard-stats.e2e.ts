@@ -13,12 +13,13 @@ test('links to the configured AdGuard instance', async ({ page }) => {
 	await expect(box).toHaveAttribute('rel', 'noreferrer');
 });
 
-test('renders an empty box instead of failing the page when AdGuard is unreachable', async ({
+test('says the stats are unavailable instead of failing the page when AdGuard is unreachable', async ({
 	page,
 }) => {
 	const box = page.locator(`a[href="${ADGUARD_HREF}"]`);
 
-	await expect(box.locator('p')).toHaveCount(0);
+	await expect(box.locator('p')).toHaveCount(1);
+	await expect(box.locator('p')).toHaveText('Statistics unavailable');
 
 	// The rest of the page is unaffected.
 	await expect(

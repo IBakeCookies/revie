@@ -13,6 +13,7 @@
 	"adguard_delay": "Verzögerung: {milliseconds} ms",
 	"adguard_top_blocked_domain": "Häufigste blockierte Domain: {domain}",
 	"adguard_open": "AdGuard Home öffnen",
+	"adguard_unavailable": "Statistiken nicht verfügbar",
 	"service_status_online": "online",
 	"service_status_offline": "offline",
 	"service_status_unknown": "Status unbekannt",

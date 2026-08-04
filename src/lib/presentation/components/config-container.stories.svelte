@@ -203,7 +203,7 @@
 			'--span': '8',
 		});
 
-		// No stats, so no readings — and no placeholder rows either.
-		await expect(link?.querySelectorAll('p')).toHaveLength(0);
+		// No stats, so one line saying so instead of the four readings.
+		await expect(link?.querySelectorAll('p')).toHaveLength(1);
 	}}
 />

@@ -130,7 +130,7 @@
 	}}
 	play={async ({ canvas, canvasElement }) => {
 		await expect(canvasElement.querySelector(`a[href="${ADGUARD_HREF}"]`)).toBeInTheDocument();
-		await expect(canvasElement.querySelectorAll(`a[href="${ADGUARD_HREF}"] p`)).toHaveLength(0);
+		await expect(canvasElement.querySelectorAll(`a[href="${ADGUARD_HREF}"] p`)).toHaveLength(1);
 		await expect(canvas.queryByText(/DNS queries/)).not.toBeInTheDocument();
 
 		// A missing read must not take its siblings with it — grid, service and the

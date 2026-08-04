@@ -78,12 +78,15 @@ describe('box-adguard.svelte', () => {
 			.toBeInTheDocument();
 	});
 
-	it('renders an empty box when AdGuard could not be reached', async () => {
+	it('says so when AdGuard could not be reached', async () => {
 		const screen = await render(BoxAdguard, {
 			href,
 		});
 
-		expect(screen.container.querySelectorAll('p')).toHaveLength(0);
+		const readings = screen.container.querySelectorAll('p');
+
+		expect(readings).toHaveLength(1);
+		expect(readings[0]).toHaveTextContent(m.adguard_unavailable());
 	});
 
 	it('passes the column span as a custom property', async () => {

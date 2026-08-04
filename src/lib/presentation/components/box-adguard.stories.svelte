@@ -97,14 +97,16 @@
 />
 
 <!-- AdGuard unreachable: business hands the failure back as a value, the store keeps no
-     stats, and `stats` arrives undefined through box-adguard-wrapper. The box stays, empty. -->
+     stats, and `stats` arrives undefined through box-adguard-wrapper. The box stays and
+     says why — a padded empty rectangle reads as a layout bug instead. -->
 <Story
 	name="Unreachable"
 	args={{
 		stats: undefined,
 	}}
 	play={async ({ canvas, canvasElement }) => {
-		await expect(canvasElement.querySelectorAll('p')).toHaveLength(0);
+		await expect(canvasElement.querySelectorAll('p')).toHaveLength(1);
+		await expect(canvas.getByText(m.adguard_unavailable())).toBeInTheDocument();
 
 		// The link is what makes the empty box useful — it is how an operator gets to the
 		// admin UI to find out why the probe failed.
