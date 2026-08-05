@@ -14,8 +14,8 @@
 	const choose = fn();
 </script>
 
-<!-- The header's theme picker, closed: hover-only and CSS-driven, so the panel is in
-     the DOM from the first render rather than mounted on an open state. -->
+<!-- The header's theme picker, closed: CSS-driven, so the panel is in the DOM from the
+     first render rather than mounted on an open state. -->
 <Story
 	name="Closed"
 	play={async ({ canvas }) => {
@@ -52,8 +52,8 @@
 </Story>
 
 <!-- Opening is `group-hover` on the wrapper, so pointing at the trigger reveals the
-     panel with no click and no JS. There is no aria-expanded to assert: the component
-     exposes the state to sighted pointer users only. -->
+     panel with no click and no JS. There is no aria-expanded to assert: the open state
+     lives in CSS, so no component state exists to report. -->
 <Story
 	name="Opens on hover"
 	play={async ({ canvas, userEvent }) => {
@@ -81,6 +81,54 @@
 
 			<button onclick={() => choose('solid-dark')}>solid-dark</button>
 		</Dropdown>
+	{/snippet}
+</Story>
+
+<!-- The other half of opening it: `group-focus-within`. `invisible` takes the panel's
+     buttons out of the tab order, so hover alone let a keyboard reach the trigger and
+     then gave it nothing to open. Only a Tab can prove those two classes work, which is
+     why this is a story rather than a class assertion. -->
+<Story
+	name="Opens on keyboard focus"
+	play={async ({ canvas, userEvent }) => {
+		await userEvent.tab();
+
+		await expect(
+			canvas.getByRole('button', {
+				name: 'Theme',
+			}),
+		).toHaveFocus();
+
+		await waitFor(() =>
+			expect(
+				canvas.getByRole('button', {
+					name: 'solid-dark',
+				}),
+			).toBeVisible(),
+		);
+
+		// What the tab order is about: focus can leave the trigger and land on the option,
+		// which is exactly what `visibility: hidden` had made impossible.
+		await userEvent.tab();
+
+		await expect(
+			canvas.getByRole('button', {
+				name: 'solid-dark',
+			}),
+		).toHaveFocus();
+	}}
+>
+	{#snippet template(args)}
+		<!-- Padded so the dropdown is not under the pointer's resting (0, 0): the wrapper is
+		     full-width, so at the canvas origin `group-hover` opens the panel and this story
+		     would pass without the focus classes it exists to prove. -->
+		<div class="p-16">
+			<Dropdown panelClass={args.panelClass}>
+				{#snippet trigger()}Theme{/snippet}
+
+				<button onclick={() => choose('solid-dark')}>solid-dark</button>
+			</Dropdown>
+		</div>
 	{/snippet}
 </Story>
 

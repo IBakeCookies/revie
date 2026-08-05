@@ -38,6 +38,33 @@ test('marks the theme that is currently active', async ({ page }) => {
 	).toHaveClass(/font-bold/);
 });
 
+/* `visibility: hidden` keeps the panel's buttons out of the tab order, so focusing the
+   trigger is the only thing that can open one from the keyboard. Asserted here rather
+   than through chooseFromDropdown, which hovers — and only e2e sees the composed
+   header, where all 27 themes, the reroll and the motion toggle live behind one panel. */
+test('opens the appearance menu from the keyboard and picks a theme', async ({ page }) => {
+	await page
+		.getByRole('button', {
+			name: 'Theme',
+		})
+		.focus();
+
+	// The first entry in the catalogue, so one Tab from the trigger lands on it.
+	const option = page.getByRole('button', {
+		name: 'Revie',
+	});
+
+	await expect(option).toBeVisible();
+
+	await page.keyboard.press('Tab');
+
+	await expect(option).toBeFocused();
+
+	await page.keyboard.press('Enter');
+
+	await expect(page.locator('html')).toHaveClass(/revie/);
+});
+
 test.describe('with an operating system that prefers dark', () => {
 	test.use({
 		colorScheme: 'dark',

@@ -412,12 +412,14 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   ([+layout.svelte:118](src/routes/+layout.svelte#L118)), which is what keeps it matching the
   real palette. Don't hand-write a swatch.
 
-- **[scenery-seed.ts](src/lib/presentation/util/scenery-seed.ts) draws from two shared PRNG streams, so
-  variable _position_ is an invariant within each stream** — `rnd` for everything up to
-  `--meridian-ribbons`, `rnd2 = mulberry32(seed ^ 0x9e3779b9)` for everything added after
-  (there is also an independent local stream inside `dunesRidgesUrl`). Inserting a variable
-  reshuffles the later ones **in that same stream** for every existing user. Append only
-  within a stream, or re-seed per theme group and make ordering local ([roadmap.md](roadmap.md) #11).
+- **[scenery-seed.ts](src/lib/presentation/util/scenery-seed.ts) gives each theme its own PRNG
+  stream, keyed by the theme's name** — `themeRandom(seed, 'dunes')`, `mulberry32(seed ^ hashName(name))`
+  — so draw order only has to hold _within_ one theme. Adding, reordering or retuning one theme
+  cannot reshuffle another's arrangement, which is what two shared streams and a "must stay last"
+  guard used to cost. The stream key is the **theme name**, so renaming a theme reshuffles that one
+  theme for every existing user; the names in `themeRandom` calls are the 11 with a
+  [scenery](src/lib/presentation/style/scenery/) file that reads seeded vars, and they must keep
+  spelling real `ThemeName`s.
 - Every read of a stored theme must go through `resolveThemeName()`. Cookies outlive deploys;
   a cookie naming a deleted theme resolves to no CSS classes and the app renders unstyled.
 - Paraglide **regenerates `src/lib/paraglide/` on every vite run** and typechecks message
@@ -461,6 +463,16 @@ undefined, so it sat in the tab order announcing nothing). Note axe only ever se
 **rest** state, so the states worth an a11y check have to exist as their own stories rather than
 being reached inside a `play` function. The one violation it cannot catch is `document-title`
 ([roadmap.md](roadmap.md) #21) — the `<title>` lives in the root layout, which no story mounts.
+
+**A `play` function's pointer rests at the canvas origin, so a story can pass without the
+interaction it names.** The storybook project drives a real pointer and it starts at (0, 0);
+`dropdown`'s wrapper is a full-width block at the top of the canvas, so `.group` matches `:hover`
+before any `userEvent.hover` runs — which means "Opens on hover" would pass with `group-hover`
+deleted, and "Opens on keyboard focus" did pass with `group-focus-within` deleted. Measured: wrap
+that story's template in a `p-16` div, off the origin, and it fails as it should. **That padding is
+the assertion; don't tidy it away.** Any new story asserting a hover- or focus-driven CSS state
+needs the same offset, and `userEvent.unhover` is not a substitute — it parks the pointer on the
+body, whose centre can land back inside the component.
 
 **Wrappers get a story but no `*.svelte.spec.ts`.** A wrapper reads a store and forwards props
 ([box-service-wrapper.svelte](src/lib/presentation/components/box-service-wrapper.svelte),
@@ -567,7 +579,7 @@ Comments explain _why_, not _what_; the existing ones are the house style, match
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 25 open items, all but #33 from three review
+The open work lives in [roadmap.md](roadmap.md) — 23 open items, all but #33 from three review
 passes and adversarially verified against the code, ordered by what breaks soonest. Several are straight ports from
 `zenith`, which has already solved them; those items name the upstream files. It is its own file
 because it churns as items land, while this one is the architecture and should not. **Nothing in it

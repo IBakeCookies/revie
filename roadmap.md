@@ -17,20 +17,28 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 25 items are open; **1, 2, 3, 4, 6, 7, 31 and 32 are
-done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
-the rest of the numbering stays put so the cross-references below keep resolving.
+**Numbers are stable, so gaps mean landed.** 23 items are open; **1, 2, 3, 4, 5, 6, 7, 11, 31 and 32
+are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+the rest of the numbering stays put so the cross-references below keep resolving. A landed item
+_inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
+lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
+`npm run format` — measured, #12 became #11 while the "#23 before #12" sequencing note still said 12.
+Where a whole section emptied (#5, #7, #31, #32) the note sits at section level, which is safe
+because there is no list left to renumber.
 
 ## Correctness
 
-5. **No keyboard path to any appearance control** — the dropdowns are hover-only, so
-   `visibility: hidden` keeps all 27 theme buttons, both locales, reroll and the motion toggle out
-   of the tab order. Two classes fix it:
-   `group-focus-within:visible group-focus-within:opacity-100`, and
-   [dropdown.svelte](src/lib/presentation/components/dropdown.svelte) already has the `group` parent
-   they need. Note [e2e/dropdown.ts](e2e/dropdown.ts) hardcodes `.hover()`, so no current test can
-   catch this. Nothing to port: zenith gets its keyboard path from bits-ui's `DropdownMenu`
-   primitive, and AGENTS.md records dropping zenith's shadcn dependencies on purpose.
+_(#5 — "no keyboard path to any appearance control" — landed. The panel carries
+`group-focus-within:visible group-focus-within:opacity-100`
+([dropdown.svelte:39](src/lib/presentation/components/dropdown.svelte#L39)) beside the wrapper's
+`focus-within:z-20`, so focusing a trigger opens it and the next Tab lands on the first option —
+all 27 themes, both locales, reroll and the motion toggle are back in the tab order. Two tests hold
+it, both verified to fail with those two classes removed: the "Opens on keyboard focus" story
+([dropdown.stories.svelte](src/lib/presentation/components/dropdown.stories.svelte)) and
+[can-change-theme.e2e.ts:45](e2e/can-change-theme.e2e.ts#L45), which is the only one that sees the
+composed header. [e2e/dropdown.ts](e2e/dropdown.ts) still hovers on purpose — it is the pointer
+path. Nothing was ported: zenith gets its keyboard path from bits-ui's `DropdownMenu`, and AGENTS.md
+records dropping zenith's shadcn dependencies deliberately.)_
 
 ## Storybook
 
@@ -60,20 +68,21 @@ vitest project. See AGENTS.md's "Already done".)_
     _Half landed in the zenith parity pass:_ `project.inlang/cache/` is now in
     [.gitignore](.gitignore), as zenith's is — but the blobs were already tracked, so the line is
     inert until the `git rm --cached` actually runs. `dps.js` is still tracked.
-11. **Re-seed scenery per theme group** so variable order stops being global. That deletes the
-    second PRNG stream, the "must stay last" guard, and the call-count preservation in
-    `dunesRidgesUrl`. Don't pin current output with a golden test — that freezes the invariant
-    instead of removing it. **Zenith already did this; port it.** Copy `hashName` (FNV-1a) and
-    `themeRandom(seed, name)` returning `{between, rem, sec, tile}` from
-    `zenith/src/lib/presentation/utils/scenery-seed.ts`, its per-theme instantiations, and its
-    single `vars` table. That deletes our `rnd2`/`between2` stream, the "must stay last" guard, the
-    local-seed harvest inside `dunesRidgesUrl` and the `{...vars, ...vars2}` merge — exactly what
-    this item asks for. Copy `scenery-seed.test.ts` with it: determinism, >90% of variables differ
-    across seed pairs, no `NaN`/`undefined`/`Infinity`, SVG-url shape — it pins no output, so it
-    satisfies the "don't freeze the invariant" constraint, and our `server` project already
-    includes `*.test.ts`. Our variable set is zenith's minus three it doesn't have, none ours-only.
-    Keep our ordering of the dunes pair and our header comment. Landing this deletes the
-    two-PRNG-streams invariant from AGENTS.md, which already anticipates it.
+11. _(**Re-seed scenery per theme group** — landed, ported from zenith. `hashName` (FNV-1a) and
+    `themeRandom(seed, name)` are in
+    [scenery-seed.ts](src/lib/presentation/util/scenery-seed.ts), one stream per theme, one `vars`
+    table. Gone with them: the `rnd2`/`between2` stream, the `{...vars, ...vars2}` merge, the "must
+    stay last" guard on `--meridian-ribbons`, and the local-seed harvest inside `dunesRidgesUrl`,
+    which now draws from the dunes stream. The 11 stream names are the 11 scenery files that read a
+    seeded var, verified one-to-one, and each spells a real `ThemeName`. Our ordering of the dunes
+    pair is kept, so `--dunes-ridges` draws before `--dunes-shimmer-phase-1` where zenith's is the
+    other way round — self-consistent either way now that order is per-theme. `revie` is ours-only,
+    so it got a stream zenith has no counterpart for; zenith's `zenith` and `polaris` vars were not
+    ported, having no scenery here. Zenith's test came with it as
+    [scenery-seed.spec.ts](src/lib/presentation/util/scenery-seed.spec.ts) — 12 cases, `.spec.ts`
+    not `.test.ts` because all 19 node specs in this repo are `.spec.ts` and AGENTS.md's
+    Conventions say so. It pins no output, as the item required. The two-PRNG-streams invariant is
+    out of AGENTS.md, replaced by the per-theme one and its rename caveat.)_
 12. **Two missing config warnings**: a non-integer `span` is dropped silently and falls back to full
     width, and a `defaults` key naming an unknown component never matches and never warns. Both
     write into #23's diagnostics channel — land that first.
@@ -587,8 +596,9 @@ the same applies to a future 34.
 
 ## Upstream drift (the `zenith` ports)
 
-Everything else portable from zenith maps onto an item above — see #10, #11, #18, #21, #28. The
-app.html and reduced-motion ports (#3, #4) have landed, and so have both items this section held.
+Everything else portable from zenith maps onto an item above — see #10, #18, #21, #28. The
+app.html and reduced-motion ports (#3, #4) have landed, so has the scenery-seed one (#11), and so
+have both items this section held.
 
 _(#31 — "retire the self-referential `--color-x: var(--color-x)` idiom" — landed. All 15 `@theme`
 entries now alias the unprefixed upstream seed (`--color-danger: var(--danger)`), base.css declares
