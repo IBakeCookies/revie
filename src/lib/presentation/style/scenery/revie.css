@@ -13,10 +13,10 @@
 	.theme-helper-1 {
 		position: absolute;
 		inset: 0;
-		background-image: radial-gradient(oklch(0.85 0.04 200 / 0.16) 1px, transparent 1.4px);
+		background-image: radial-gradient(oklch(0.85 0.04 200 / 0.3) 1px, transparent 1.4px);
 		background-size: 2rem 2rem;
 		background-position: var(--revie-grid, 0 0);
-		mask-image: radial-gradient(ellipse 75% 65% at 50% 45%, black, transparent 78%);
+		mask-image: radial-gradient(ellipse 90% 80% at 50% 45%, black, transparent 82%);
 	}
 
 	.theme-helper-2 {

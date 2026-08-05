@@ -47,7 +47,7 @@
 				     story's first heading and passed. The size is a class, so the visual
 				     step is unchanged. Container-queried, not viewport-queried: the same card
 				     is the whole page here and a third of a row there. -->
-				<h2 class="text-lg font-semibold tracking-tight @2xl/grid:text-xl">{title}</h2>
+				<h2 class="text-xl font-semibold tracking-tight @2xl/grid:text-2xl">{title}</h2>
 			{/if}
 
 			{#if subTitle}
@@ -57,7 +57,7 @@
 				     grouping now that SubGrid draws no surface of its own. `ty-secondary`
 				     and not `ty-silent` for that reason: an 11px uppercase label doing the
 				     page's structural work was also the quietest text on it. -->
-				<h3 class="text-ty-secondary text-2xs font-semibold tracking-wider uppercase">
+				<h3 class="text-ty-secondary text-xs font-semibold tracking-wider uppercase">
 					{subTitle}
 				</h3>
 			{/if}

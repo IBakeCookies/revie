@@ -34,9 +34,11 @@
 		// `wide` is the domain reading, and the only thing that differs about it: it is
 		// the one value that is not a number, so it takes the row to itself and a
 		// smaller size. At the size the counts are set it would truncate to three
-		// characters in a quarter-width tile — which is why it stops being wide once the
-		// box passes @4xl and a quarter of it is ~14rem, enough for a domain. A full-width
-		// box then reads as one row of four rather than a row of three plus a plinth.
+		// characters in a narrow tile — which is why it stops being wide once the box
+		// passes @3xl and a quarter of it is ~13rem, enough for a domain at text-base.
+		// The cutover is @3xl and not @4xl because the box is 8 of 12 columns in the
+		// hero row, which lands at ~868px inner: under @4xl, so the domain took a
+		// second row to itself and left the row of three above it with a plinth.
 		return [
 			{
 				label: m.adguard_dns_queries(),
@@ -70,6 +72,10 @@
      to contain — all four readings run together, or the one unavailable line. The link is
      how an operator reaches the admin UI to find out why AdGuard is unreachable, so it has
      to announce that in both states. -->
+<!-- `flex justify-center` rather than `block`: this box shares a row with the clock and
+     stretches to it, so the one-line unavailable state used to sit pinned to the top of a
+     tall rectangle and read as a box that had failed to render. Centred, it reads as a
+     state. With stats the `dl` fills the box, so it is a no-op there. -->
 <a
 	{...restProps}
 	{href}
@@ -78,7 +84,7 @@
 	aria-label={m.adguard_open()}
 	style={spanStyle(span)}
 	class={cn(
-		'@container/box-adguard bg-(--box-surface,var(--surface-card)) border-line-soft hover:border-line-strong focus-visible:ring-ring col-span-12 block rounded-lg border p-box-md backdrop-blur transition focus-visible:ring-2 focus-visible:outline-none xl:col-span-(--span)',
+		'@container/box-adguard bg-(--box-surface,var(--surface-card)) border-line-soft hover:border-line-strong focus-visible:ring-ring col-span-12 flex flex-col justify-center rounded-2xl border p-box-lg backdrop-blur transition focus-visible:ring-2 focus-visible:outline-none xl:col-span-(--span)',
 		restProps.class,
 	)}
 >
@@ -92,19 +98,22 @@
 		     as the ladder goes and still reads, because the dark themes' inset is a
 		     translucent veil that composites a step lighter over itself. -->
 		<dl
-			class="grid grid-cols-2 gap-grid-xs [--box-surface:var(--surface-inset)] @2xl/box-adguard:grid-cols-3 @4xl/box-adguard:grid-cols-4"
+			class="grid grid-cols-2 gap-grid-xs [--box-surface:var(--surface-inset)] @2xl/box-adguard:grid-cols-3 @3xl/box-adguard:grid-cols-4"
 		>
 			{#each readings as reading (reading.label)}
 				<div
 					class={[
-						'flex min-w-0 flex-col gap-text-3xs rounded-md border-l-2 bg-(--box-surface,var(--surface-card)) p-box-sm',
+						'flex min-w-0 flex-col gap-text-3xs rounded-lg border-l-2 bg-(--box-surface,var(--surface-card)) p-box-sm',
 						reading.accent,
-						reading.wide && 'col-span-2 @2xl/box-adguard:col-span-3 @4xl/box-adguard:col-span-1',
+						reading.wide && 'col-span-2 @2xl/box-adguard:col-span-3 @3xl/box-adguard:col-span-1',
 					]}
 				>
 					<dt class="text-ty-silent truncate text-2xs tracking-wider uppercase">{reading.label}</dt>
 					<dd
-						class={['truncate font-semibold', reading.wide ? 'text-base' : 'text-xl tabular-nums']}
+						class={[
+							'truncate font-semibold tracking-tight',
+							reading.wide ? 'text-base' : 'text-2xl tabular-nums',
+						]}
 					>
 						{reading.value}
 					</dd>
@@ -120,7 +129,7 @@
 		     nothing between them — most visible on the opaque light themes, where the two
 		     fills are a step apart and the outer one then reads as a frame with a hole in
 		     it. The dot carries the state and the box's own border carries the edge. -->
-		<p class="text-ty-secondary flex items-center gap-text-xs">
+		<p class="text-ty-secondary flex items-center justify-center gap-text-xs">
 			<span class="bg-danger size-2 shrink-0 rounded-full" aria-hidden="true"></span>
 			{m.adguard_unavailable()}
 		</p>

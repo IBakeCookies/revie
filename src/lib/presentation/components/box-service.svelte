@@ -52,13 +52,13 @@
 	rel="noreferrer"
 	style={spanStyle(span)}
 	class={cn(
-		'@container/box-service bg-(--box-surface,var(--surface-card)) border-line-soft hover:border-line-strong hover:shadow-card focus-visible:ring-ring col-span-12 flex cursor-pointer items-center gap-text-md rounded-lg border p-box-md backdrop-blur transition focus-visible:ring-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5 xl:col-span-(--span)',
+		'@container/box-service bg-(--box-surface,var(--surface-card)) border-line-soft hover:border-line-strong hover:bg-surface-hover hover:shadow-card focus-visible:ring-ring col-span-12 flex cursor-pointer items-center gap-text-sm rounded-xl border p-box-sm backdrop-blur transition focus-visible:ring-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5 xl:col-span-(--span)',
 		restProps.class,
 	)}
 >
-	<span
-		class="bg-surface-card border-line-soft grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg border"
-	>
+	<!-- No border of its own: a bordered plate inside a bordered tile, thirteen times
+	     over, is a page of nested boxes. The fill alone is enough to seat the icon. -->
+	<span class="bg-surface-card grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg">
 		{#if hasIcon}
 			<img
 				class="size-6 object-contain"

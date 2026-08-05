@@ -428,9 +428,9 @@
 	   maps to a utility; zenith's --mind/--body/--flow/--mixed are left to base.css
 	   because there is no upstream palette to stay diffable against. */
 	--background-image:
-		radial-gradient(ellipse 70% 50% at 12% -8%, oklch(0.5 0.1 175 / 0.18), transparent 68%),
-		radial-gradient(ellipse 65% 45% at 92% 6%, oklch(0.45 0.09 255 / 0.16), transparent 70%),
-		radial-gradient(ellipse 85% 55% at 50% 112%, oklch(0.42 0.08 200 / 0.2), transparent 68%),
+		radial-gradient(ellipse 70% 50% at 12% -8%, oklch(0.5 0.1 175 / 0.3), transparent 68%),
+		radial-gradient(ellipse 65% 45% at 92% 6%, oklch(0.45 0.09 255 / 0.28), transparent 70%),
+		radial-gradient(ellipse 85% 55% at 50% 112%, oklch(0.42 0.08 200 / 0.32), transparent 68%),
 		linear-gradient(oklch(0.19 0.022 240), oklch(0.13 0.018 235));
 
 	--radius: 0.875rem;

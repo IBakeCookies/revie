@@ -46,7 +46,7 @@
 	{...restProps}
 	style={spanStyle(span)}
 	class={cn(
-		'@container/box-date bg-(--box-surface,var(--surface-card)) border-line-soft col-span-12 rounded-lg border px-box-lg py-box-md backdrop-blur xl:col-span-(--span)',
+		'@container/box-date bg-(--box-surface,var(--surface-card)) border-line-soft col-span-12 flex flex-col justify-center rounded-2xl border p-box-lg backdrop-blur xl:col-span-(--span)',
 		restProps.class,
 	)}
 >
@@ -67,8 +67,13 @@
 		</span>
 
 		<!-- `tabular-nums` so the seconds do not shift the line's width once a second,
-		     which is what a proportional font does to a running clock. -->
-		<time class="text-3xl font-semibold tabular-nums" datetime={now.toISOString()}>
+		     which is what a proportional font does to a running clock. Sized up and
+		     tightened: this is the one reading on the page with no rival for the eye,
+		     and at text-3xl it was the same weight as a card title. -->
+		<time
+			class="text-4xl font-semibold tracking-tight tabular-nums @lg/box-date:text-5xl"
+			datetime={now.toISOString()}
+		>
 			{timeFormatter.format(now)}
 		</time>
 	</div>

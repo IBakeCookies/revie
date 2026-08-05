@@ -25,7 +25,7 @@
 <Grid
 	{...restProps}
 	class={cn(
-		'border-transparent border-l-line-strong self-start bg-transparent p-0 pl-box-md shadow-none backdrop-blur-none rounded-none',
+		'border-transparent border-l-2 border-l-line-strong self-start bg-transparent p-0 pl-box-md shadow-none backdrop-blur-none rounded-none',
 		className,
 	)}
 	gridClass={cn('gap-grid-sm [--box-surface:inherit]', gridClass)}
