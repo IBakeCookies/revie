@@ -14,8 +14,11 @@
 	"adguard_top_blocked_domain": "Top blocked domain",
 	"adguard_open": "Open AdGuard Home",
 	"adguard_unavailable": "AdGuard statistics unavailable",
+	"adguard_load_failed": "Could not read AdGuard statistics",
 	"service_status_online": "online",
 	"service_status_offline": "offline",
 	"service_status_unknown": "status unknown",
+	"service_probe_failed": "Could not check {href}",
+	"toast_dismiss": "Dismiss this message",
 	"error_unknown": "Something went wrong"
 }

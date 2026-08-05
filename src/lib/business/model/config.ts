@@ -213,6 +213,16 @@ export function normalizeConfig(raw: unknown): Config {
 			continue;
 		}
 
+		// A page key is a URL path and the navigation links straight to it, so one
+		// without the leading slash emits a RELATIVE href: `noslash` visited from
+		// /services resolves to /noslash under it and 404s. Dropped rather than warned
+		// about, because a link that navigates somewhere else is worse than no link.
+		if (!path.startsWith('/')) {
+			console.warn(`Skipping page "${path}", a page path has to start with "/"`);
+
+			continue;
+		}
+
 		pages[path] = {
 			name: typeof rawPage.name === 'string' ? rawPage.name : undefined,
 			containers: (Array.isArray(rawPage.containers) ? rawPage.containers : [])

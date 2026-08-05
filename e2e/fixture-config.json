@@ -58,6 +58,19 @@
 					}
 				}
 			]
+		},
+		"/media/plex": {
+			"name": "Plex",
+			"containers": [
+				{
+					"name": "BoxService",
+					"props": {
+						"title": "Grouped",
+						"href": "http://127.0.0.1:4173",
+						"img": { "src": "/robots.txt" }
+					}
+				}
+			]
 		}
 	}
 }

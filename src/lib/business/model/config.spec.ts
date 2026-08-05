@@ -58,6 +58,10 @@ const rawConfig = {
 			],
 		},
 		'/broken': 'not a page',
+		'/media/plex': {
+			name: 'Plex',
+			containers: [],
+		},
 	},
 };
 
@@ -71,9 +75,28 @@ function itemsOf(container: ConfigContainer): ConfigContainer[] {
 
 describe('normalizeConfig', () => {
 	it('keeps only well-formed pages and containers', () => {
-		expect(Object.keys(config.pages)).toEqual(['/']);
+		expect(Object.keys(config.pages)).toEqual(['/', '/media/plex']);
 		expect(home.name).toBe('Home');
 		expect(home.containers).toHaveLength(1);
+	});
+
+	it('keeps a nested page path, which the route matches as a rest parameter', () => {
+		expect(config.pages['/media/plex'].name).toBe('Plex');
+	});
+
+	it('drops a page path with no leading slash, which would emit a relative link', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		const pages = normalizeConfig({
+			pages: {
+				noslash: {
+					containers: [],
+				},
+			},
+		}).pages;
+
+		expect(Object.keys(pages)).toEqual([]);
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('noslash'));
 	});
 
 	it('drops unregistered components and entries that are not containers', () => {

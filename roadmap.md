@@ -17,8 +17,8 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 23 items are open; **1, 2, 3, 4, 5, 6, 7, 11, 31 and 32
-are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+**Numbers are stable, so gaps mean landed.** 21 items are open; **1, 2, 3, 4, 5, 6, 7, 8, 11, 19, 31
+and 32 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
 the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -48,15 +48,22 @@ vitest project. See AGENTS.md's "Already done".)_
 
 ## Cleanup
 
-8. **Wire a toast store into the `ErrorReporter` seam.** `ServicesStore` already accepts one and
-   defaults to `console.error`, so a failed ping is reported rather than swallowed — but nothing
-   shows it to the user yet. A `ToastStore` in `business/store/`, set in
-   [+layout.svelte](src/routes/+layout.svelte), then `setServicesStore(toasts.report)` in
-   [page.svelte](src/lib/presentation/components/page.svelte). `AppError.message` is guaranteed
-   renderable, so the toast body is `error.message` and nothing else. Do the same for the AdGuard
-   failure in [+page.server.ts](src/routes/[[slug]]/+page.server.ts), which still logs and returns
-   `null` — the error is available, it just isn't forwarded to the page yet. Two producers are
-   already logging-and-swallowing: +page.server.ts:19-22 and :33-37.
+8. _(**Wire a toast store into the `ErrorReporter` seam** — landed, then corrected.
+   [toast-store.svelte.ts](src/lib/business/store/toast-store.svelte.ts) is set in
+   [+layout.svelte](src/routes/+layout.svelte) and rendered by
+   [toasts.svelte](src/lib/presentation/components/toasts.svelte), an `aria-live` region kept in
+   the DOM while empty so its first message is announced. Both producers report.
+   **The item's own instruction — "the toast body is `error.message` and nothing else" — was
+   wrong and was NOT followed.** `AppError.message` is minted in `data`, which has no locale, so
+   that shipped an English toast on a German page. `ErrorReporter` is gone: `ServicesStore` takes
+   `NotifyProbeFailed = (href: string) => void` and logs the message itself, the load returns
+   `adguardFailed: boolean`, and `[...slug]/+page.svelte` picks the paraglide message. Ported from
+   zenith, which has no language problem for exactly this reason — its seams are `() => void` and
+   its variants are kinds. Five shape decisions plus the `untrack` trap are in AGENTS.md's
+   "Already done"; the no-copy-crosses-a-layer rule is under "Errors are values". What this did
+   NOT do: the credentials-absent branch still only warns, an unconfigured box being an absence
+   rather than a failure, and the three `console` calls on this path are now permanent by
+   design — #23 covers the seven that are not.)_
 9. **Delete the browser cookie re-read in `ThemeStore`** (lines 99–109 + the `browser` import at
    :2). The same cookie was already resolved through the same `resolveThemeName` to produce
    `data.theme` in the same request, so it can only ever equal what was handed in — while its early
@@ -108,7 +115,7 @@ vitest project. See AGENTS.md's "Already done".)_
     dies too. README.md:63 promises "a malformed container is dropped with a warning instead of
     breaking the page".
     _Files:_ src/lib/business/model/config-source.ts:43, src/lib/business/model/config.ts:147-173,
-    src/routes/[[slug]]/page.server.spec.ts
+    src/routes/[...slug]/page.server.spec.ts
 
 15. **State `secure` explicitly on all three appearance cookies** — `S`
     Neither write path types it: `cookie.ts:41` omits the attribute, and `COOKIE_WRITE_OPTIONS`
@@ -129,23 +136,23 @@ vitest project. See AGENTS.md's "Already done".)_
 
 16. **Stop a dead AdGuard box from gating first byte: cache the stats with a short TTL, then refresh
     them** — `M`
-    `+page.server.ts:52` is `adguard: await loadAdguardStats(page)` and nothing caches the result.
+    `+page.server.ts:59` awaits `loadAdguardStats(page)` inline and nothing caches the result.
     Mirror config-source.ts:18's cache shape with a short TTL so at most one request per window pays
     the 3s bound (keep the bound), then add `depends('dashboard:adguard')` in the load and a
-    visibility-gated `invalidate('dashboard:adguard')` interval in **src/routes/[[slug]]/+page.svelte**
+    visibility-gated `invalidate('dashboard:adguard')` interval in **src/routes/[...slug]/+page.svelte**
     (reuse the setInterval + teardown shape at poll-services-state.ts:19-23). Note `invalidate`
     re-runs the whole load, so `readConfig` (mtime-cached) runs again too.
     _Prevents:_ measured with a blackhole href — `ttfb=2.996s` then `2.954s` on the second request,
     while a 404 on the same server answers in 0.005s; repository/adguard.ts:16-22's own comment says
     "it does not get to hold the other boxes hostage". Also unfreezes the only real-data widget,
     currently loaded once per navigation while the date box ticks at 1s and dots re-poll at 15min.
-    _Files:_ src/routes/[[slug]]/+page.server.ts:42-54, src/lib/business/model/adguard.ts,
-    src/routes/[[slug]]/+page.svelte
+    _Files:_ src/routes/[...slug]/+page.server.ts:51-67, src/lib/business/model/adguard.ts,
+    src/routes/[...slug]/+page.svelte
 
 17. **Key AdGuard stats by href, and validate the wire shape before transforming** — `M`
     `loadAdguardStats` resolves `findContainer(page, 'BoxAdguard')` — first match at any depth — and
     `AdguardStore` holds one value that box-adguard-wrapper.svelte:11 hands to every instance without
-    reading `props.href`. Add `collectAdguardHrefs` beside `collectServiceHrefs` (config.ts:253-267),
+    reading `props.href`. Add `collectAdguardHrefs` beside `collectServiceHrefs` (config.ts:272-286),
     `Promise.all` the fetches so the 3s bound stays 3s total, return `Record<href, AdguardStats>`, and
     make the store `stats(href)` (the wrapper edit is one line — `props.href` is already typed in).
     Separately, add a numeric check right after `raw.json()` in `getAdguardStats`, matching the
@@ -156,16 +163,16 @@ vitest project. See AGENTS.md's "Already done".)_
     contacted or reported. And a 200 with the wrong body (`{"message":"unauthorized"}`) renders
     `DNS queries: undefined`, `Delay: NaNms` with nothing logged, while the same function already
     defends `top_blocked_domains?.at(0) ?? {}`.
-    _Sequencing:_ the load's return type changes to a record, rippling into page.svelte:9-18 — land
-    this before #16's refresh. Decide explicitly whether `findContainer` (config.ts:239-250) gets
-    deleted; `+page.server.ts:11` is its only production caller. Cheap fallback if multi-instance is
+    _Sequencing:_ the load's return type changes to a record, rippling into page.svelte:10-21 — land
+    this before #16's refresh. Decide explicitly whether `findContainer` (config.ts:258-269) gets
+    deleted; `+page.server.ts:17` is its only production caller. Cheap fallback if multi-instance is
     not wanted: warn on a second BoxAdguard via #23's channel (credentials are global —
-    `+page.server.ts:17` reads one `ADGUARD_USERNAME`/`ADGUARD_PASSWORD` pair — so keying only
+    `+page.server.ts:23` reads one `ADGUARD_USERNAME`/`ADGUARD_PASSWORD` pair — so keying only
     supports instances sharing a login).
-    _Files:_ src/routes/[[slug]]/+page.server.ts:11, src/lib/business/model/config.ts:253-267,
+    _Files:_ src/routes/[...slug]/+page.server.ts:17, src/lib/business/model/config.ts:272-286,
     src/lib/business/store/adguard-store.svelte.ts:12-20,
     src/lib/presentation/components/box-adguard-wrapper.svelte:11,
-    src/lib/data/repository/adguard.ts:43-47, src/lib/presentation/components/page.svelte:18
+    src/lib/data/repository/adguard.ts:43-47, src/lib/presentation/components/page.svelte:28
 
 18. **Re-poll service status on `visibilitychange` and `focus`** — `S`
     `pollServicesState` is 24 lines: one `poll()`, one `setInterval(poll, 15min)`, a teardown that
@@ -184,18 +191,15 @@ vitest project. See AGENTS.md's "Already done".)_
     new case needs a `*.svelte.spec.ts` home or a stubbed `document`, since the node project has
     none)
 
-19. **Widen `[[slug]]` to `[...slug]` and warn on `pages` keys without a leading slash** — `S`
-    `+layout.server.ts:11-14` turns every `config.pages` key into a nav link with no validation, but
-    the built route pattern is `/^(?:\/([^/]+))?\/?$/` — one segment, no slashes. Rename the route
-    directory (a rest param still matches `/`, and the static `/api/ping` sorts ahead of it) and add
-    a `normalizeConfig` warning for a key not starting with `/`.
-    _Prevents:_ verified on the built server with keys `/media/plex` and `noslash` — `/media/plex`
-    renders as a nav link and returns SvelteKit's generic `Not Found`, never reaching the configured
-    `No dashboard page is configured for "…"` message; `noslash` emits a **relative**
-    `href="noslash"` that resolves against whatever page the user is on. Also unblocks `/media/*`,
-    `/network/*` page grouping.
-    _Files:_ src/routes/[[slug]]/ → src/routes/[...slug]/, src/routes/+layout.server.ts:11-14,
-    src/lib/business/model/config.ts
+19. _(**Widen `[[slug]]` to `[...slug]` and warn on `pages` keys without a leading slash** —
+    landed. The route directory is renamed and `normalizeConfig` **drops** a key with no leading
+    slash rather than only warning: the nav links straight to the key, so a relative href that
+    navigates somewhere else is worse than no link. `/media/plex` is in
+    [fixture-config.json](e2e/fixture-config.json) and asserted at 200 in
+    [can-navigate-between-pages.e2e.ts](e2e/can-navigate-between-pages.e2e.ts); `/api/ping` still
+    sorts ahead of the rest parameter, verified by the four ping cases in
+    [can-see-service-status.e2e.ts](e2e/can-see-service-status.e2e.ts). `/media/*` and `/network/*`
+    page grouping is unblocked. Recorded in AGENTS.md under "Config-driven rendering".)_
 
 20. **Add a response-header `Handle` (Referrer-Policy, X-Content-Type-Options, X-Robots-Tag,
     Cache-Control), flip robots.txt, then enable CSP** — `M`
@@ -208,7 +212,7 @@ vitest project. See AGENTS.md's "Already done".)_
     `<script nonce="%sveltekit.nonce%">` on the hand-written pre-paint script (app.html:12-26), and
     an explicit `'style-src-attr': ['unsafe-inline']`, because the app puts computed values in inline
     `style` **attributes** (box-service.svelte:34 `style={spanStyle(span)}` — the `--span` invariant;
-    +layout.svelte:72 scenery; +layout.svelte:124,126 swatches) and SvelteKit's own nonced `<style>`
+    +layout.svelte:97 scenery; +layout.svelte:191,192 swatches) and SvelteKit's own nonced `<style>`
     nullifies `'unsafe-inline'` in `style-src`. Nothing sets `prerender`, so `mode: 'nonce'` is
     available.
     _Prevents:_ the page's content is an internal network map (hostnames, ports, inventory) typically
@@ -227,8 +231,8 @@ vitest project. See AGENTS.md's "Already done".)_
     src/routes/+layout.server.ts:21
 
 21. **Fix the page's accessibility skeleton and land one axe e2e audit** — `M`
-    In +layout.svelte: move `<header>` (:106) out of `<main>` (:103, closing :213) so it maps to
-    `banner` instead of `generic` — the IntersectionObserver sentinel at :104 must move with it and
+    In +layout.svelte: move `<header>` (:118) out of `<main>` (:112, closing :238) so it maps to
+    `banner` instead of `generic` — the IntersectionObserver sentinel at :113 must move with it and
     the header currently inherits `main`'s `p-page-sm md:p-page-md xl:p-page` ramp. Then add
     `@axe-core/playwright` and one `e2e/is-accessible.e2e.ts` scanning `/`, `/services`, `/nope` in
     both locales and with `colorScheme: 'dark'` (the `test.use` pattern exists at
@@ -243,9 +247,9 @@ vitest project. See AGENTS.md's "Already done".)_
     role-less `<span>`, which was ignored outright until the `role="img"` now at
     box-service.svelte:73.
     _The nav and `<title>` halves landed in the design pass_ (verified 2026-08-05): the page links
-    sit in a `<nav>` (+layout.svelte:117) with `aria-current="page"` (:121) off `page` from
-    `$app/state`, and `<svelte:head>` (:76-79) composes the title from the configured page name
-    plus `m.app_title()` (:77). That closes `document-title` **for the app but not for the gate** —
+    sit in a `<nav>` (+layout.svelte:140) with `aria-current="page"` (:144) off `page` from
+    `$app/state`, and `<svelte:head>` (:88-91) composes the title from the configured page name
+    plus `m.app_title()` (:89). That closes `document-title` **for the app but not for the gate** —
     the title lives in the root layout, which no component story mounts, so axe in storybook still
     cannot see it and only the e2e audit above can.
     **What is left is what no component story can reach:** the `banner` landmark, the title (e2e
@@ -264,7 +268,7 @@ vitest project. See AGENTS.md's "Already done".)_
     at 6. Don't create a `scripts/` directory for it: zenith's `ink-contrast.mjs` measures
     `bg-<state> text-<state>-ink` over 9 fills and we have no `-ink` token, and its
     `hover-contrast.mjs` drives a shadcn button story we have no equivalent of.
-    _Files:_ src/routes/+layout.svelte:103-106 (the `banner` move; its `<nav>` and `<title>` are
+    _Files:_ src/routes/+layout.svelte:112-118 (the `banner` move; its `<nav>` and `<title>` are
     done), src/lib/presentation/components/box-service.svelte:72-80 (the non-colour cue),
     e2e/is-accessible.e2e.ts (new), e2e/can-navigate-between-pages.e2e.ts.
     grid.svelte, box-adguard.svelte and grid.svelte.spec.ts are off this list — their half landed.
@@ -307,8 +311,8 @@ vitest project. See AGENTS.md's "Already done".)_
 
 23. **Give config loading a return channel: diagnostics as values, `GET /api/health`, one log per
     mtime** — `M`
-    `normalizeConfig` reports drops with four `console.warn`s from inside a framework-free model file
-    (config.ts:136,142,156,178) and `readConfig` `console.error`s and discards its `AppError`
+    `normalizeConfig` reports drops with five `console.warn`s from inside a framework-free model file
+    (config.ts:140,146,160,182,221) and `readConfig` `console.error`s and discards its `AppError`
     (config-source.ts:25-41) — both violate the errors-as-values contract in AGENTS.md. Return them:
     `normalizeConfig(raw): { config, warnings }`, and `readConfig` handing back the last-good config
     plus the problems it hit; keep the retained error beside the cache and add `GET /api/health`
@@ -316,17 +320,18 @@ vitest project. See AGENTS.md's "Already done".)_
     _Prevents:_ measured with a trailing comma in config.json — every page 404s with
     `No dashboard page is configured for "/"`, a message that blames the URL, while the real cause is
     written only to stdout as **two** full SyntaxError stack traces _per request_ (55 log lines for 3
-    requests; `+layout.server.ts:6` and `+page.server.ts:43` both call `readConfig`, and
+    requests; `+layout.server.ts:6` and `+page.server.ts:52` both call `readConfig`, and
     config-source.ts:31's mtime short-circuit never engages because the failing branch never populates
     `cache`). Worse, the log never names the file: the operator sees
     `Unexpected token '}' … is not valid JSON` with no path, because the thrown message wins over the
     fallback at src/lib/data/config.ts:29. No health/readiness route exists for a systemd
     `ExecStartPost` or compose `HEALTHCHECK`.
-    _Unlocks a lint rule:_ once this and #8 land, `no-console` becomes enableable with only
-    `[[slug]]/+page.server.ts` and `service-store.svelte.ts`'s default reporter exempted — 10 sites
-    now, 3 after, one of which is #10's `dps.js`. Don't reach for zenith's answer to get there: a
+    _Unlocks a lint rule:_ #8 has landed, so this is the last item in the way. Once it does,
+    `no-console` becomes enableable with only `[...slug]/+page.server.ts` and
+    `service-store.svelte.ts`'s probe diagnostic exempted — 11 sites now, 4 after, one of which is
+    #10's `dps.js`. Don't reach for zenith's answer to get there: a
     root `logger.ts` plus `no-console: 'error'` everywhere is a fourth module below all three layers,
-    and it collides with the errors-as-values / injected-`ErrorReporter` contract AGENTS.md records as
+    and it collides with the errors-as-values / injected-notify contract AGENTS.md records as
     deliberate. If a logger is ever genuinely needed here it goes in `src/lib/utils/` and needs **no**
     new lint rule — `leaf-not-to-upper-layers` already fences that directory. Zenith needed a
     root-level file and a bespoke `logger-imports-nothing` rule precisely because it has no leaf.
@@ -334,7 +339,7 @@ vitest project. See AGENTS.md's "Already done".)_
     `pageWith` helper already returns `{ page, warn }`, so those assertions are a mechanical rewrite;
     page.server.spec.ts:54-58 needs a new case separating unreadable-config from unknown-path.
     _Files:_ src/lib/business/model/config.ts:136-178, src/lib/business/model/config-source.ts:20-45,
-    src/lib/data/config.ts:29, src/routes/[[slug]]/+page.server.ts:43-48,
+    src/lib/data/config.ts:29, src/routes/[...slug]/+page.server.ts:52-57,
     src/routes/api/health/+server.ts (new)
 
 ## Features
@@ -345,7 +350,7 @@ vitest project. See AGENTS.md's "Already done".)_
     in config-container.svelte's if/else chain (:38-52, ending in the `never` assert). Props: `href`
     (required), optional `placeholder`; renders `<form action={href} method="get"><input name="q">`
     — hardcode `q` (Whoogle, SearXNG, Google, DuckDuckGo all use it). Add a `/`-key focus handler and
-    the two new message keys to **both** messages/en.json and messages/de.json (16-keys-in-sync
+    the two new message keys to **both** messages/en.json and messages/de.json (21-keys-in-sync
     invariant).
     _Payoff:_ the page is currently read-only — `grep -rniE "search|<form|<input" src e2e` returns
     zero matches — so the first thing a user does after loading their start page is leave for the
@@ -359,7 +364,7 @@ vitest project. See AGENTS.md's "Already done".)_
 25. **Add a `BoxBookmark` container so link-only boxes stop being probed** — `S`
     Same three edit points as #24 (`CONTAINER_NAMES`, `requiredProps`, one config-container branch):
     `title` required, `img.src`/`subtitle` optional, no status dot, no store. Because
-    `collectServiceHrefs` (config.ts:253) walks only `isBoxService`, a bookmark is automatically
+    `collectServiceHrefs` (config.ts:272) walks only `isBoxService`, a bookmark is automatically
     excluded from the poll set and from `/api/ping`'s allowlist (api/ping/+server.ts:45) — zero
     changes to the probing path. Then migrate the one offending config entry.
     _Payoff:_ BoxService is the only link container and it demands `title` + `href` + `img.src`
@@ -383,12 +388,14 @@ vitest project. See AGENTS.md's "Already done".)_
     pass raw numbers and the compiled
     message is `` `DNS-Anfragen: ${i?.count}` ``.
     _Payoff:_ closes the first-render locale gap in a deliberately bilingual app, and `43871` becomes
-    `43.871` in German. No test today can tell German output from English:
-    box-date.svelte.spec.ts:20 matches `/\d{1,2}:\d{2}:\d{2}/` (true in every locale),
-    box-adguard.svelte.spec.ts:31-45 compares against `m.*()` so it auto-follows any format change,
-    and e2e cannot render a populated AdGuard box (fixture-config.json:12 points at closed port
-    9999). Assert it in box-adguard.svelte.spec.ts against a literal string — the compiled message
-    accepts `{ locale: 'de' }`.
+    `43.871` in German. Nothing tests the READINGS in German: box-date.svelte.spec.ts:20 matches
+    `/\d{1,2}:\d{2}:\d{2}/` (true in every locale), box-adguard.svelte.spec.ts:31-45 compares
+    against `m.*()` so it auto-follows any format change, and e2e cannot render a populated AdGuard
+    box (fixture-config.json:12 points at closed port 9999). Assert it in
+    box-adguard.svelte.spec.ts against a literal string — the compiled message accepts
+    `{ locale: 'de' }`, which is the lever
+    [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts)'s German toast case
+    demonstrates for the one path that IS asserted in German since #8 landed.
     _Files:_ vite.config.ts:11-14, src/lib/presentation/components/box-adguard.svelte:24-34,
     src/lib/presentation/components/box-adguard.svelte.spec.ts
 
@@ -403,7 +410,7 @@ the same applies to a future 34.
     rest** — `L`
     Stats are hardcoded to one vendor at every layer: the literal `'BoxAdguard'` in
     `CONTAINER_NAMES` (config.ts:15), one `findContainer(page, 'BoxAdguard')` in the load
-    (+page.server.ts:11), one global credential pair (+page.server.ts:17), and one `AdguardStats`
+    (+page.server.ts:17), one global credential pair (+page.server.ts:23), and one `AdguardStats`
     in the store (adguard-store.svelte.ts:12). A second integration is therefore not an addition,
     it is a fourth copy of the three defects #16 and #17 already name. **Land those two first** —
     they are what turns "AdGuard, singular" into "a provider, keyed by href, `Promise.all`'d inside
@@ -469,15 +476,20 @@ the same applies to a future 34.
     a live instance behind this code — unlike every other item here, so re-check each before
     implementing it. Homepage's widget list is the working popularity ranking if this needs
     extending.
-    _Also needs #8 or #23_ for a failure channel. Today an AdGuard failure is `console.warn` +
-    `return null` (+page.server.ts:19-22,33-37): an empty box with no stated reason, tolerable for
-    one optional widget and not for eight.
+    _The failure channel is in — #8 landed._ An unreachable AdGuard box returns a flag and the
+    route toasts a paraglide message. What a provider ADDS is that the toast has to name WHICH one
+    failed — one line is enough for one widget and useless for eight — and the way it does that is
+    **not** by returning a sentence: no copy crosses a layer (AGENTS.md, "Errors are values"). So
+    `adguardFailed: boolean` becomes `failedProviders: ProviderName[]`, and presentation holds a
+    `Record<ProviderName, () => string>` message map, complete the same way `requiredProps` is —
+    the same shape this item already proposes for `StatKey`, for the same reason. A provider name
+    is data; the sentence around it is presentation's.
     _Files:_ src/lib/business/model/config.ts:15,114-131, src/lib/business/model/stats.ts (new),
     src/lib/data/repository/ (one file per provider),
     src/lib/business/store/adguard-store.svelte.ts,
     src/lib/presentation/components/box-stats.svelte (new),
     src/lib/presentation/components/config-container.svelte:38-52,
-    src/routes/[[slug]]/+page.server.ts:10-40, messages/en.json, messages/de.json,
+    src/routes/[...slug]/+page.server.ts:16-48, messages/en.json, messages/de.json,
     README.md:65-74, .env.example
 
 ## Ops & DX
@@ -493,11 +505,13 @@ the same applies to a future 34.
     `WorkingDirectory=`) or compose file with the config bind-mounted — neither `deploy/` nor a
     compose file exists yet. In the same README pass, name the two AdGuard variables (they appear
     **nowhere** in README.md or AGENTS.md — README.md:17 says only "AdGuard credentials, optional",
-    and the names live in `.env.example` and `+page.server.ts:17`), state that they are runtime
-    `$env/dynamic/private`, describe the one degradation with two causes (credentials absent →
-    +page.server.ts:19-22; box unreachable/401 → :33-37, both `console.warn` + `return null` = an
-    empty box with no user-visible reason), and mention the 3s `AbortSignal.timeout`
-    (repository/adguard.ts:38).
+    and the names live in `.env.example` and `+page.server.ts:23`), state that they are runtime
+    `$env/dynamic/private`, and describe the two degradations, which are no longer the same one
+    now that #8 has landed: credentials absent is a silent empty box plus a `console.warn`
+    (+page.server.ts:23-28 — deliberately not toasted, an unconfigured box being an absence rather
+    than a failure, so this is the case the README has to explain instead), while
+    unreachable/401 both logs and toasts the reason (:30-48). Mention the 3s `AbortSignal.timeout`
+    (repository/adguard.ts:38) as what the reader will see in that toast on a dead host.
     _The `engines` half landed_ (verified 2026-08-04): package.json:6-8 declares `"node": ">=22"`,
     so `.npmrc`'s `engine-strict=true` is no longer inert, and README.md:11-12 documents that an
     older node fails `npm install` outright rather than warning. That also retires this item's
@@ -540,7 +554,7 @@ the same applies to a future 34.
     One spec reading the real files with `node:fs` (the `server` project at vite.config.ts:35-43 is
     the home; no spec anywhere reads a real file today — config-source.spec.ts _mocks_
     `node:fs/promises`). Assert: (1) `messages/en.json` and `messages/de.json` have identical key sets
-    (17 each incl. `$schema`); (2) the `--spacing-*` names in tokens.css:46-86 (28) equal the spacing
+    (22 each incl. `$schema`); (2) the `--spacing-*` names in tokens.css:46-86 (28) equal the spacing
     array in style.ts:12-41 (28) — exporting that array out of the inline `extendTailwindMerge` call
     is part of the work; (3) every `css` class of every one of the 27 `themes` entries has a palette
     selector in themes.css (25) or base.css (`.solid-light`:19, `.dark`:183), and an
@@ -625,7 +639,8 @@ The order that matters, beyond the group ranking:
   community-scripts.github.io, which means four connects an hour to GitHub Pages to paint a
   meaningless dot (`POLL_INTERVAL_MS` 15min). Move that entry to a bookmark.
 - **#17 before #16** — #17 changes the load's return type to a record, rippling into
-  page.svelte:9-18.
+  page.svelte:10-21 and, since #8 landed, into `[...slug]/+page.svelte`, which now spreads the
+  load's `adguard` / `adguardError` into the component by hand.
 - **#16 and #17 before #33** — a second stats provider inherits AdGuard's single-value store, its
   uncached serial await and its one global credential pair unless those two land first. #33 is the
   generalization they set up, not a parallel track.

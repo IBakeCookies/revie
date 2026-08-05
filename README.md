@@ -63,6 +63,10 @@ props:
 ```
 
 - `defaults` holds per-container props applied to every instance of that container.
+- A page key is a URL path and has to start with `/`. It may have more than one
+  segment, so `"/media/plex"` works and is how pages are grouped. A key without the
+  leading slash is dropped with a warning, because the navigation links straight to it
+  and a relative link would land on a different page than it names.
 - A path that is not listed under `pages` returns 404.
 - A malformed container is dropped with a warning instead of breaking the page: an
   unknown container name, something that isn't an object, or a missing required prop
@@ -98,6 +102,15 @@ TCP connection to the `href`'s own host **and port** — so a dead service on a 
 reads as offline, and two boxes on one host can disagree. A scheme without a port to
 connect to is rejected. The endpoint only probes `host:port` pairs that appear in
 `config.json`; anything else is rejected too.
+
+A dot only changes when a probe answers. A probe that **fails** — a network drop, a
+proxy erroring — says nothing about the service, so the dot keeps its last known state
+and a dismissible message names the service at the bottom of the page instead. An
+unreachable AdGuard box gets one too, which is otherwise visible only as an empty box.
+Each clears itself after a few seconds, a failure that repeats does not stack up, and
+both follow the page language. The technical detail behind them — `fetch failed`, an
+HTTP status, the host — goes to the server's log rather than the screen, so check there
+when the message is not enough.
 
 ## Languages
 

@@ -14,8 +14,11 @@
 	"adguard_top_blocked_domain": "Häufigste blockierte Domain",
 	"adguard_open": "AdGuard Home öffnen",
 	"adguard_unavailable": "AdGuard-Statistiken nicht verfügbar",
+	"adguard_load_failed": "AdGuard-Statistiken konnten nicht gelesen werden",
 	"service_status_online": "online",
 	"service_status_offline": "offline",
 	"service_status_unknown": "Status unbekannt",
+	"service_probe_failed": "{href} konnte nicht geprüft werden",
+	"toast_dismiss": "Diese Meldung ausblenden",
 	"error_unknown": "Etwas ist schiefgelaufen"
 }

@@ -4,10 +4,10 @@
 	import icon from '$lib/presentation/assets/favicon.svg';
 	import BoxServiceWrapper from '$lib/presentation/components/box-service-wrapper.svelte';
 
-	/* The store's ErrorReporter defaults to console.error. Injecting a spy is the
-	   whole point of that seam — and it lets a story assert that a failed probe was
-	   reported rather than swallowed. */
-	const report = fn();
+	/* The store's notify callback. Injecting a spy is the whole point of that seam —
+	   and it lets a story assert that a failed probe told presentation WHICH href
+	   failed, rather than being swallowed. */
+	const notify = fn();
 
 	const { Story } = defineMeta({
 		title: 'Components/Box Service Wrapper',
@@ -30,7 +30,7 @@
 	/* The wrapper reads the store out of context, so it cannot mount without one —
 	   and `setContext` needs a component being initialised, which the module script
 	   above is not. */
-	const servicesStore = setServicesStore(report);
+	const servicesStore = setServicesStore(notify);
 
 	/* `refresh` is the store's only writer, and it really POSTs /api/ping — a route
 	   no storybook server serves. Stubbing the transport keeps the STORE the thing
@@ -119,9 +119,9 @@
 			await expect(dot).toHaveClass('bg-success');
 		});
 
-		// Nothing failed, so the reporter stays silent — a green dot and a reported
-		// error would mean the store had guessed.
-		await expect(report).not.toHaveBeenCalled();
+		// Nothing failed, so notify stays silent — a green dot and a raised toast
+		// together would mean the store had guessed.
+		await expect(notify).not.toHaveBeenCalled();
 	}}
 />
 
@@ -164,12 +164,9 @@
 
 		await expect(canvasElement.querySelector('[aria-label]')).toHaveClass('bg-success');
 
-		// Errors are values: the repository's own message reaches the injected
-		// reporter, so it can be rendered instead of printed.
-		await expect(report).toHaveBeenCalledWith(
-			expect.objectContaining({
-				message: 'probe failed',
-			}),
-		);
+		// The href alone reaches the injected callback. The repository's own message
+		// ('probe failed') goes to the log instead: it has no locale, so a toast built
+		// from it would be English on a German page.
+		await expect(notify).toHaveBeenCalledWith(args.href);
 	}}
 />

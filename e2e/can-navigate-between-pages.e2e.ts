@@ -44,6 +44,21 @@ test('navigates to another page and renders its containers', async ({ page }) =>
 	).toHaveCount(0);
 });
 
+// The route is `[...slug]`, not `[[slug]]`. The optional parameter compiled to a
+// one-segment pattern, so a grouped page like this rendered as a nav link and then
+// answered SvelteKit's generic Not Found — never reaching the configured message.
+test('serves a page whose path has more than one segment', async ({ page }) => {
+	const response = await page.goto('/media/plex');
+
+	expect(response?.status()).toBe(200);
+
+	await expect(
+		page.getByRole('link', {
+			name: /Grouped/,
+		}),
+	).toBeVisible();
+});
+
 test('keeps the navigation on every page', async ({ page }) => {
 	await page.goto('/services');
 

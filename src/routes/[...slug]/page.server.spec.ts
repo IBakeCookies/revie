@@ -125,7 +125,7 @@ describe('load', () => {
 		expect(readAdguardStats).not.toHaveBeenCalled();
 	});
 
-	it('renders the page without stats when AdGuard is unreachable', async () => {
+	it('renders the page without stats when AdGuard is unreachable, and hands on why', async () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
 
@@ -137,8 +137,23 @@ describe('load', () => {
 			null,
 		]);
 
+		// A flag, never the message: `AppError.message` is English minted in `data`, and
+		// the route is what turns this into a line in the user's language.
 		expect(await load(event('/'))).toMatchObject({
 			adguard: null,
+			adguardFailed: true,
+		});
+	});
+
+	it('reports no failure when there is nothing to read rather than a failure', async () => {
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		vi.mocked(readConfig).mockResolvedValue(configWith(boxAdguard));
+		env.ADGUARD_PASSWORD = '';
+
+		// An unconfigured box is an absence. Toasting it would put an operator's own
+		// setup decision in front of every visitor on every page load.
+		expect(await load(event('/'))).toMatchObject({
+			adguardFailed: false,
 		});
 	});
 });

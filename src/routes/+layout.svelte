@@ -7,9 +7,11 @@
 	import { page as currentPage } from '$app/state';
 	import { cn } from '$lib/utils/style';
 	import { setThemeStore } from '$lib/business/store/theme-store.svelte';
+	import { setToastStore } from '$lib/business/store/toast-store.svelte';
 	import { sceneryStyle } from '$lib/presentation/util/scenery-seed';
 	import { dataSceneryStyle } from '$lib/presentation/util/scenery-time';
 	import Dropdown from '$lib/presentation/components/dropdown.svelte';
+	import Toasts from '$lib/presentation/components/toasts.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale, locales, setLocale } from '$lib/paraglide/runtime';
 
@@ -21,6 +23,10 @@
 	// the appearance from here on and mirrors it into the cookies itself.
 	// svelte-ignore state_referenced_locally
 	const themeStore = setThemeStore(data.theme, data.scenerySeed, data.sceneryPaused);
+
+	// Set here rather than per page, so a failure reported while navigating survives
+	// the page component being torn down and rebuilt.
+	const toasts = setToastStore();
 
 	// Clock-driven scenery state (sundial, tide, city-windows). SSR renders
 	// the server's clock; hydration never re-patches
@@ -230,3 +236,7 @@
 		{@render children()}
 	</div>
 </main>
+
+<!-- Outside <main>: the region is fixed to the viewport, so main's padding ramp and
+     its 12-column grid have nothing to say about it. -->
+<Toasts messages={toasts.messages} ondismiss={(message) => toasts.dismiss(message)} />

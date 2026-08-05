@@ -97,7 +97,7 @@ Note the exemption is narrow. A route **server** file may call `business/model`,
 it may NOT reach `src/lib/data` — a load function is the composition root, not a
 licence to call a repository. That is why `readAdguardStats` and `readConfig` are
 business functions rather than repository calls inlined into
-[+page.server.ts](src/routes/[[slug]]/+page.server.ts).
+[+page.server.ts](src/routes/[...slug]/+page.server.ts).
 
 **Business names no component, in values or in types.**
 [business/model/config.ts](src/lib/business/model/config.ts) declares the config
@@ -201,10 +201,40 @@ whoever holds the state, not to the innermost function.
 - **A layer must not swallow.** [business/model/service.ts](src/lib/business/model/service.ts) returns
   `Result<boolean>` and does not log: a probe that _fails_ is not a service that is _down_,
   and only the caller knows whether to keep the last known value, toast, or ignore it.
-- Reporting is presentation's job, injected: `ServicesStore` takes an
-  `ErrorReporter`([service-store.svelte.ts](src/lib/business/store/service-store.svelte.ts)) that
-  defaults to `console.error`. A toast store drops in as
-  `setServicesStore(toasts.report)` with no change to the store, business, or the repository.
+- **`AppError.message` is for a LOG, not for an eye — no copy crosses a layer.** This is the
+  rule the whole reporting path is built on, ported from zenith: raising a toast is
+  presentation's job and **so is the wording**. A message minted in `data` or `business`
+  (`fetch failed`, `AdGuard responded with 401 Unauthorized`) has no locale available to it and
+  never will, so rendering one puts an English line on a German page with nothing short of this
+  rule to fix it. What crosses a layer is **data or a kind**, never a sentence:
+
+  | Producer         | Hands over                                   | Words chosen by                                              |
+  | ---------------- | -------------------------------------------- | ------------------------------------------------------------ |
+  | `ServicesStore`  | `NotifyProbeFailed = (href: string) => void` | `[...slug]/+page.svelte`: `m.service_probe_failed({ href })` |
+  | the AdGuard load | `adguardFailed: boolean`                     | the same route: `m.adguard_load_failed()`                    |
+
+  So `ServicesStore` keeps its own `console.error(err.message, …)` **unconditionally** — that
+  is a diagnostic, and a diagnostic has a fixed sink — while the injected half carries the href
+  alone. The notify default is a no-op precisely because the log fires either way, so nothing is
+  swallowed. Zenith's own seams are `() => void` (`NotifyHistoryLoadFailed`) and its variants
+  are kinds (`StorageErrorKind`); its `logError` is what our `console.error` stands in for,
+  because AGENTS.md refuses a `logger.ts` here.
+  [ToastStore](src/lib/business/store/toast-store.svelte.ts) therefore takes a **finished
+  string** and is translation-blind, which is what lets it live in business at all.
+  The fence is the German case in
+  [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts) — verified to fail, and to be
+  the only thing that fails, when that call site is given a literal instead of a message.
+  **What was NOT built:** zenith's `showToastAfterReload` / `flushPendingToasts` sessionStorage
+  queue (~90 lines and a hand-rolled validator to survive a `location.reload()` this app never
+  does) and its 4-entry `showToast` severity map over `svelte-sonner`. The rule ported; the
+  plumbing did not.
+
+- **`ToastStore.show` untracks its own body, and that is load-bearing:** the route calls it
+  from inside an `$effect` (the AdGuard flag the load returned), and both the dedupe check and
+  the `push` READ the message array — so the effect subscribed to it and dismissing a toast put
+  it straight back. Reproduced end to end; the fence is the dismiss case in
+  [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts), because `untrack` outside
+  an effect is a pass-through and no node spec can register one.
 
 ### Config-driven rendering
 
@@ -215,7 +245,7 @@ carries its props.
 config.json ─(disk read, no caching)→ data/config.ts
             ─(mtime cache)→ business/model/config-source.ts   readConfig
             ─(validate + drop bad)→ business/model/config.ts  normalizeConfig
-            ─(page data)→ [[slug]]/+page.server.ts
+            ─(page data)→ [...slug]/+page.server.ts
             ─(recurse)→ page.svelte → config-container.svelte → the component
 ```
 
@@ -231,6 +261,14 @@ config.json ─(disk read, no caching)→ data/config.ts
   Any _new_ cycle outside that trio is worth a look.
 - Config is re-read whenever the file's mtime changes, so edits apply without a restart.
   Nothing in it reaches the Tailwind compiler — see Invariants.
+- **A `pages` key is a URL path, and the route is `[...slug]`** — a rest parameter, so
+  `/media/plex` and other grouped paths match. It was `[[slug]]`, whose compiled pattern
+  (`/^(?:\/([^/]+))?\/?$/`) took one segment: a nested key rendered as a nav link and then
+  answered SvelteKit's generic `Not Found`, never reaching the configured 404 message. A rest
+  parameter still matches `/`, and the static `/api/ping` sorts ahead of it. `normalizeConfig`
+  **drops** a key without a leading slash rather than warning about it, because the nav links
+  straight to the key: `noslash` visited from `/services` emits a relative href that resolves
+  under it, and a link that navigates somewhere else is worse than no link.
 
 ### The appearance pipeline
 
@@ -409,7 +447,7 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   `solid-light` is the unprefixed `:root` palette and needs no variant to select it.
 
   The header-dropdown swatch is **not** one of them — it's generated from `theme.css`
-  ([+layout.svelte:118](src/routes/+layout.svelte#L118)), which is what keeps it matching the
+  ([+layout.svelte:191](src/routes/+layout.svelte#L191)), which is what keeps it matching the
   real palette. Don't hand-write a swatch.
 
 - **[scenery-seed.ts](src/lib/presentation/util/scenery-seed.ts) gives each theme its own PRNG
@@ -428,11 +466,13 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  18 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
-  All 18 are **parameter-free**: the four AdGuard keys are labels and `Intl.NumberFormat` formats
-  the readings themselves ([box-adguard.svelte](src/lib/presentation/components/box-adguard.svelte)),
-  so the parameter typecheck has nothing to check today and a missing translation is the only way
-  a message can go wrong.
+  21 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  **Exactly one takes a parameter** — `service_probe_failed({ href })`, so the toast names the
+  service it could not reach — and it is the only thing the compiler's parameter typecheck has
+  ever had to check. The four AdGuard keys are labels, with `Intl.NumberFormat` formatting the
+  readings themselves ([box-adguard.svelte](src/lib/presentation/components/box-adguard.svelte)).
+  A parameter is how DATA reaches a message; it is never how copy leaves a lower layer — see the
+  no-copy-crosses-a-layer rule above.
 
 ## Conventions
 
@@ -525,16 +565,18 @@ file doesn't start the drift.
 green test that proves nothing, which is worse than no test.
 
 **`console` has exactly four homes, and no lint rule guards them yet.**
-`business/model/config.ts` (4 warns), `business/model/config-source.ts` (2 errors),
-`business/store/service-store.svelte.ts` (the default `ErrorReporter`), and
-`[[slug]]/+page.server.ts` (2 — the operator channel). Measured: a global `no-console` reports
-10, the tenth being `dps.js`, which [roadmap.md](roadmap.md) #10 deletes. Six of the nine
-are #23's work — they are diagnostics a framework-free model should be **returning**, not
-printing — and the reporter is #8's. Don't add a fifth home, and don't reach for zenith's
-`no-console: 'error'` + a `logger.ts` to force the issue: the sink seam here is the injected
-`ErrorReporter` recorded under "Already done", and a logger module would be a second,
-competing seam for the same job. Turn the rule on once #23 and #8 land, with
-`+page.server.ts` and the default reporter exempted.
+`business/model/config.ts` (5 warns), `business/model/config-source.ts` (2 errors),
+`business/store/service-store.svelte.ts` (1 — the probe diagnostic), and
+`[...slug]/+page.server.ts` (2 — the operator channel). Measured: a global `no-console` reports
+11, the eleventh being `dps.js`, which [roadmap.md](roadmap.md) #10 deletes. Seven of the ten
+in `src` are #23's work — they are diagnostics a framework-free model should be **returning**,
+not printing. The other three are **deliberate and permanent**: they are the log half of the
+no-copy-crosses-a-layer rule, carrying the `AppError.message` that must never reach a toast.
+They are unconditional rather than injected precisely because a diagnostic has a fixed sink,
+and that is the one thing zenith uses its `logger.ts` for. Don't add a fifth home, and don't
+reach for zenith's `no-console: 'error'` + a `logger.ts` to force the issue: a logger module
+would be a second seam competing with the injected notify. Turn the rule on once #23 lands,
+with `+page.server.ts` and `service-store.svelte.ts` exempted.
 
 **One definition per concept.** If you catch yourself writing "mirrors", "same as" or "keep in
 sync with", export the thing instead. This repo has exactly two exceptions, both documented
@@ -597,9 +639,39 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
 - **`Result<T>` / `AppError` replaced the old error tuple.** The old shape set `message` only
   on the non-`Error` branch, so every real failure was `message: undefined` and unrenderable.
   Do not reintroduce an optional `message`, and do not add back `code` — it was never assigned.
-- **`ServicesStore` takes an `ErrorReporter`.** Business returns the error; the store decides
-  to keep the last known state; the reporter decides how a human hears about it. Keep those
-  three separate — the earlier version collapsed them and swallowed the error.
+- **`ServicesStore` hands over data, never words.** Business returns the error; the store
+  decides to keep the last known state; the _route_ decides what a human reads. Keep those three
+  separate — the earlier version collapsed them and swallowed the error.
+- **Failures reach the user as toasts, and the copy is chosen in presentation.** Five things
+  about the shape are decisions, not defaults:
+  1. **`ToastStore` is set in [+layout.svelte](src/routes/+layout.svelte), not per page**, so a
+     failure reported during a navigation outlives the page component being rebuilt.
+  2. **[page.svelte](src/lib/presentation/components/page.svelte) takes `notify` as an optional
+     prop rather than calling `getToastStore()`.** The route reads the store and hands the
+     callback down. A `getContext` there would make the component unmountable without a layout
+     above it, and `page.stories.svelte` mounts exactly that — while setting the store from a
+     stories file gives every story on the autodocs page one shared context. Left out, the
+     failure is still logged by the store; only the toast is missing.
+  3. **`loadAdguardStats` returns `Result<AdguardStats | null>`, and the load passes
+     `adguardFailed: boolean`.** A flag, not a message — see the no-copy rule above.
+     `[null, null]` is reserved for an _absence_ — no box configured, or no credentials —
+     because toasting an operator's own setup decision would put it in front of every visitor on
+     every page load. One flag rather than an `'unauthorized' | 'unreachable'` kind because the
+     only distinction worth drawing is already in the server's log line, which names the host and
+     the status, and a user reads the same sentence either way. Add the kind if that stops being
+     true; the shape is ready for it.
+  4. **`toasts.show()` takes a finished string.** It is the one thing in `business/store/` that
+     could plausibly have wanted a message key, and it must not: keys there would make the store
+     name a locale and a catalogue. Callers resolve first.
+  5. **This is the second attempt.** The first shipped `adguardError: string` and rendered
+     `AppError.message`, on the reasoning that business cannot pick a message so the toast had
+     to be English. That was wrong: business does not pick the message, it does not _carry_ one.
+     Don't re-derive the first version.
+- **The route is `[...slug]`, and `normalizeConfig` drops a `pages` key with no leading slash.**
+  See "Config-driven rendering" for why each half exists; the fences are
+  [can-navigate-between-pages.e2e.ts](e2e/can-navigate-between-pages.e2e.ts) (a two-segment path
+  answers 200) and a `config.spec.ts` case. Don't narrow the route back to an optional parameter
+  to "match one segment" — grouped pages are the point.
 - **`.dependency-cruiser.cjs` was rewritten** from the stock `--init` template (which reported
   148 violations, all false, and never resolved `.svelte` so most edges were missing from the
   graph). It now has the five layer rules plus
@@ -663,8 +735,8 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
       HTML reporters under `test-result/`; zenith's playwright shape; `.storybook/preview.ts`'s
       theme toolbar and scenery mount; a story per component; `.github/workflows/ci.yml`.
   - **Refused, with reasons that still hold:** `no-console: 'error'` and a `logger.ts` (the
-    injected `ErrorReporter` is this repo's sink seam, and a logger would be a second one
-    competing for the same job); `prettier-plugin-tailwindcss` (measured: 0 files changed at
+    injected notify callback is this repo's report seam and an unconditional `console` its log
+    sink, so a logger module would be a second seam competing for the same job); `prettier-plugin-tailwindcss` (measured: 0 files changed at
     this plugin/plugin-svelte pairing, because it does not sort classes in `.svelte`);
     `@typescript-eslint/no-explicit-any: 'off'` and `ban-ts-comment: 'off'` (both are `error`
     here at 0 violations — porting them is a pure loosening); zenith's `--strategy` on

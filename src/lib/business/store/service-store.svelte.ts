@@ -1,26 +1,28 @@
 import { getContext, setContext } from 'svelte';
 import { readServiceState } from '$lib/business/model/service';
-import type { AppError } from '$lib/utils/useAsyncErrorAsValue';
 
 const CONTEXT_KEY = Symbol();
 
 /**
- * Where a failure goes once the store has decided what it means for the state.
- * Defaults to the console; pass a toast store's reporter to show it to the user
- * instead. This is the seam that keeps error REPORTING out of the store, the
- * business layer and the repository.
+ * Says a probe of this href failed, so presentation can tell the user. It carries the
+ * href and **no words**: raising a toast is presentation's job, and so is the copy.
+ * The `AppError`'s own message is a developer detail in one language, which is why it
+ * goes to the log below and never through here.
+ *
+ * Ported from zenith, where every such seam is a zero-argument thunk
+ * (`NotifyHistoryLoadFailed`) and a variant is a kind, never a string. The href is
+ * data rather than copy, so passing it is what lets the message name the service.
  */
-export type ErrorReporter = (error: AppError) => void;
-
-const reportToConsole: ErrorReporter = (error) => console.error(error.message, error.cause ?? '');
+export type NotifyProbeFailed = (href: string) => void;
 
 export class ServicesStore {
 	/** Keyed by href so a refresh replaces the previous result instead of stacking up. */
 	#states = $state<Record<string, boolean>>({});
-	#report: ErrorReporter;
+	#notify: NotifyProbeFailed;
 
-	constructor(report: ErrorReporter = reportToConsole) {
-		this.#report = report;
+	/** No-op by default: the log below fires either way, so nothing is swallowed. */
+	constructor(notify: NotifyProbeFailed = () => {}) {
+		this.#notify = notify;
 	}
 
 	isAlive(href: string): boolean | null {
@@ -32,9 +34,14 @@ export class ServicesStore {
 
 		if (err) {
 			// The probe failed, which says nothing about the service — keep the last
-			// known state rather than showing a false offline dot, and hand the error
-			// on so it is reported rather than swallowed.
-			this.#report(err);
+			// known state rather than showing a false offline dot.
+			//
+			// Two channels, and the split is the point. `err.message` ("fetch failed")
+			// is for whoever is reading a log, so it stays here unconditionally rather
+			// than being injected: it is a diagnostic, not a report. The notify is the
+			// injected half, and it hands over the href alone.
+			console.error(err.message, err.cause ?? '');
+			this.#notify(href);
 
 			return;
 		}
@@ -43,8 +50,8 @@ export class ServicesStore {
 	}
 }
 
-export function setServicesStore(report?: ErrorReporter): ServicesStore {
-	return setContext<ServicesStore>(CONTEXT_KEY, new ServicesStore(report));
+export function setServicesStore(notify?: NotifyProbeFailed): ServicesStore {
+	return setContext<ServicesStore>(CONTEXT_KEY, new ServicesStore(notify));
 }
 
 export function getServicesStore(): ServicesStore {

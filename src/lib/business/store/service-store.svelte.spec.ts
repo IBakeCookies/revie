@@ -41,8 +41,8 @@ describe('ServicesStore', () => {
 	});
 
 	it('leaves the last known state alone when the probe fails', async () => {
-		const report = vi.fn();
-		const store = new ServicesStore(report);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const store = new ServicesStore(vi.fn());
 
 		vi.mocked(readServiceState).mockResolvedValue([null, true]);
 		await store.refresh(href);
@@ -59,24 +59,27 @@ describe('ServicesStore', () => {
 		expect(store.isAlive(href)).toBe(true);
 	});
 
-	it('reports the failure instead of swallowing it, with a renderable message', async () => {
-		const report = vi.fn();
-		const store = new ServicesStore(report);
+	it('tells presentation WHICH href failed, and hands over no words', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const notify = vi.fn();
+		const store = new ServicesStore(notify);
 
-		const error = {
-			message: `Could not reach ${href}`,
-			cause: new Error('fetch failed'),
-		};
+		vi.mocked(readServiceState).mockResolvedValue([
+			{
+				message: `Could not reach ${href}`,
+				cause: new Error('fetch failed'),
+			},
+			null,
+		]);
 
-		vi.mocked(readServiceState).mockResolvedValue([error, null]);
 		await store.refresh(href);
 
-		expect(report).toHaveBeenCalledWith(error);
-		// what a toast would render — never undefined
-		expect(report.mock.calls[0][0].message).toBe(`Could not reach ${href}`);
+		// The href and nothing else. `AppError.message` is English minted in `data`, so
+		// letting it through here is what put an untranslatable line in front of a user.
+		expect(notify).toHaveBeenCalledWith(href);
 	});
 
-	it('logs to the console when no reporter is given', async () => {
+	it('logs the technical detail either way, so nothing is swallowed', async () => {
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const store = new ServicesStore();
 
@@ -89,6 +92,8 @@ describe('ServicesStore', () => {
 
 		await store.refresh(href);
 
-		expect(consoleError).toHaveBeenCalledOnce();
+		// No notify was injected — a story mounts the page that way — and the diagnostic
+		// still reaches a log. That is why the default may be a no-op.
+		expect(consoleError).toHaveBeenCalledWith('boom', '');
 	});
 });
