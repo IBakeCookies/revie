@@ -19,8 +19,12 @@
      sibling painting over the earlier one's panel, which below `sm` is exactly the
      wide theme list under a half-width trigger. -->
 <div {...restProps} class={cn('group relative z-1 hover:z-20 focus-within:z-20', restProps.class)}>
+	<!-- Ghost until pointed at, and it rises into the same chip the nav marks its current
+	     page with: the trigger sits in a recessed track that already separates it from the
+	     bar, so a border and a fill of its own made the two menus the heaviest thing in a
+	     header whose job is to stay out of the way. -->
 	<button
-		class="bg-surface-card border-line-strong hover:bg-surface-hover focus-visible:ring-ring flex w-full cursor-pointer items-center justify-center gap-text-2xs rounded-md border px-box-lg py-box-xs transition-colors focus-visible:ring-2 focus-visible:outline-none sm:w-auto"
+		class="hover:bg-surface-card hover:shadow-card focus-visible:ring-ring flex w-full cursor-pointer items-center justify-center gap-text-2xs rounded-full px-box-sm py-box-3xs text-sm transition focus-visible:ring-2 focus-visible:outline-none"
 	>
 		{@render trigger()}
 		<!-- The trigger looked like a plain button, so nothing said a menu was behind

@@ -51,10 +51,14 @@
 			'--span': '4',
 		});
 
-		// A translucent inset sitting on the page carries its own blur, or the
+		// A translucent surface sitting on the page carries its own blur, or the
 		// theme's background image shows through unfrosted beside the other cards.
 		await expect(box).toHaveClass('backdrop-blur');
-		await expect(box).toHaveClass('bg-surface-inset');
+
+		// The fill is the container's to decide: a tile in a Grid card takes the
+		// inset that card declares, and one sitting straight on the page takes the
+		// fallback. A story mounts no card, so this is the second case.
+		await expect(box).toHaveClass('bg-(--box-surface,var(--surface-card))');
 	}}
 />
 

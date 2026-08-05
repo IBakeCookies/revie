@@ -52,12 +52,12 @@
 	rel="noreferrer"
 	style={spanStyle(span)}
 	class={cn(
-		'bg-surface-inset border-line-soft hover:border-line-strong hover:shadow-card focus-visible:ring-ring col-span-12 flex cursor-pointer items-center gap-text-md rounded-lg border p-box-md backdrop-blur transition focus-visible:ring-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5 xl:col-span-(--span)',
+		'@container/box-service bg-(--box-surface,var(--surface-card)) border-line-soft hover:border-line-strong hover:shadow-card focus-visible:ring-ring col-span-12 flex cursor-pointer items-center gap-text-md rounded-lg border p-box-md backdrop-blur transition focus-visible:ring-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5 xl:col-span-(--span)',
 		restProps.class,
 	)}
 >
 	<span
-		class="bg-surface-card border-line-soft grid size-10 shrink-0 place-items-center overflow-hidden rounded-md border"
+		class="bg-surface-card border-line-soft grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg border"
 	>
 		{#if hasIcon}
 			<img
@@ -74,9 +74,22 @@
 	</span>
 
 	<div class="flex min-w-0 flex-col">
-		<h3 class="truncate font-medium">{title}</h3>
+		<h3 class="truncate font-semibold">{title}</h3>
 		<span class="text-ty-silent truncate text-2xs">{host}</span>
 	</div>
+
+	<!-- A tile is far wider than its name and host, so the state used to be a 10px dot
+	     at the end of an empty half-tile — the one place on the row the eye is least
+	     likely to be. The word fills that gap and says the state without colour;
+	     `aria-hidden`, because the dot beside it is already announcing it once.
+	     Container-queried rather than a viewport breakpoint: the same tile is a third of
+	     a row here and a full phone width there, and only the tile knows which. -->
+	<span
+		class="text-ty-silent ml-auto hidden shrink-0 text-2xs tracking-wider uppercase @xs/box-service:block"
+		aria-hidden="true"
+	>
+		{statusLabel}
+	</span>
 
 	<!-- `role="img"` is what makes the label count: `aria-label` is ignored on an
 	     element with no role and no text, so without it the dot's state reached nobody
@@ -84,12 +97,23 @@
 
 	     Unknown is `ty-ghost`, not `primary`: a theme is free to make its accent the
 	     same green as `success` — `revie` deliberately does — and then a service whose
-	     probe has not answered yet reads as online to everyone not using the label. -->
+	     probe has not answered yet reads as online to everyone not using the label.
+
+	     The ring is a halo of the dot's own colour at 20%, not a second element: a 10px
+	     disc is the smallest mark on the page and was carrying the one fact the page
+	     exists to show. `ring` draws as a shadow, so the halo costs no layout — and it
+	     is why the transition is `transition` and not `transition-colors`, which does
+	     not cover box-shadow. Every dot starts unknown and flips once its probe
+	     answers, so without it a page settling in reads as a rank of things blinking. -->
 	<span
 		role="img"
 		class={[
-			'ml-auto size-2.5 shrink-0 rounded-full',
-			isOnline === true ? 'bg-success' : isOnline === false ? 'bg-danger' : 'bg-ty-ghost',
+			'ml-auto size-2.5 shrink-0 rounded-full ring-4 transition @xs/box-service:ml-text-2xs',
+			isOnline === true
+				? 'bg-success ring-success/20'
+				: isOnline === false
+					? 'bg-danger ring-danger/20'
+					: 'bg-ty-ghost ring-ty-ghost/20',
 		]}
 		aria-label={statusLabel}
 	>

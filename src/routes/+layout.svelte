@@ -106,26 +106,40 @@
 <main class="flex min-h-screen flex-col p-page-sm md:p-page-md xl:p-page">
 	<div bind:this={sentinel}></div>
 
+	<!-- `@container/header`, and every reflow below queries it rather than the viewport:
+	     the header is the page's own width minus a padding ramp, so a `sm:` breakpoint
+	     was answering a question about the window when the question is about the bar. -->
 	<header
 		class={cn(
-			'bg-surface-card border-line-strong shadow-card sticky top-0 z-10 mx-auto flex w-full max-w-screen-2xl flex-wrap items-center gap-x-text-lg gap-y-text-xs rounded-b-2xl border px-box-lg py-box-md backdrop-blur',
+			'@container/header bg-surface-card border-line-strong shadow-card sticky top-0 z-10 mx-auto flex w-full max-w-screen-2xl flex-wrap items-center gap-x-text-lg gap-y-text-xs rounded-b-2xl border px-box-lg py-box-sm backdrop-blur',
 			{
 				'rounded-t-2xl': !isNavAtTheTop,
 				'border-t-transparent': isNavAtTheTop,
 			},
 		)}
 	>
-		<h1 class="text-xl font-bold tracking-tight sm:text-2xl">{m.app_title()}</h1>
+		<!-- The mark is the favicon, so the tab and the bar agree on what this is. Its
+		     colours are fixed on purpose — it is the app's identity, not a themed
+		     surface — which is also why it carries its own rounding and no border. -->
+		<div class="flex items-center gap-text-xs">
+			<img src={favicon} alt="" class="size-7 shrink-0 rounded-md" />
+			<h1 class="text-xl font-bold tracking-tight @xl/header:text-2xl">{m.app_title()}</h1>
+		</div>
 
-		<nav class="flex items-center gap-text-2xs">
+		<!-- A recessed track with a raised chip on the current page, rather than two bare
+		     words beside the title: the pages are a switch between states of one thing, and
+		     an inset rail is what says so. The header's two interactive groups — this and
+		     the appearance menus — use the same track, so the bar reads as one control
+		     surface instead of a heading with loose parts stuck to it. -->
+		<nav class="bg-surface-inset flex items-center gap-text-3xs rounded-full p-box-3xs">
 			{#each data.pages as page (page.path)}
 				<a
 					href={page.path}
 					aria-current={currentPage.url.pathname === page.path ? 'page' : undefined}
 					class={cn(
-						'hover:text-ty-primary focus-visible:ring-ring rounded-md px-box-2xs py-text-3xs transition-colors focus-visible:ring-2 focus-visible:outline-none',
+						'hover:text-ty-primary focus-visible:ring-ring rounded-full px-box-sm py-box-3xs text-sm transition focus-visible:ring-2 focus-visible:outline-none',
 						{
-							'bg-surface-hover text-ty-primary font-semibold':
+							'bg-surface-card shadow-card text-ty-primary font-semibold':
 								currentPage.url.pathname === page.path,
 							'text-ty-secondary': currentPage.url.pathname !== page.path,
 						},
@@ -139,12 +153,14 @@
 		<!-- A full row of its own until the title, the nav and both menus fit on one
 		     line: the three of them together overflow a phone, and letting the flex
 		     wrap decide left the menus stranded mid-row under the heading. -->
-		<div class="ml-auto flex w-full items-center justify-end gap-text-md sm:w-auto">
+		<div
+			class="bg-surface-inset ml-auto flex w-full items-center gap-text-3xs rounded-full p-box-3xs @2xl/header:w-auto"
+		>
 			<!-- flex-1 only while the menus have a row to themselves: two equal buttons
 			     filling a phone's width read as a control bar, where two content-width
 			     ones adrift in the middle of it read as leftovers. -->
 			<Dropdown
-				class="flex-1 sm:flex-none"
+				class="flex-1 @2xl/header:flex-none"
 				panelClass="nice-scrollbar max-h-[min(80vh,32rem)] overflow-y-auto"
 			>
 				{#snippet trigger()}
@@ -191,7 +207,7 @@
 				{/if}
 			</Dropdown>
 
-			<Dropdown class="flex-1 sm:flex-none">
+			<Dropdown class="flex-1 @2xl/header:flex-none">
 				{#snippet trigger()}
 					{m.language_label()}
 				{/snippet}

@@ -19,7 +19,7 @@ test('says the stats are unavailable instead of failing the page when AdGuard is
 	const box = page.locator(`a[href="${ADGUARD_HREF}"]`);
 
 	await expect(box.locator('p')).toHaveCount(1);
-	await expect(box.locator('p')).toHaveText('Statistics unavailable');
+	await expect(box.locator('p')).toHaveText('AdGuard statistics unavailable');
 
 	// The rest of the page is unaffected.
 	await expect(

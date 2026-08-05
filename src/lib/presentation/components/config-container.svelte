@@ -47,7 +47,7 @@
 	<BoxDate {...container.props} />
 {:else}
 	<p
-		class="bg-surface-inset border-danger text-ty-secondary col-span-12 rounded-lg border p-box-md backdrop-blur"
+		class="border-danger text-ty-secondary col-span-12 rounded-lg border bg-(--box-surface,var(--surface-card)) p-box-md backdrop-blur"
 	>
 		{unhandled(container)}
 	</p>

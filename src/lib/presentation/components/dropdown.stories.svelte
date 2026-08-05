@@ -23,7 +23,10 @@
 			name: 'Theme',
 		});
 
-		await expect(trigger).toHaveClass('bg-surface-card');
+		// Ghost at rest: the header seats it in a recessed track, so the fill is what
+		// hovering adds, not what the trigger carries.
+		await expect(trigger).toHaveClass('hover:bg-surface-card');
+		await expect(trigger).not.toHaveClass('bg-surface-card');
 
 		// `invisible` hides the panel, it does not remove it — the options are in the
 		// DOM before anything is opened. That is only safe because `visibility: hidden`

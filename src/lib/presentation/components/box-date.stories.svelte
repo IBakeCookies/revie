@@ -13,7 +13,7 @@
 	});
 </script>
 
-<!-- The clock box: a translucent inset surface, so it carries its own backdrop-blur -->
+<!-- The clock box: a translucent surface, so it carries its own backdrop-blur -->
 <Story
 	name="Default span"
 	play={async ({ canvasElement }) => {
@@ -29,7 +29,15 @@
 		// Every translucent surface on the page needs the blur, or the theme's
 		// background image shows through unfrosted next to the cards around it.
 		await expect(box).toHaveClass('backdrop-blur');
-		await expect(box).toHaveClass('bg-surface-inset');
+
+		// Nothing declares --box-surface above a story, which is the top-level case:
+		// the box takes the fallback and sits at card weight, the same as a Grid
+		// beside it on the page. The computed value is the assertion and not just
+		// the class, because the failure mode is silent — one typo inside the var()
+		// makes the whole declaration invalid, and an invalid background computes to
+		// transparent with no error in the build, the browser or the type checker.
+		await expect(box).toHaveClass('bg-(--box-surface,var(--surface-card))');
+		await expect(getComputedStyle(box!).backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
 	}}
 />
 

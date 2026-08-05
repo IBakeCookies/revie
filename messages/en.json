@@ -13,7 +13,7 @@
 	"adguard_delay": "Avg. delay",
 	"adguard_top_blocked_domain": "Top blocked domain",
 	"adguard_open": "Open AdGuard Home",
-	"adguard_unavailable": "Statistics unavailable",
+	"adguard_unavailable": "AdGuard statistics unavailable",
 	"service_status_online": "online",
 	"service_status_offline": "offline",
 	"service_status_unknown": "status unknown",

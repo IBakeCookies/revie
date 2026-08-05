@@ -46,15 +46,30 @@
 	{...restProps}
 	style={spanStyle(span)}
 	class={cn(
-		'bg-surface-inset border-line-soft col-span-12 flex flex-col items-center gap-text-3xs rounded-lg border px-box-lg py-box-md backdrop-blur xl:col-span-(--span)',
+		'@container/box-date bg-(--box-surface,var(--surface-card)) border-line-soft col-span-12 rounded-lg border px-box-lg py-box-md backdrop-blur xl:col-span-(--span)',
 		restProps.class,
 	)}
 >
-	<span class="text-ty-silent text-2xs tracking-wider uppercase">{dateFormatter.format(now)}</span>
+	<!-- Stacked while the box is narrow, one line once it is wide: a config that gives
+	     this no span makes it the full 12 columns, where a centred two-line stack was
+	     ~200px of content in a 1300px box and spent a whole page row on it. The row is
+	     REVERSED so the clock — the reading — lands at the start and its caption at the
+	     far end, without reordering the DOM the stacked layout reads top-down.
 
-	<!-- `tabular-nums` so the seconds do not shift the line's width once a second,
-	     which is what a proportional font does to a running clock. -->
-	<time class="text-3xl font-semibold tabular-nums" datetime={now.toISOString()}>
-		{timeFormatter.format(now)}
-	</time>
+	     Its own element, and not the box's classes, because a container-type element is
+	     a container for its DESCENDANTS: `@2xl/box-date:` on the box itself matches
+	     nothing at any width. -->
+	<div
+		class="flex flex-col items-center gap-text-3xs @2xl/box-date:flex-row-reverse @2xl/box-date:items-baseline @2xl/box-date:justify-between @2xl/box-date:gap-text-md"
+	>
+		<span class="text-ty-silent text-2xs tracking-wider uppercase">
+			{dateFormatter.format(now)}
+		</span>
+
+		<!-- `tabular-nums` so the seconds do not shift the line's width once a second,
+		     which is what a proportional font does to a running clock. -->
+		<time class="text-3xl font-semibold tabular-nums" datetime={now.toISOString()}>
+			{timeFormatter.format(now)}
+		</time>
+	</div>
 </div>

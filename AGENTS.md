@@ -289,6 +289,13 @@ Things that break **silently** — no error, just wrong output.
   `normalizeConfig` strips `class` / `gridClass` from config and warns.
 - `spanStyle()` must always emit `--span`. An unset custom property makes `grid-column`
   invalid at computed-value time, which drops the whole declaration.
+- **A `@container/name` element is a query container for its DESCENDANTS, never for itself.**
+  `@2xl/box-date:flex-row` on the same element that declares `@container/box-date` matches at
+  no width, with no error — the class is emitted, the rule is generated, and it is simply never
+  in scope. Measured: the box computed `flex-direction: column` at a container width of 1376px.
+  So the queried classes go on a child, which is why
+  [box-date.svelte](src/lib/presentation/components/box-date.svelte) has a wrapper around its
+  two lines that exists for nothing else.
 - **The `@theme` spacing scale in [tokens.css](src/lib/presentation/style/tokens.css) is hand-mirrored** in
   `extendTailwindMerge` in [style.ts](src/lib/utils/style.ts). If they drift, `cn()` stops
   recognising a spacing class as a conflict and silently keeps both.
@@ -334,16 +341,61 @@ Things that break **silently** — no error, just wrong output.
   theirs, because config decides whether they are nested and no component can know. `SubGrid` is
   the exception and not a counter-example: it can still be top-level, but it draws no surface at
   all, so `backdrop-blur-none` is there because there is nothing of its own to blur.
+- **A box does not name its own fill — the container it sits in declares it, through
+  `--box-surface`.** Config decides depth, so no component can know its own: the same
+  `BoxService` is a tile inside a `Grid` card on one page and sits straight on the page on
+  another, and one hardcoded fill is wrong in whichever case it wasn't written for. It was
+  wrong: every box named `bg-surface-inset`, so a top-level `BoxDate` / `BoxAdguard` rendered
+  a step **below** the `Grid` card beside it, which is elevation upside down for two siblings.
+  Measured on `solid-light` — inset `0.955` on a `0.96` page, so the clock box dissolved into
+  the background while the card next to it was white with a shadow. The shape now:
+
+  | Who                                                                                                                         | Does what                                         |
+  | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+  | `box-date`, `box-adguard`, `box-service`, `grid`, `config-container`'s `{:else}`, [+error.svelte](src/routes/+error.svelte) | READ it: `bg-(--box-surface,var(--surface-card))` |
+  | `grid`'s items `<div>`, `box-adguard`'s `<dl>`                                                                              | DECLARE `[--box-surface:var(--surface-inset)]`    |
+  | `sub-grid`'s items `<div>`                                                                                                  | PASS THROUGH: `[--box-surface:inherit]`           |
+
+  Four things about it are load-bearing:
+  1. **The declaration is on the items wrapper, never on the card that reads it.** Unlike a
+     container query, a custom property DOES apply to the element that declares it — so a card
+     that both declared and read `--box-surface` would hand itself its own children's fill.
+  2. **`SubGrid` inherits rather than stepping down**, because it draws no surface: its tiles
+     sit on whatever the group sits on. Nested, `inherit` reaches the outer card's `inset`;
+     top-level there is nothing to inherit, the property is guaranteed-invalid, and the `var()`
+     fallback takes over — which is exactly right in both. Step down there instead and a
+     top-level group's tiles drop below a page they are sitting directly on.
+  3. **The default lives in the `var()` fallback, not at `:root`.** base.css and tokens.css are
+     kept diffable against zenith (see below), and a story mounts a box with no page above it —
+     the fallback is the one form that costs neither.
+  4. **It names the seed `--surface-card`, not the `--color-surface-card` utility.** `@theme
+inline` inlines its values at build time and emits no `--color-*` custom property, so the
+     seed is the only name that exists at runtime. This is the one place a component reaches
+     past a utility class to a seed, and there is no alternative.
+
+  Two steps is all there is, because there are only two tokens: page → card → inset. The third
+  level — a reading inside a nested `BoxAdguard` — lands on inset-over-inset and reads only
+  because the veil composites (next bullet).
+
 - **On the dark glass themes, nesting gets LIGHTER — `--surface-inset` is a white veil.** All
   15 of them pair `--surface-card: oklch(1 0 0 / ~0.06)` with `--surface-inset:
-oklch(1 0 0 / 0.1)`, so the ladder that renders is card → inset and brightens with depth. Two
-  steps, not three: `SubGrid` sits between them and draws no surface. It was a **black**
-  veil at `0.15`–`0.35` until 2026-08-04, which inverted the elevation: the box read as a hole
-  punched through the two cards above it, and a top-level `BoxDate` / `BoxAdguard` on the page
-  vanished outright. The light themes are the other way round on purpose — deeper is slightly
-  darker there (`oklch(0 0 0 / 0.05)`, or a hued veil at `0.07`–`0.1`) — so this flip applies
-  to dark themes only. `.dark` in [base.css](src/lib/presentation/style/base.css) is opaque and
-  already brightens with depth.
+oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens with depth. It
+  was a **black** veil at `0.15`–`0.35` until 2026-08-04, which inverted the elevation: the box
+  read as a hole punched through the card above it. The light themes are the other way round on
+  purpose — deeper is slightly darker there (`oklch(0 0 0 / 0.05)`, or a hued veil at
+  `0.07`–`0.1`) — so this flip applies to dark themes only. `.dark` in
+  [base.css](src/lib/presentation/style/base.css) is opaque and already brightens with depth.
+- **A translucent veil COMPOSITES, so `--surface-inset` is `0.05` and not `0.1`.** It was `0.1`
+  until 2026-08-05. Landing on a card's ~0.06 it reached `1 − 0.94 × 0.9 ≈ 0.154` — two and a
+  half times the surface it sat on, which is why a `BoxService` tile read as a bright grey patch
+  and, on the tinted dark themes (royal, aurora, synthwave, abyss), washed the palette out of
+  itself: the veil is **neutral white**, so the more of it there is, the less theme is left. At
+  `0.05` the composite is `≈ 0.107`, one quiet step above its card. Halving it is safe in the
+  other direction because nothing depends on inset being far from card; a step is all that is
+  needed. Same defect mirrored on `solid-light`, whose opaque `--surface-inset` was
+  `oklch(0.91 …)` against a `0.995` card — a drop so deep it fell **past the page** (`0.96`) and
+  read as a hole; it is `0.955` now, a step of `0.04` that matches what a `0 0 0 / 0.05` veil
+  does on the light glass themes.
 - **A theme lives in three hand-edited places**, plus optionally a fourth:
   1. the `ThemeName` union **and** the `themes` catalogue in
      [theme.ts](src/lib/business/model/theme.ts) — 27 entries, and the two must agree
@@ -434,6 +486,17 @@ to `::1`, and `POST /api/ping {"href":"http://127.0.0.1:4173"}` answers `{"isAli
 while `GET /` over `[::1]` answers 200. Note `url` does **not** seed `baseURL` the way `port`
 does; drop the explicit `use.baseURL` and every `page.goto('/')` fails with "Cannot navigate
 to invalid URL".
+
+**A box reflows on its OWN width, not the window's.** Config decides where a component lands
+— the same `BoxService` is a third of a row on one page and a full phone width on another, and
+the same `Grid` is the whole page or a quarter of it — so a `sm:` breakpoint answers a question
+about the window when the question is about the box. Every component that changes shape
+declares `@container/<its-name>` and queries that: `box-service` (the status word), `box-date`
+(stacked vs. one line), `box-adguard` (2 → 3 → 4 readings), `grid` (title size), and `header`
+(when the menus stop taking a row of their own). The viewport variants left in the tree are the
+ones that genuinely mean the viewport: `xl:col-span-(--span)`, which is where the 12-column page
+grid starts honouring config's span at all, and `md:p-page-md` on `<main>`, which is the page.
+Read the invariant above before writing the first one — the classes go on a child.
 
 **Code.** Named exports only; a default export is for a Svelte component, or for a root
 `*.config.*` / `.storybook/` / `*.stories.*` file whose tool dictates it. Import through
@@ -634,6 +697,9 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
     its `css` is `['revie', 'dark']`, so stamping it on a light-preferring OS is the wrong first
     paint; the light branch gets the frosted light theme nearest it instead. Everything else
     still pastes from upstream; a paste that reintroduces `fallow` is the one thing to reject.
+    **Second divergence, 2026-08-05: `--surface-inset` in the 15 dark blocks, plus the one in
+    `base.css`.** See the compositing invariant above for why. A theme pasted from zenith
+    arrives with the old `0.1` — halve it on the way in, the way `fallow` gets dropped.
 - **`src/lib/test/` is under no layer constraint.** No eslint layer block and no cruiser layer
   rule matches it, so [dom.ts](src/lib/test/dom.ts) and
   [adguard-store-harness.svelte](src/lib/test/adguard-store-harness.svelte) may import from any

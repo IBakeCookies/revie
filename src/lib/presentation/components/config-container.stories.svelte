@@ -62,7 +62,7 @@
 		// A card sitting on the page is translucent in all 27 themes, so the theme's
 		// background image shows through unfrosted without the blur.
 		await expect(grid).toHaveClass('backdrop-blur');
-		await expect(grid).toHaveClass('bg-surface-card');
+		await expect(grid).toHaveClass('bg-(--box-surface,var(--surface-card))');
 
 		await expect(
 			canvas.getByRole('heading', {

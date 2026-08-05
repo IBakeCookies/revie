@@ -74,7 +74,7 @@
 		});
 
 		await expect(card).toHaveClass('backdrop-blur');
-		await expect(card).toHaveClass('bg-surface-card');
+		await expect(card).toHaveClass('bg-(--box-surface,var(--surface-card))');
 
 		await expect(canvas.getByText('Services')).toBeInTheDocument();
 		await expect(canvas.getByText('All of them')).toBeInTheDocument();
@@ -129,7 +129,7 @@
 	args={{
 		items: nested,
 	}}
-	play={async ({ canvas }) => {
+	play={async ({ canvas, canvasElement }) => {
 		await expect(canvas.getByText('Smart Home')).toBeInTheDocument();
 		await expect(canvas.getByText('Lights')).toBeInTheDocument();
 
@@ -145,6 +145,17 @@
 		// A nested group draws no card of its own, so nothing is left to blur.
 		await expect(subGrid).toHaveClass('bg-transparent');
 		await expect(subGrid).toHaveClass('backdrop-blur-none');
+
+		// Two groups deep, and the box still reads the step this card declared: a
+		// group draws no surface, so it passes --box-surface through rather than
+		// stepping down again. Without the `inherit` each level would step down once
+		// more, except there is no third token — so it would land back on the same
+		// fill as its parent and the box would vanish into it on the opaque themes.
+		const box = canvasElement.querySelector('time')?.closest('.col-span-12');
+
+		await expect(getComputedStyle(box!).backgroundColor).toBe(
+			getComputedStyle(document.documentElement).getPropertyValue('--surface-inset').trim(),
+		);
 	}}
 />
 

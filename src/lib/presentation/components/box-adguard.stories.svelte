@@ -60,9 +60,11 @@
 			[m.adguard_top_blocked_domain(), 'ads.example.com'],
 		]);
 
-		// The card is a translucent inset surface, so it carries its own backdrop-blur —
-		// without it the theme's background image shows through unfrosted.
-		await expect(link).toHaveClass('bg-surface-inset');
+		// The card is a translucent surface, so it carries its own backdrop-blur —
+		// without it the theme's background image shows through unfrosted. The fill
+		// itself comes from whatever the box sits in; a story mounts no card, so it
+		// is the fallback here.
+		await expect(link).toHaveClass('bg-(--box-surface,var(--surface-card))');
 		await expect(link).toHaveClass('backdrop-blur');
 
 		// `--span` must always be emitted: an unset custom property makes `grid-column`
@@ -78,6 +80,12 @@
 		for (const [index, accent] of accents.entries()) {
 			await expect(tiles[index]).toHaveClass(accent);
 		}
+
+		// A reading sits ON this box, so the box declares the step below itself for
+		// them rather than each reading naming a fill it cannot know is right.
+		await expect(getComputedStyle(tiles[0]).backgroundColor).toBe(
+			getComputedStyle(document.documentElement).getPropertyValue('--surface-inset').trim(),
+		);
 	}}
 />
 
