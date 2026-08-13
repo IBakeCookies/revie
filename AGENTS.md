@@ -27,6 +27,7 @@ npm run lint:fix       # eslint --fix; run BEFORE `format`, never after
 npm run lint:deps      # just the layer rules (also run by `lint`)
 npm run paraglide      # compile messages (also chained into prepare + check)
 npm run depgraph       # regenerate dependency-graph.svg (needs graphviz `dot`)
+npm run screenshot     # rebuild, then reshoot docs/screenshot.png from config.example.json
 npm run test:unit      # vitest, three projects: node, real chromium, storybook
 npm run test:e2e       # playwright against a fixture config
 npm run test:e2e:ui    # the same suite in playwright's UI mode
@@ -568,7 +569,9 @@ green test that proves nothing, which is worse than no test.
 `business/model/config.ts` (5 warns), `business/model/config-source.ts` (2 errors),
 `business/store/service-store.svelte.ts` (1 — the probe diagnostic), and
 `[...slug]/+page.server.ts` (2 — the operator channel). Measured: a global `no-console` reports
-11, the eleventh being `dps.js`, which [roadmap.md](roadmap.md) #10 deletes. Seven of the ten
+12 — the other two are outside `src`, and neither is a home: `dps.js`, which
+[roadmap.md](roadmap.md) #10 deletes, and `scripts/screenshot.js`, a CLI whose whole job is to
+tell a terminal where it wrote a file. Seven of the ten
 in `src` are #23's work — they are diagnostics a framework-free model should be **returning**,
 not printing. The other three are **deliberate and permanent**: they are the log half of the
 no-copy-crosses-a-layer rule, carrying the `AppError.message` that must never reach a toast.
@@ -576,7 +579,7 @@ They are unconditional rather than injected precisely because a diagnostic has a
 and that is the one thing zenith uses its `logger.ts` for. Don't add a fifth home, and don't
 reach for zenith's `no-console: 'error'` + a `logger.ts` to force the issue: a logger module
 would be a second seam competing with the injected notify. Turn the rule on once #23 lands,
-with `+page.server.ts` and `service-store.svelte.ts` exempted.
+with `+page.server.ts`, `service-store.svelte.ts` and `scripts/` exempted.
 
 **One definition per concept.** If you catch yourself writing "mirrors", "same as" or "keep in
 sync with", export the thing instead. This repo has exactly two exceptions, both documented

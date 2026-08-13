@@ -3,8 +3,14 @@
 A self-hosted start page for home services: every box on it comes from `config.json`,
 which is read from disk at runtime.
 
-![The dashboard: a date box, AdGuard Home stats, and two sub-grids of services with
-status dots](docs/screenshot.png)
+![The dashboard: a date box beside wider AdGuard Home stats, then a grid of services in
+labelled sub-grids of differing widths — two thirds beside a third, three thirds, two
+halves — each service showing an online or offline status dot](docs/screenshot.png)
+
+That is `config.example.json` rendered — the same file the next section tells you to copy.
+`npm run screenshot` regenerates it, stubbing AdGuard and the status probes so none of the
+services have to be reachable. Point `DASHBOARD_CONFIG` at another file to shoot that one
+instead.
 
 ## Running
 

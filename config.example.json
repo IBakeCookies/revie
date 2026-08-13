@@ -1,12 +1,15 @@
 {
 	"defaults": {
-		"BoxService": { "span": 4 }
+		"BoxAdguard": { "span": 8 }
 	},
 	"pages": {
 		"/": {
 			"name": "Home",
 			"containers": [
-				{ "name": "BoxDate" },
+				{
+					"name": "BoxDate",
+					"props": { "span": 4 }
+				},
 				{
 					"name": "BoxAdguard",
 					"props": { "href": "http://192.168.1.2" }
@@ -21,26 +24,362 @@
 								"props": {
 									"title": "Proxmox",
 									"href": "https://192.168.1.10:8006",
-									"span": 6,
+									"span": 8,
 									"img": { "src": "https://cdn.simpleicons.org/proxmox" }
+								}
+							},
+							{
+								"name": "BoxService",
+								"props": {
+									"title": "Portainer",
+									"href": "https://192.168.1.11:9443",
+									"span": 4,
+									"img": {
+										"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/portainer.svg"
+									}
 								}
 							},
 							{
 								"name": "SubGrid",
 								"props": {
 									"subTitle": "Smart Home",
+									"span": 8,
 									"items": [
 										{
 											"name": "BoxService",
 											"props": {
 												"title": "Home Assistant",
 												"href": "http://192.168.1.20:8123",
+												"span": 6,
 												"img": {
-													"src": "https://cdn.simpleicons.org/homeassistant"
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/home-assistant.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "ESPHome",
+												"href": "http://192.168.1.21:6052",
+												"span": 6,
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/esphome.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "WLED",
+												"href": "http://192.168.1.22",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/wled.png"
 												}
 											}
 										}
 									]
+								}
+							},
+							{
+								"name": "SubGrid",
+								"props": {
+									"subTitle": "Network",
+									"span": 4,
+									"items": [
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "AdGuard Home",
+												"href": "http://192.168.1.2",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/adguard-home.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "EMQX",
+												"href": "http://192.168.1.40:18083",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/emqx.svg"
+												}
+											}
+										}
+									]
+								}
+							},
+							{
+								"name": "SubGrid",
+								"props": {
+									"subTitle": "Automation",
+									"span": 4,
+									"items": [
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Node-RED",
+												"href": "http://192.168.1.30:1880",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/node-red.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Huginn",
+												"href": "http://192.168.1.31",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/huginn.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Cronicle",
+												"href": "http://192.168.1.32:3012",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/cronicle.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Change Detection",
+												"href": "http://192.168.1.33:5000",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/changedetection.svg"
+												}
+											}
+										}
+									]
+								}
+							},
+							{
+								"name": "SubGrid",
+								"props": {
+									"subTitle": "Monitoring",
+									"span": 4,
+									"items": [
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Grafana",
+												"href": "http://192.168.1.50:3000",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/grafana.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Prometheus",
+												"href": "http://192.168.1.51:9090",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/prometheus.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Uptime Kuma",
+												"href": "http://192.168.1.52:3001",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/uptime-kuma.svg"
+												}
+											}
+										}
+									]
+								}
+							},
+							{
+								"name": "SubGrid",
+								"props": {
+									"subTitle": "Tools",
+									"span": 4,
+									"items": [
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "IT Tools",
+												"href": "http://192.168.1.70",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/it-tools.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Whoogle",
+												"href": "http://192.168.1.71:5000",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/whoogle.png"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Vaultwarden",
+												"href": "http://192.168.1.72",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/vaultwarden.svg"
+												}
+											}
+										}
+									]
+								}
+							},
+							{
+								"name": "SubGrid",
+								"props": {
+									"subTitle": "Finance",
+									"span": 6,
+									"items": [
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Wallos",
+												"href": "http://192.168.1.60",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/wallos.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Ghostfolio",
+												"href": "http://192.168.1.61:3333",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/ghostfolio.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Actual Budget",
+												"href": "http://192.168.1.62:5006",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/actual-budget.svg"
+												}
+											}
+										}
+									]
+								}
+							},
+							{
+								"name": "SubGrid",
+								"props": {
+									"subTitle": "Files",
+									"span": 6,
+									"items": [
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Nextcloud",
+												"href": "http://192.168.1.80",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/nextcloud.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Immich",
+												"href": "http://192.168.1.81:2283",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/immich.svg"
+												}
+											}
+										},
+										{
+											"name": "BoxService",
+											"props": {
+												"title": "Paperless-ngx",
+												"href": "http://192.168.1.82:8000",
+												"img": {
+													"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/paperless-ngx.svg"
+												}
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				}
+			]
+		},
+		"/media": {
+			"name": "Media",
+			"containers": [
+				{
+					"name": "Grid",
+					"props": {
+						"title": "Media",
+						"items": [
+							{
+								"name": "BoxService",
+								"props": {
+									"title": "Jellyfin",
+									"href": "http://192.168.1.90:8096",
+									"span": 8,
+									"img": {
+										"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/jellyfin.svg"
+									}
+								}
+							},
+							{
+								"name": "BoxService",
+								"props": {
+									"title": "Plex",
+									"href": "http://192.168.1.91:32400",
+									"span": 4,
+									"img": {
+										"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/plex.svg"
+									}
+								}
+							},
+							{
+								"name": "BoxService",
+								"props": {
+									"title": "Navidrome",
+									"href": "http://192.168.1.92:4533",
+									"span": 4,
+									"img": {
+										"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/navidrome.svg"
+									}
+								}
+							},
+							{
+								"name": "BoxService",
+								"props": {
+									"title": "Audiobookshelf",
+									"href": "http://192.168.1.93:13378",
+									"span": 4,
+									"img": {
+										"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/audiobookshelf.svg"
+									}
+								}
+							},
+							{
+								"name": "BoxService",
+								"props": {
+									"title": "Kavita",
+									"href": "http://192.168.1.94:5000",
+									"span": 4,
+									"img": {
+										"src": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/kavita.svg"
+									}
 								}
 							}
 						]
