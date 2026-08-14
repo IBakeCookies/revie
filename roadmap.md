@@ -282,10 +282,13 @@ vitest project. See AGENTS.md's "Already done".)_
     `& HTMLAttributes<HTMLDivElement>` and remove the `{...restProps}` pass-throughs from the **six**
     components that carry them — box-service.svelte:18,30, box-adguard.svelte:16,42,
     box-date.svelte:22,37, grid.svelte:17,21, plus dropdown.svelte:15,18 and sub-grid.svelte:6,10;
-    `sub-grid` re-uses `grid`'s `Props`, so dropping grid's `& HTMLAttributes` ripples into it, and
-    `dropdown`'s pass-through is provably dead (+layout.svelte:103 passes only `panelClass`, :153
-    passes nothing, so `restProps` and the `restProps.class` read at :18 have no source) — verified no
-    caller depends on any of them (svelte-check stays at 0); (b) add an allowlist of schema-declared prop
+    `sub-grid` re-uses `grid`'s `Props`, so dropping grid's `& HTMLAttributes` ripples into it.
+    **`dropdown`'s pass-through is the one exception — it is LIVE, not dead** (corrected 2026-08-14;
+    the earlier note cited +layout.svelte:103/:153, lines that no longer exist): both call sites,
+    +layout.svelte:169 and :216, pass `class="flex-1 @2xl/header:flex-none"`, `class` is not
+    destructured at dropdown.svelte:15, and it is read at :21 via `restProps.class`. Deleting it drops
+    the header menus' flex sizing. Give it a declared `class` prop rather than removing the seam —
+    verify the rest with svelte-check at 0; (b) add an allowlist of schema-declared prop
     keys next to `requiredProps` (a `Record<ContainerName, readonly string[]>`, same compile-time
     completeness) and warn on unknown keys, reusing the `STYLE_KEYS` phrasing at config.ts:156; (c) add
     the check the spread cannot give you — an

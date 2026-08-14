@@ -169,10 +169,12 @@ rules that are each inert in the other repo — so it is a superset, not a byte-
   of the three to a module outside the trio still fails, reported from that outside module.
 - `no-orphans` is `error`. Its type-only `pathNot` is
   `^src/lib/(presentation|business|data)/type(s)?/`. Worth knowing that this rule is
-  fragile by nature: [dom.ts](src/lib/test/dom.ts) and
-  [presentation/util/](src/lib/presentation/util/) are non-orphans **only** because specs and
-  components import them, so deleting the last importer now hard-fails `npm run lint` on a
-  change that looks unrelated.
+  fragile by nature: [presentation/util/](src/lib/presentation/util/) is a non-orphan **only**
+  because components import it, so deleting the last importer hard-fails `npm run lint` on a
+  change that looks unrelated. That is not hypothetical — trimming duplicated component specs took
+  `spanOf`'s last importer with it and lint failed on `src/lib/test/dom.ts`. The orphan was
+  **deleted**, not kept alive by re-adding the assertion that imported it: a helper whose only
+  reader is a test that shouldn't exist is precisely what the rule is for.
 
 Two cruiser config notes, both non-obvious:
 
@@ -192,13 +194,17 @@ Two cruiser config notes, both non-obvious:
 rather than throwing or logging it, so the decision about what a failure MEANS belongs to
 whoever holds the state, not to the innermost function.
 
-- `AppError.message` is **required and always a string**, so any failure can be rendered.
-  This is load-bearing: the earlier version only set `message` on the non-`Error` branch, so
-  every real failure (network drop, HTTP error) produced `message: undefined` and could not
-  be shown to a user at all.
+- `AppError.message` is **required and always a string**, so any failure is reportable. This is
+  load-bearing: the earlier version only set `message` on the non-`Error` branch, so every real
+  failure (network drop, HTTP error) produced `message: undefined` and could not be reported at
+  all.
 - `AppError.cause` is the original thrown value, **for the log only** — never render it.
-- A thrown `Error`'s own message wins over the fallback, because the repositories throw the
-  specific one (`AdGuard responded with 401 Unauthorized`).
+- **`useAsyncErrorAsValue`'s second parameter is `context`, and it COMPOSES** —
+  `${context}: ${thrown}`, with either half standing alone. It used to be a _fallback_ the thrown
+  message beat, so every call site's context was silently discarded: the probe diagnostic logged
+  undici's bare `fetch failed`, naming no service, which is the one thing that log exists for.
+  Neither half is enough alone — `fetch failed` names nothing, the context alone loses
+  `401 Unauthorized` — so don't restore the contest.
 - **A layer must not swallow.** [business/model/service.ts](src/lib/business/model/service.ts) returns
   `Result<boolean>` and does not log: a probe that _fails_ is not a service that is _down_,
   and only the caller knows whether to keep the last known value, toast, or ignore it.
@@ -225,6 +231,10 @@ whoever holds the state, not to the innermost function.
   The fence is the German case in
   [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts) — verified to fail, and to be
   the only thing that fails, when that call site is given a literal instead of a message.
+  `message`'s own doc comment in
+  [useAsyncErrorAsValue.ts](src/lib/utils/useAsyncErrorAsValue.ts) now says the same thing. It used
+  to read "safe to show a user. A toast renders it verbatim" — the first attempt below, written
+  into the type itself, which is what kept the wrong version re-derivable from the code alone.
   **What was NOT built:** zenith's `showToastAfterReload` / `flushPendingToasts` sessionStorage
   queue (~90 lines and a hand-rolled validator to survive a `location.reload()` this app never
   does) and its 4-entry `showToast` severity map over `svelte-sonner`. The rule ported; the
@@ -244,7 +254,7 @@ carries its props.
 
 ```
 config.json ─(disk read, no caching)→ data/config.ts
-            ─(mtime cache)→ business/model/config-source.ts   readConfig
+            ─(stamp cache)→ business/model/config-source.ts   readConfig
             ─(validate + drop bad)→ business/model/config.ts  normalizeConfig
             ─(page data)→ [...slug]/+page.server.ts
             ─(recurse)→ page.svelte → config-container.svelte → the component
@@ -260,7 +270,14 @@ config.json ─(disk read, no caching)→ data/config.ts
   It's deliberate (recursion), which is why `no-circular` exempts those three files by name
   rather than being turned down to a warning.
   Any _new_ cycle outside that trio is worth a look.
-- Config is re-read whenever the file's mtime changes, so edits apply without a restart.
+- Config is re-read whenever the file's `{ mtimeMs, size }` stamp changes, so edits apply without
+  a restart. Size as well as mtime because mtime alone is not evidence of sameness — `cp -p` and a
+  coarse mtime tick (drvfs, some network volumes) both serve a changed file forever. Be honest
+  about what that buys: it **narrows** the staleness window, it does not close it, and a same-size
+  edit within one tick is still served stale. Closing it means hashing the bytes, which costs a
+  full read per request and so destroys the only thing the cache buys. A read FAILURE is cached
+  against its stamp too, so a broken `config.json` costs one read + parse + log per mtime instead
+  of per request, and still recovers when the file is fixed.
   Nothing in it reaches the Tailwind compiler — see Invariants.
 - **A `pages` key is a URL path, and the route is `[...slug]`** — a rest parameter, so
   `/media/plex` and other grouped paths match. It was `[[slug]]`, whose compiled pattern
@@ -335,9 +352,12 @@ Things that break **silently** — no error, just wrong output.
   So the queried classes go on a child, which is why
   [box-date.svelte](src/lib/presentation/components/box-date.svelte) has a wrapper around its
   two lines that exists for nothing else.
-- **The `@theme` spacing scale in [tokens.css](src/lib/presentation/style/tokens.css) is hand-mirrored** in
-  `extendTailwindMerge` in [style.ts](src/lib/utils/style.ts). If they drift, `cn()` stops
-  recognising a spacing class as a conflict and silently keeps both.
+- **Two `@theme` scales in [tokens.css](src/lib/presentation/style/tokens.css) are hand-mirrored**
+  in `extendTailwindMerge` in [style.ts](src/lib/utils/style.ts): `spacing`, and `shadow: ['card']`
+  for the one `--shadow-*` key. Either drifting has the same silent failure — `cn()` stops
+  recognising the class as a conflict and keeps both. Measured on the second: unlisted,
+  tailwind-merge reads `shadow-card` as a shadow COLOR, so `cn('shadow-card', 'shadow-none')` kept
+  the pair and sub-grid's switch-off held only by CSS emission order.
 - **The import order in [app.css](src/lib/presentation/style/app.css) is the cascade order** and is
   load-bearing: `scenery → tokens → base → themes`. There is a second, independent reason
   beyond the cascade: the `@theme inline` block in tokens.css aliases utility names onto the
@@ -411,6 +431,10 @@ Things that break **silently** — no error, just wrong output.
 inline` inlines its values at build time and emits no `--color-*` custom property, so the
      seed is the only name that exists at runtime. This is the one place a component reaches
      past a utility class to a seed, and there is no alternative.
+  5. **`box-service`'s icon plate names `bg-surface-inset` directly**, and that is not a hole in
+     the rule: `--box-surface` carries the TILE's own fill, so a plate reading it would be handed
+     the surface it is meant to sit on. It hardcoded `bg-surface-card` before, which is exactly the
+     tile's fill whenever the tile is top-level — so the plate vanished into it.
 
   Two steps is all there is, because there are only two tokens: page → card → inset. The third
   level — a reading inside a nested `BoxAdguard` — lands on inset-over-inset and reads only
@@ -435,9 +459,23 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   `oklch(0.91 …)` against a `0.995` card — a drop so deep it fell **past the page** (`0.96`) and
   read as a hole; it is `0.955` now, a step of `0.04` that matches what a `0 0 0 / 0.05` veil
   does on the light glass themes.
+- **A heading level is depth, so the container declares it — the same shape as `--box-surface`.**
+  `headingLevel?: 2 | 3` on `box-service` and `grid`, threaded through `config-container`; `grid`
+  hands its items `3` when it drew a heading of its own and `2` when it did not, on the same
+  condition as the heading block so the two cannot disagree. The layout's app title is the page's
+  only `h1`, so a `BoxService` sitting straight on the page was an `h3` under an `h1` — a skipped
+  level on two of the routes the e2e fixture exercises — while the same tile inside a `Grid` card
+  correctly sat under that card's `h2`. Same for a top-level `SubGrid`'s label, which is its only
+  heading. Size stays a class, so nothing moves visually. The storybook a11y gate cannot catch this
+  class of defect at all: no story mounts the layout, so axe never sees the `h1` being skipped from.
 - **A theme lives in three hand-edited places**, plus optionally a fourth:
   1. the `ThemeName` union **and** the `themes` catalogue in
-     [theme.ts](src/lib/business/model/theme.ts) — 27 entries, and the two must agree
+     [theme.ts](src/lib/business/model/theme.ts) — 27 entries. Union → catalogue is the one
+     direction that is machine-checked, by the type-only `UncataloguedThemeName`: verified, deleting
+     an entry now reports `Type '"abyss"' does not satisfy the constraint 'never'` where it used to
+     compile clean at 0 errors. What buys it is `themes = [...] satisfies ThemeItem[]`, not an
+     annotation — `themes: ThemeItem[]` widens every `name` back to `ThemeName`, which is why the
+     `as const` that used to sit there was inert. Places 2–4 are still hand-held.
   2. an `@custom-variant` in [tokens.css](src/lib/presentation/style/tokens.css)
   3. a palette class in [themes.css](src/lib/presentation/style/themes.css) — **except** the two baseline
      themes: `solid-light` and `solid-dark` (CSS class `dark`) live in
@@ -485,7 +523,18 @@ the browser project. Test files are not compiled as rune modules, so they cannot
 
 The `client` project's `exclude` is `src/lib/data/**` where zenith's is `src/lib/server/**`
 (there is no `src/lib/server/` here). That line is a **deliberate divergence, not drift** —
-copy zenith's over it and the six data-layer specs silently start running in real chromium.
+copy zenith's over it and the three data-layer specs silently start running in real chromium.
+
+**A `*.svelte.spec.ts` sees no CSS, so it cannot assert a CSS-driven state.** The `client` project
+loads no app stylesheet, which makes a class like `invisible` inert there — and inert is not
+neutral, it is the opposite answer. `dropdown.svelte.spec.ts` asserted the closed panel's button
+WAS reachable by role; `dropdown.stories.svelte` asserts it is not; both passed. That is why
+**component specs are down to two**, each covering the one thing the story beside it cannot:
+`box-date.svelte.spec.ts` (2 tests — the tick and unmount cleanup, the only deterministic cover of
+a one-second interval) and `box-service.svelte.spec.ts` (2 tests — the icon's `naturalWidth` poll
+and the unparseable-href branch). The other three were pure duplication of a story that renders the
+same component against real CSS, and were deleted. A third spec has to name what a story cannot
+reach.
 
 `coverage.exclude` **replaces** vitest's defaults rather than extending them, so
 `**/*.{test,spec}.ts` and `**/*.stories.svelte` have to be listed back or the test files are
@@ -515,12 +564,11 @@ the assertion; don't tidy it away.** Any new story asserting a hover- or focus-d
 needs the same offset, and `userEvent.unhover` is not a substitute — it parks the pointer on the
 body, whose centre can land back inside the component.
 
-**Wrappers get a story but no `*.svelte.spec.ts`.** A wrapper reads a store and forwards props
+**A wrapper's story is its only test.** A wrapper reads a store and forwards props
 ([box-service-wrapper.svelte](src/lib/presentation/components/box-service-wrapper.svelte),
-[box-adguard-wrapper.svelte](src/lib/presentation/components/box-adguard-wrapper.svelte)); the
-component beside it takes the same data as a plain prop and is tested directly, so a spec would
-duplicate it. The story is different — providing the store context is the only thing that
-proves the store→prop forwarding, which nothing else covers.
+[box-adguard-wrapper.svelte](src/lib/presentation/components/box-adguard-wrapper.svelte)) —
+and providing the store context is the only thing that proves the store→prop forwarding, which
+nothing else covers.
 
 **One e2e file per feature**, named after it (`e2e/can-change-theme.e2e.ts` — `*.e2e.ts`, so
 that `testMatch` separates them from the vitest specs). Playwright
@@ -566,12 +614,12 @@ file doesn't start the drift.
 green test that proves nothing, which is worse than no test.
 
 **`console` has exactly four homes, and no lint rule guards them yet.**
-`business/model/config.ts` (5 warns), `business/model/config-source.ts` (2 errors),
+`business/model/config.ts` (6 warns), `business/model/config-source.ts` (2 errors),
 `business/store/service-store.svelte.ts` (1 — the probe diagnostic), and
 `[...slug]/+page.server.ts` (2 — the operator channel). Measured: a global `no-console` reports
-12 — the other two are outside `src`, and neither is a home: `dps.js`, which
+13 — the other two are outside `src`, and neither is a home: `dps.js`, which
 [roadmap.md](roadmap.md) #10 deletes, and `scripts/screenshot.js`, a CLI whose whole job is to
-tell a terminal where it wrote a file. Seven of the ten
+tell a terminal where it wrote a file. Eight of the eleven
 in `src` are #23's work — they are diagnostics a framework-free model should be **returning**,
 not printing. The other three are **deliberate and permanent**: they are the log half of the
 no-copy-crosses-a-layer rule, carrying the `AppError.message` that must never reach a toast.
@@ -585,7 +633,7 @@ with `+page.server.ts`, `service-store.svelte.ts` and `scripts/` exempted.
 sync with", export the thing instead. This repo has exactly two exceptions, both documented
 above as load-bearing because **no export can span the two sides**: the five container names in
 `business/model/config.ts` versus `config-container.svelte`'s `if/else` chain (a component held
-in a variable has no statically known props), and the `@theme` spacing scale versus
+in a variable has no statically known props), and the `@theme` scales versus
 `extendTailwindMerge` in `style.ts` (one side is CSS). Anything else that reads "keep in sync"
 is a bug waiting, not a convention.
 
@@ -635,7 +683,7 @@ is fixed** — the section below is what is.
 Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
 
 - **The two stores go through business.** `theme-store` uses
-  [business/model/appearance.ts](src/lib/business/model/appearance.ts) (`readClientTheme`,
+  [business/model/appearance.ts](src/lib/business/model/appearance.ts) (`readClientAppearance`,
   `updateTheme`, `updateScenerySeed`, `updateSceneryMotion`) and `service-store` uses
   [business/model/service.ts](src/lib/business/model/service.ts). Neither imports a repository. The
   business writers narrow to `ThemeName` on purpose — that's why they aren't pass-throughs.
@@ -751,22 +799,22 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
     `@eslint/compat` is **gone** — eslint 10 exports `includeIgnoreFile` from `eslint/config`,
     so the shim had one consumer and no reason to stay. Vite 8 rejects `__dirname` in
     [vite.config.ts](vite.config.ts) under `configLoader: 'native'`, so it is
-    `import.meta.dirname` now. vitest-browser-svelte 3 made `render()` **async**, so all 22
-    call sites in the `*.svelte.spec.ts` files `await` it and their `it()` callbacks are
-    `async` — a sync `render` now yields a `Promise` whose `getByRole` is undefined, which
-    `svelte-check` catches. **TypeScript is capped at 6, not 7**: `svelte-check@4` peers
+    `import.meta.dirname` now. vitest-browser-svelte 3 made `render()` **async**, and every
+    call site in the `*.svelte.spec.ts` files was migrated to `await` it inside an `async`
+    `it()` callback — a sync `render` yields a `Promise` whose `getByRole` is undefined,
+    which `svelte-check` catches. **TypeScript is capped at 6, not 7**: `svelte-check@4` peers
     `typescript@^5 || ^6`, and typescript-eslint 8 peers `<6.1.0`. `@types/node` stays on
-    **22** to match `engines.node`, not the 26 that is latest.
+    **22** to match `engines.node` rather than tracking the newest major.
   - The vitest 4.x family **cross-peer-pins exact versions**, so `@vitest/coverage-v8` is
     pinned to vitest's exact minor rather than caret-ranged. It moves as one unit or not at
     all; npm's peer check makes any drift a loud `ERESOLVE`, not a silent mismatch. The trap
     is that a **stale `node_modules` also counts** as a pin: npm reads the installed tree as
     "Found", so bumping the family reports `ERESOLVE` even when the manifest resolves cleanly
     from scratch. Regenerate the lock with an empty tree (`npm install --package-lock-only` in
-    a clean directory), then `npm ci` — `npm audit fix --force` instead offers
-    `@vitest/ui@4.1.10` as "outside the stated range" and is not what you want.
+    a clean directory), then `npm ci` — `npm audit fix --force` instead offers a `@vitest/ui`
+    "outside the stated range" and is not what you want.
   - **`cookie` GHSA-pxg6-pf52-xh8x (3 low) has no upstream fix and is left open.**
-    `@sveltejs/kit@2.70.2` is the latest release and still depends on `cookie@^0.6.0`, so
+    `@sveltejs/kit@2.70.2` — the version pinned here — depends on `cookie@^0.6.0`, so
     `npm audit` reports it on a fully-updated tree; `--force` "fixes" it by proposing
     `@sveltejs/kit@0.0.30`. An `overrides` block pinning `cookie@^0.7.2` clears it and was
     deliberately **refused** — kit's own peer range is the thing to wait on. Re-check when kit
@@ -788,11 +836,12 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
     `base.css`.** See the compositing invariant above for why. A theme pasted from zenith
     arrives with the old `0.1` — halve it on the way in, the way `fallow` gets dropped.
 - **`src/lib/test/` is under no layer constraint.** No eslint layer block and no cruiser layer
-  rule matches it, so [dom.ts](src/lib/test/dom.ts) and
-  [adguard-store-harness.svelte](src/lib/test/adguard-store-harness.svelte) may import from any
+  rule matches it, so the two harnesses that live there —
+  [adguard-store-harness.svelte](src/lib/test/adguard-store-harness.svelte) and
+  [theme-store-harness.svelte](src/lib/test/theme-store-harness.svelte) — may import from any
   layer with nothing to stop them. That is fine for test support and is why they live there
   rather than under `presentation/` — but it means an import _from_ this directory into app code
-  would look legal and is not. The harness exists because `setContext` needs a component being
-  initialised, so a story wanting its own store has to mount one; setting the store from a
+  would look legal and is not. They exist because `setContext` needs a component being
+  initialised, so a story or spec wanting its own store has to mount one; setting the store from a
   stories file instead gives every story on the autodocs page one shared context, and the last
   play function to run decides what all of them show.
