@@ -229,6 +229,26 @@
 					</button>
 				{/each}
 			</Dropdown>
+
+			<!-- In the control track rather than the config-pages rail: /admin is a reserved
+			     path the guard wins over, not a configured page, so it does not belong in a
+			     rail driven by config's own keys. Same trigger affordance as the two menus and
+			     the same conditional flex-1, so a third item still fills a phone's row
+			     instead of stranding the menus mid-line. Labelled for the area: signed out,
+			     handleAdmin redirects it to the login form.
+
+			     It still marks itself current the way the rail's links do — the placement is
+			     what differs, not whether a screen reader is told where it is. Exact match,
+			     so the login form it redirects to is not announced as this destination. -->
+			{#if data.adminEnabled}
+				<a
+					href="/admin"
+					aria-current={currentPage.url.pathname === '/admin' ? 'page' : undefined}
+					class="hover:bg-surface-card hover:shadow-card focus-visible:ring-ring flex flex-1 items-center justify-center rounded-full px-box-sm py-box-3xs text-sm transition focus-visible:ring-2 focus-visible:outline-none @2xl/header:flex-none"
+				>
+					{m.admin_title()}
+				</a>
+			{/if}
 		</div>
 	</header>
 

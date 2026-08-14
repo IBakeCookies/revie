@@ -1,4 +1,5 @@
 import type { LayoutServerLoad } from './$types';
+import { isAdminEnabled } from '$lib/business/model/admin-auth';
 import { readConfig } from '$lib/business/model/config-source';
 import { readOrMintScenerySeed, readRequestAppearance } from '$lib/business/model/appearance';
 
@@ -33,5 +34,11 @@ export const load: LayoutServerLoad = async (event) => {
 		// one seed per user varies the animated theme scenery; minted once,
 		// then stable across visits (the reroll button rewrites the cookie)
 		scenerySeed: readOrMintScenerySeed(event.cookies),
+		// Whether the header shows a link to /admin at all. Unset token means the
+		// guard 404s every /admin path, and a switched-off feature must not
+		// advertise itself — so the link cannot be unconditional. No "is signed in"
+		// counterpart: handleAdmin redirects an unauthenticated /admin to the login
+		// form, so one link is right either way.
+		adminEnabled: isAdminEnabled(),
 	};
 };
