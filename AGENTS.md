@@ -347,6 +347,43 @@ config.json ─(disk read, no caching)→ data/config.ts
   deliberately does not cross: it has no sink on this page — presentation cannot render
   `message` and `/admin` is not one of the three `console` homes — so a parse or write
   failure becomes a kind and its message is dropped.
+- **The editor's form is GENERATED from the schema, which is the only reason a container
+  isn't a fourth edit point.** `containerFields` walks `containerSchemas`' runtime nodes
+  (`entries` / `wrapped` / `default` / `type`) into plain data — `{ path, kind, isRequired }`
+  — so adding a container to the schema and to `config-container.svelte` makes it appear in
+  the editor with no third edit, and `config.spec.ts` asserts that rather than asserting five
+  hardcoded names. Four things about it:
+  1. **Valibot's internals stop in business.** The walk reads the schemas through one
+     structural `SchemaNode` type that is **assigned** from `containerSchemas` rather than
+     asserted, so a schema shape the walk cannot read is a compile error. `lint:deps` then
+     refuses a route component value-importing the model at all (R2), so the descriptions
+     cross through the `load` as props — the same carve-out `containers` itself uses: static
+     structure travels as props.
+  2. **An `optional` with a default keeps what is under it required.** That is what makes
+     `BoxService.img`'s deliberately invalid `{} as { src: string }` produce a required
+     `img.src` field, the same technicality the warning path depends on.
+  3. **The recursion is a self-referencing `{#snippet}` in the route, not a component.**
+     Containers nest arbitrarily, and a second component would have joined the
+     `config-container ↔ grid ↔ sub-grid` cycle that `no-circular` exempts **by name** — a
+     fourth member means editing that exemption. A snippet adds no module edge at all.
+  4. **`$state` wraps an assigned array or object in its own proxy**, so writing through the
+     reference that went IN mutates the raw target behind it, where neither the render nor
+     the payload will find it. Adding a container therefore assigns a whole new array
+     (`slice(0, i)` + the new entry + `slice(i)`, which is also what gives every position an
+     insertion point) and the `record()` helper reads a created object back out of its parent.
+     Measured: pushing instead produced a container that rendered nowhere and was silently
+     absent from the saved file.
+- **The form is skipped entirely for a file it cannot represent, and `reviewConfig` is the one
+  predicate.** `writeConfig` is `review → write`, and `needsRawEditor` is the same review
+  asking whether the rejection is non-null — so the editor shows a raw `<textarea>` exactly
+  when a save would be refused. That is not a second JSON editor competing with the form: it
+  is the repair path, and without it refuse-on-warnings is a dead end. A file with an
+  undeclared container, an entry that is not a container, a stripped `class` or a bad span
+  cannot be saved from a generated form AND cannot be fixed in one, because the form only
+  offers what the schema declares — so the operator would be stuck with a config that blocks
+  every other edit and no way to reach what is blocking it. One predicate covers all of them
+  without enumerating any. The choice is made from the bytes on DISK, so fixing the file
+  brings the form back on the next load.
 - **A `pages` key is a URL path, and the route is `[...slug]`** — a rest parameter, so
   `/media/plex` and other grouped paths match. It was `[[slug]]`, whose compiled pattern
   (`/^(?:\/([^/]+))?\/?$/`) took one segment: a nested key rendered as a nav link and then
@@ -406,8 +443,9 @@ appearance cookie's name and write belong in the repository, its rules in busine
 One operator, one shared secret, no user system. It exists because `config.json` is the
 internal network map _and_ the source of `/api/ping`'s allowlist: an unauthenticated write
 path would let anyone on the LAN rewrite that allowlist and turn the ping endpoint into an
-arbitrary internal port scanner. So auth landed **before** any write path, and the write path
-is still to come — today `/admin` only renders the config read-only.
+arbitrary internal port scanner. So auth landed **before** any write path, and the editor landed
+behind it: `/admin` now generates a form from the container schema and writes `config.json`
+through `writeConfig` — see "Config-driven rendering" for both halves.
 
 ```
 DASHBOARD_ADMIN_TOKEN ─→ business/model/admin-auth.ts    every decision, owns no cookie name
@@ -442,6 +480,18 @@ things about it are decisions:
   on cross-site navigations, and this one must do neither.
 - **The route files do not re-check auth.** `handleAdmin` has already answered for every
   `/admin` path, and a second check is a second place to get it wrong.
+- **The header's link to the area is gated on the same flag as the guard**, via
+  `adminEnabled: isAdminEnabled()` from [+layout.server.ts](src/routes/+layout.server.ts) — an
+  unconditional link would both advertise a switched-off feature and 404 when followed, which
+  is decision one above. There is deliberately **no "is signed in" flag and no second label**:
+  `handleAdmin` redirects an unauthenticated `/admin` to the login form, so one link naming the
+  destination is right in both states and a second flag would be machinery for a distinction
+  the redirect already owns. The link sits with the appearance menus rather than in the
+  config-pages nav rail, because that rail is driven by config's own keys and `/admin` is a
+  path the guard takes back. Accept the corollary: once the token is set, the link tells
+  anyone who can load the dashboard that an admin area exists — and so does `adminEnabled` in
+  the SSR payload, whether or not the link renders. That is the price of a UI entry point, and
+  it is why the gate is the token rather than always-on.
 
 Two gaps, both known and neither accidental: there is **no login rate limiting**, and
 `secure: !dev` means a production deployment on plain http will have the browser drop the
@@ -619,10 +669,12 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  33 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
-  **Exactly one takes a parameter** — `service_probe_failed({ href })`, so the toast names the
-  service it could not reach — and it is the only thing the compiler's parameter typecheck has
-  ever had to check. The four AdGuard keys are labels, with `Intl.NumberFormat` formatting the
+  38 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  **Two take parameters** — `service_probe_failed({ href })`, so the toast names the service it
+  could not reach, and `admin_container_add_at({ target, position })`, so each of a list's N+1
+  insertion buttons has an accessible name that says which list and where. They are the only
+  things the compiler's parameter typecheck has ever had to check. The four AdGuard keys are
+  labels, with `Intl.NumberFormat` formatting the
   readings themselves ([box-adguard.svelte](src/lib/presentation/components/box-adguard.svelte)).
   A parameter is how DATA reaches a message; it is never how copy leaves a lower layer — see the
   no-copy-crosses-a-layer rule above.
@@ -787,10 +839,10 @@ Comments explain _why_, not _what_; the existing ones are the house style, match
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 22 open items, all but #33, #35 and #36 from three
+The open work lives in [roadmap.md](roadmap.md) — 21 open items, all but #33 and #36 from three
 review passes and adversarially verified against the code, ordered by what breaks soonest. Those
-three are the config editor's remaining half and the admin area's two known gaps, which came from
-building the guard rather than from a review. Several are straight ports from
+two are the second stats provider and the admin area's two known gaps, the latter from building
+the guard rather than from a review. Several are straight ports from
 `zenith`, which has already solved them; those items name the upstream files. It is its own file
 because it churns as items land, while this one is the architecture and should not. **Nothing in it
 is fixed** — the section below is what is.

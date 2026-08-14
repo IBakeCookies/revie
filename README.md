@@ -104,8 +104,8 @@ the components.
 ## The admin area
 
 `DASHBOARD_ADMIN_TOKEN` is one shared secret for one operator — not a user system. Set it
-in `.env` (or the environment `node build` runs in) and `/admin` shows the config the
-server is currently serving, read-only:
+in `.env` (or the environment `node build` runs in) and `/admin` becomes an editor for the
+config the server is serving — a form built from the container schema, not a JSON box:
 
 ```sh
 DASHBOARD_ADMIN_TOKEN=$(openssl rand -hex 32)
@@ -113,6 +113,19 @@ DASHBOARD_ADMIN_TOKEN=$(openssl rand -hex 32)
 
 - **Unset, the whole admin area returns 404**, not 401: a feature that is switched off
   should not advertise that it exists.
+- **Set, the header shows an "Administration" link** beside the theme and language menus,
+  so `/admin` does not have to be typed. Signed out it lands on the login form. The
+  tradeoff is deliberate: once the token is set, that link tells anyone who can load the
+  dashboard that an admin area exists — which is why it is gated on the token rather than
+  always present, so switching the feature off still leaves nothing advertising it.
+- **A save is refused outright if the config would drop anything**, and the page names what:
+  nothing is written unless every container in it is valid, so a typo cannot cost you a box
+  silently. Edits are written atomically and take effect on the next request — no restart.
+- **What the form cannot edit, you get as raw JSON instead.** A file with a container the
+  schema does not declare, an entry that is not a container, or a `class` prop the config
+  format does not allow cannot be repaired through a generated form — so the editor hands you
+  the text. Fix it, save, and the form comes back. Adding, removing and renaming **pages**
+  still means editing `config.json` directly, as does reordering containers.
 - Signing in at `/admin/login` sets a session cookie that is `httpOnly`, `SameSite=Strict`
   and — outside `npm run dev` — `Secure`, so **serve production over TLS** or the browser
   drops it and the login never sticks.

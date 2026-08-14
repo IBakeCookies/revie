@@ -17,9 +17,9 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 23 items are open — 20 from the review passes, plus
-items 34–36, which came from building the admin guard rather than from a review; **1, 2, 3, 4, 5,
-6, 7, 8, 11, 19, 23, 31 and 32 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+**Numbers are stable, so gaps mean landed.** 21 items are open — 20 from the review passes, plus
+item 36, which came from building the admin guard rather than from a review; **1, 2, 3, 4, 5,
+6, 7, 8, 11, 19, 23, 31, 32, 34 and 35 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
 the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -350,11 +350,11 @@ vitest project. See AGENTS.md's "Already done".)_
     in config-container.svelte's if/else chain (:38-52, ending in the `never` assert). Props: `href`
     (required), optional `placeholder`; renders `<form action={href} method="get"><input name="q">`
     — hardcode `q` (Whoogle, SearXNG, Google, DuckDuckGo all use it). Add a `/`-key focus handler and
-    the two new message keys to **both** messages/en.json and messages/de.json (21-keys-in-sync
+    the two new message keys to **both** messages/en.json and messages/de.json (the keys-in-sync
     invariant).
-    _Payoff:_ the page is currently read-only — `grep -rniE "search|<form|<input" src e2e` returns
-    zero matches — so the first thing a user does after loading their start page is leave for the
-    address bar. The target is already self-hosted: config.json:227-228 links Whoogle at
+    _Payoff:_ the dashboard itself takes no input — every `<form>` and `<input>` in the tree now
+    belongs to `/admin`, so on the pages a visitor actually loads the first thing they do after
+    their start page renders is leave for the address bar. The target is already self-hosted: config.json:227-228 links Whoogle at
     `http://192.168.178.192:5000/` as a click-through.
     _Files:_ src/lib/business/model/config.ts:15,112-127,
     src/lib/presentation/components/config-container.svelte:38-52,
@@ -494,7 +494,8 @@ the same applies to a future 34.
 
 ## The admin area and the config editor
 
-The guard landed with the read-only `/admin` page; everything that makes it useful is here. The
+The guard, the write path and the editor have all landed; #36 is what is left, and the two items
+above it are kept as numbered entries because the notes below still cross-reference them. The
 threat model is the reason for the ordering: `config.json` is the internal network map _and_ the
 source of `/api/ping`'s allowlist, so a write path without the guard in front of it would let
 anyone on the LAN rewrite the allowlist and turn the ping endpoint into an arbitrary internal port
@@ -519,13 +520,34 @@ rewritten allowlist.
     test would dirty the tree and poison every later test through the stamp cache; the e2e covers
     the rejection, where nothing is written. Interim UI only: a plain `<textarea>`, which is #35's
     to replace.
-35. **A schema-driven form over the containers, not a JSON textarea** — `L`
-    A `<textarea>` of raw JSON in a browser is a worse VS Code and earns nothing over editing the
-    file. The win is picking a container from a list and filling in its props, which is what the
-    valibot schema now makes possible: `containerSchemas` is a runtime value, so the form can be
-    generated from it rather than hand-written per container — and generating it is the only way
-    the form does not become a fourth place to edit when a container is added. Needs #34 under it.
-    _Files:_ src/routes/admin/, src/lib/business/model/config.ts (schema introspection)
+35. ~~**A schema-driven form over the containers, not a JSON textarea**~~ — **LANDED.** Generated
+    from `containerSchemas` via `containerFields`, arbitrary nesting through a self-referencing
+    snippet, and every list has N+1 insertion points so a container can go anywhere in it. The
+    architecture is in [AGENTS.md](AGENTS.md) under "Config-driven rendering", including the
+    `$state`-proxy trap that makes an added container invisible to both the render and the saved
+    file. The raw `<textarea>` did not die — it is now the **repair path**, shown exactly when
+    `needsRawEditor` says a save would be refused, because a form can neither save nor fix a file
+    whose problem the schema does not describe.
+    **What it deliberately does not do**, and what is therefore still open:
+    - **Pages cannot be added, removed or renamed**, and a page's `name` is not editable. Only the
+      containers inside existing pages are. A new page still means editing the file.
+    - **Containers cannot be reordered** — insertion covers "put one here", not "move that one".
+      Add/remove at a position plus retyping is the workaround.
+    - **Switching a container's type leaves the old type's props in the file**, invisible in the
+      form (`items` and all its children survive a Grid → BoxDate switch). Harmless —
+      `normalizeConfig` strips them on read — and it is the flip side of preserving keys the
+      schema does not name, which is what protects `defaults`. Clearing them on a type change
+      would be the fix, and would also throw away a switch made by mistake.
+    - **No `use:enhance`**, so saving is a full page POST, and **the payload is built client-side**
+      — without JS the form's edits do nothing and a save rewrites the file's own bytes. Lossless
+      in content, but it does re-serialize the file's whitespace.
+    - **Insertion positions are 1-based indices over the raw array**, so an entry the form cannot
+      render shifts the numbers a sighted operator counts. The ordering itself is correct.
+    - **Two sibling containers of the same type give their insertion buttons the same accessible
+      name** (`Add container to Grid, position 1` twice, on a page with two Grids). Position
+      disambiguates within a list, not between lists that share a parent type.
+      _Files:_ src/routes/admin/, src/lib/business/model/config.ts,
+      src/lib/business/model/config-source.ts
 36. **Close the two known gaps in the admin area** — `S`
     Neither is accidental and both are documented in README.md, but both are real. **No login rate
     limiting or lockout:** one shared secret with unlimited guesses is only safe because the token
