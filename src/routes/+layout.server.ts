@@ -3,8 +3,22 @@ import { readConfig } from '$lib/business/model/config-source';
 import { readOrMintScenerySeed, readRequestAppearance } from '$lib/business/model/appearance';
 
 export const load: LayoutServerLoad = async (event) => {
-	const config = await readConfig();
+	const { config, warnings, error, isFresh } = await readConfig();
 	const appearance = readRequestAppearance(event.cookies);
+
+	// Only what the file re-read actually turned up, so a broken config costs one log
+	// per mtime instead of one per request — this load runs on every one of them. Two
+	// concurrent first hits can still log twice; an in-flight promise cache to dedupe
+	// that race is more machinery than one duplicate pair is worth.
+	if (isFresh) {
+		if (error) {
+			console.error(error.message, error.cause ?? '');
+		}
+
+		for (const warning of warnings) {
+			console.warn(warning);
+		}
+	}
 
 	return {
 		// Only what the navigation needs; the containers are loaded per page.

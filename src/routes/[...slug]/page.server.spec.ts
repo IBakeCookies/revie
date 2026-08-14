@@ -40,12 +40,18 @@ const stats = {
 
 function configWith(...containers: (typeof boxAdguard | typeof boxDate)[]) {
 	return {
-		pages: {
-			'/': {
-				name: 'Home',
-				containers,
+		config: {
+			pages: {
+				'/': {
+					name: 'Home',
+					containers,
+				},
 			},
 		},
+		warnings: [],
+		error: null,
+		mtimeMs: 1,
+		isFresh: false,
 	};
 }
 
@@ -80,6 +86,29 @@ describe('load', () => {
 
 		await expect(load(event('/nope'))).rejects.toMatchObject({
 			status: 404,
+		});
+	});
+
+	// A 404 blamed the URL for a config the server could not open — the one thing the
+	// operator needed to be told, and the reason every page 404s at once.
+	it('fails with 503, not 404, when the config itself could not be read', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		vi.mocked(readConfig).mockResolvedValue({
+			config: {
+				pages: {},
+			},
+			warnings: [],
+			error: {
+				message: 'Could not read the dashboard config at "config.json"',
+				cause: new SyntaxError('Unexpected token'),
+			},
+			mtimeMs: 1,
+			isFresh: true,
+		});
+
+		await expect(load(event('/'))).rejects.toMatchObject({
+			status: 503,
 		});
 	});
 

@@ -52,8 +52,30 @@ async function loadAdguardStats(page: ConfigPage): Promise<Result<AdguardStats |
 }
 
 export const load: PageServerLoad = async ({ url }) => {
-	const config = await readConfig();
+	const { config, warnings, error: configError, isFresh } = await readConfig();
+
+	// Only what the file re-read actually turned up, so a broken config costs one log
+	// per mtime instead of one per request. Two concurrent first hits can still log
+	// twice; an in-flight promise cache to dedupe that race is more machinery than one
+	// duplicate pair is worth.
+	if (isFresh) {
+		if (configError) {
+			console.error(configError.message, configError.cause ?? '');
+		}
+
+		for (const warning of warnings) {
+			console.warn(warning);
+		}
+	}
+
 	const page = config.pages[url.pathname];
+
+	// A config that could not be read is not a wrong URL. Answering 404 for it blamed
+	// the address bar for a file the server could not open, which is the one thing the
+	// operator needed to be told.
+	if (!page && configError) {
+		error(503, 'The dashboard config could not be read');
+	}
 
 	if (!page) {
 		error(404, `No dashboard page is configured for "${url.pathname}"`);

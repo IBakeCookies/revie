@@ -62,7 +62,7 @@ describe('readConfig', () => {
 
 		fs.readFile.mockResolvedValue(file);
 
-		const config = await readConfig();
+		const { config, error, mtimeMs, isFresh } = await readConfig();
 
 		expect(fs.stat).toHaveBeenCalledWith('/etc/dashboard.json');
 
@@ -72,6 +72,10 @@ describe('readConfig', () => {
 				props: {},
 			},
 		]);
+
+		expect(error).toBeNull();
+		expect(mtimeMs).toBe(1);
+		expect(isFresh).toBe(true);
 	});
 
 	it('serves the cached config while the file is unchanged', async () => {
@@ -85,8 +89,8 @@ describe('readConfig', () => {
 		fs.readFile.mockResolvedValue(file);
 
 		await readConfig();
-		await readConfig();
 
+		expect((await readConfig()).isFresh).toBe(false);
 		expect(fs.readFile).toHaveBeenCalledOnce();
 	});
 
@@ -138,8 +142,6 @@ describe('readConfig', () => {
 	it('keeps serving the last good config when a later read fails', async () => {
 		const { fs, readConfig } = await loadModule();
 
-		vi.spyOn(console, 'error').mockImplementation(() => {});
-
 		fs.stat.mockResolvedValue({
 			mtimeMs: 1,
 			size: 10,
@@ -147,27 +149,40 @@ describe('readConfig', () => {
 
 		fs.readFile.mockResolvedValue(file);
 
-		const first = await readConfig();
+		const { config: first } = await readConfig();
 
 		fs.stat.mockRejectedValue(new Error('ENOENT'));
 
-		expect(await readConfig()).toBe(first);
+		const failed = await readConfig();
+
+		expect(failed.config).toBe(first);
+		expect(failed.error?.message).toContain('ENOENT');
+		expect(failed.mtimeMs).toBeNull();
 	});
 
 	it('falls back to an empty config when the file was never readable', async () => {
 		const { fs, readConfig } = await loadModule();
 
-		vi.spyOn(console, 'error').mockImplementation(() => {});
 		fs.stat.mockRejectedValue(new Error('ENOENT'));
 
-		expect(await readConfig()).toEqual({
+		expect((await readConfig()).config).toEqual({
 			pages: {},
 		});
 	});
 
+	// The stat failure has no stamp to be cached against, so the retained message is
+	// what keeps an unreachable config from reporting itself on every single request.
+	it('reports an unreachable config once, not once per request', async () => {
+		const { fs, readConfig } = await loadModule();
+
+		fs.stat.mockRejectedValue(new Error('ENOENT'));
+
+		expect((await readConfig()).isFresh).toBe(true);
+		expect((await readConfig()).isFresh).toBe(false);
+	});
+
 	it('reads a broken file once per mtime, and again once it is fixed', async () => {
 		const { fs, readConfig } = await loadModule();
-		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 1,
@@ -176,11 +191,14 @@ describe('readConfig', () => {
 
 		fs.readFile.mockResolvedValue('{ not json');
 
-		await readConfig();
-		await readConfig();
+		expect((await readConfig()).isFresh).toBe(true);
+
+		const cached = await readConfig();
 
 		expect(fs.readFile).toHaveBeenCalledOnce();
-		expect(error).toHaveBeenCalledOnce();
+		expect(cached.isFresh).toBe(false);
+		// Retained beside the cache, so /api/health still answers 503 on the cache hit.
+		expect(cached.error?.message).toContain('/etc/dashboard.json');
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 2,
@@ -189,13 +207,11 @@ describe('readConfig', () => {
 
 		fs.readFile.mockResolvedValue(file);
 
-		expect((await readConfig()).pages['/'].name).toBe('Home');
+		expect((await readConfig()).config.pages['/'].name).toBe('Home');
 	});
 
 	it('falls back to an empty config when the file is not valid JSON', async () => {
 		const { fs, readConfig } = await loadModule();
-
-		vi.spyOn(console, 'error').mockImplementation(() => {});
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 1,
@@ -204,8 +220,33 @@ describe('readConfig', () => {
 
 		fs.readFile.mockResolvedValue('{ not json');
 
-		expect(await readConfig()).toEqual({
+		expect((await readConfig()).config).toEqual({
 			pages: {},
 		});
+	});
+
+	it('hands back the warnings normalization produced instead of printing them', async () => {
+		const { fs, readConfig } = await loadModule();
+
+		fs.stat.mockResolvedValue({
+			mtimeMs: 1,
+			size: 10,
+		});
+
+		fs.readFile.mockResolvedValue(
+			JSON.stringify({
+				pages: {
+					'/': {
+						containers: [
+							{
+								name: 'NotAComponent',
+							},
+						],
+					},
+				},
+			}),
+		);
+
+		expect((await readConfig()).warnings).toEqual([expect.stringContaining('NotAComponent')]);
 	});
 });

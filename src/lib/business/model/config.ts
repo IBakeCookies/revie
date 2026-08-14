@@ -1,9 +1,12 @@
+import * as v from 'valibot';
 import { normalizeSpan } from '$lib/utils/style';
 
 /**
- * The dashboard config format.
+ * The dashboard config format, declared once as a runtime schema with every type
+ * below inferred from it — a second, hand-written copy of these shapes is what the
+ * old `requiredProps` table was, and nothing forced the two to agree.
  *
- * This schema is declared here rather than derived from the components' props, and
+ * The schema is declared here rather than derived from the components' props, and
  * that is the point: `config.json` is a contract with whoever edits it. Deriving it
  * meant renaming a prop on a component silently changed the file format, with no
  * error anywhere. Now presentation has to satisfy this, and a mismatch is a compile
@@ -12,49 +15,97 @@ import { normalizeSpan } from '$lib/utils/style';
  * Business therefore names no component, in values or in types.
  */
 
-export const CONTAINER_NAMES = ['BoxService', 'BoxAdguard', 'BoxDate', 'Grid', 'SubGrid'] as const;
+/** Carried by every container: how many of the twelve grid columns it takes. */
+const spanProp = v.optional(v.number());
 
-export type ContainerName = (typeof CONTAINER_NAMES)[number];
+/**
+ * A Grid's children are `unknown` in the schema and containers in the type. A
+ * container schema cannot name itself — that is a cycle TypeScript refuses to infer
+ * through — and it should not: children are validated one at a time by recursing
+ * through `normalizeContainer`, which is what lets one bad child be dropped without
+ * failing its parent. A single parse could only fail the whole grid.
+ */
+const gridProps = {
+	span: spanProp,
+	title: v.optional(v.string()),
+	subTitle: v.optional(v.string()),
+	items: v.array(v.unknown()),
+};
+
+type WithChildren<P> = P extends { items: unknown[] }
+	? Omit<P, 'items'> & { items: ConfigContainer[] }
+	: P;
+
+/**
+ * What each container may carry, and what it cannot render without.
+ *
+ * A container missing a required prop has to be dropped. The props come from a
+ * hand-edited file and are otherwise unchecked, so letting one reach its component
+ * throws during SSR and takes the whole page to a 500 — losing every other box on
+ * it, for one typo in one entry.
+ */
+const containerSchemas = {
+	// `title` is required: the box renders it as its heading, so without one it
+	// shows an empty line. Declaring it optional is what let a title-less entry
+	// through validation while the component demanded it.
+	BoxService: v.object({
+		span: spanProp,
+		title: v.string(),
+		href: v.string(),
+		// The default is deliberately not a valid `img`: it walks a missing `img` one
+		// level further into the parse, so the warning names `img.src` — the prop an
+		// operator has to write — instead of stopping at `img`. It never reaches the
+		// output, because a container that fails to parse is dropped.
+		img: v.optional(
+			v.object({
+				src: v.string(),
+			}),
+			{} as { src: string },
+		),
+	}),
+	BoxAdguard: v.object({
+		span: spanProp,
+		href: v.string(),
+	}),
+	BoxDate: v.object({
+		span: spanProp,
+	}),
+	// Grid and SubGrid do not require `items`: it is defaulted below, so a grid
+	// written before its children still renders as empty.
+	Grid: v.object(gridProps),
+	SubGrid: v.object(gridProps),
+};
+
+export type ContainerName = keyof typeof containerSchemas;
 
 export function isContainerName(name: string): name is ContainerName {
-	return (CONTAINER_NAMES as readonly string[]).includes(name);
+	return Object.hasOwn(containerSchemas, name);
 }
-
-/** Carried by every container: how many of the twelve grid columns it takes. */
-interface CommonProps {
-	span?: number;
-}
-
-interface GridProps extends CommonProps {
-	title?: string;
-	subTitle?: string;
-	items: Container[];
-}
-
-type Container =
-	| {
-			name: 'BoxService';
-			// `title` is required: the box renders it as its heading, so without one it
-			// shows an empty line. Declaring it optional here is what let a title-less
-			// entry through validation while the component demanded it.
-			props: CommonProps & { title: string; href: string; img: { src: string } };
-	  }
-	| { name: 'BoxAdguard'; props: CommonProps & { href: string } }
-	| { name: 'BoxDate'; props: CommonProps }
-	| { name: 'Grid'; props: GridProps }
-	| { name: 'SubGrid'; props: GridProps };
 
 /**
  * A container as it appears in the config file. Narrowing on `name` narrows the
  * props with it, so `ConfigContainer<'BoxService'>` is the BoxService member alone.
  */
-export type ConfigContainer<N extends ContainerName = ContainerName> = Extract<
-	Container,
-	{ name: N }
->;
+export type ConfigContainer<N extends ContainerName = ContainerName> = {
+	[K in ContainerName]: {
+		name: K;
+		props: WithChildren<v.InferOutput<(typeof containerSchemas)[K]>>;
+	};
+}[N];
 
-export type ConfigPage = {
-	name?: string;
+/**
+ * A page as it appears in the FILE: `containers` is only checked for being an
+ * array, because each entry is normalized one at a time below so that a bad one
+ * does not take its siblings. A schema claiming they are containers would be a
+ * guarantee nothing here checks.
+ */
+const pageSchema = v.object({
+	name: v.fallback(v.optional(v.string()), undefined),
+	containers: v.fallback(v.array(v.unknown()), []),
+});
+
+/** The NORMALIZED page: same shape, with the containers actually validated. */
+export type ConfigPage = Omit<v.InferOutput<typeof pageSchema>, 'containers'> & {
 	containers: ConfigContainer[];
 };
 
@@ -64,13 +115,22 @@ export type ConfigPage = {
  * The file also carries a `defaults` object, but it is consumed during
  * normalization — merged into each container's props — so nothing downstream ever
  * sees it. That is why there is no `defaults` field here, and why the file format
- * itself has no type: it arrives as `unknown` and only `normalizeConfig` reads it.
+ * has a schema of its own below: it arrives as `unknown` and only `normalizeConfig`
+ * reads it.
  */
 export type Config = {
-	pages: {
-		[path: string]: ConfigPage;
-	};
+	pages: Record<string, ConfigPage>;
 };
+
+/**
+ * The file as it arrives. Everything below the two keys stays `unknown` and is
+ * normalized entry by entry, because one malformed page must not cost the rest of
+ * the dashboard; the fallbacks are what let a file missing either key parse at all.
+ */
+const fileSchema = v.object({
+	defaults: v.fallback(v.record(v.string(), v.unknown()), {}),
+	pages: v.fallback(v.record(v.string(), v.unknown()), {}),
+});
 
 export const emptyConfig: Config = {
 	pages: {},
@@ -99,51 +159,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/**
- * What each container cannot render without, returning the name of the first
- * missing prop.
- *
- * A container missing one has to be dropped HERE. The props come from a
- * hand-edited file and are otherwise unchecked, so letting one reach its
- * component throws during SSR and takes the whole page to a 500 — losing every
- * other box on it, for one typo in one entry.
- *
- * Keyed by `ContainerName`, so adding a container to the schema without deciding
- * what it requires is a compile error rather than a gap.
- */
-const requiredProps: Record<ContainerName, (props: Record<string, unknown>) => string | undefined> =
-	{
-		BoxService: (props) => {
-			if (typeof props.title !== 'string') return 'title';
-
-			if (typeof props.href !== 'string') return 'href';
-
-			if (!isRecord(props.img) || typeof props.img.src !== 'string') return 'img.src';
-
-			return undefined;
-		},
-		BoxAdguard: (props) => (typeof props.href !== 'string' ? 'href' : undefined),
-		BoxDate: () => undefined,
-		// Grid and SubGrid need `items`, but it is defaulted below rather than
-		// required, so a grid written before its children still renders as empty.
-		Grid: () => undefined,
-		SubGrid: () => undefined,
-	};
-
 const CONTAINS_CHILDREN: ContainerName[] = ['Grid', 'SubGrid'];
 
 function normalizeContainer(
 	raw: unknown,
 	defaults: Record<string, unknown>,
+	warnings: string[],
 ): ConfigContainer | undefined {
 	if (!isRecord(raw) || typeof raw.name !== 'string') {
-		console.warn('Skipping a container without a name');
+		warnings.push('Skipping a container without a name');
 
 		return undefined;
 	}
 
 	if (!isContainerName(raw.name)) {
-		console.warn(`Skipping container "${raw.name}", no such container exists`);
+		warnings.push(`Skipping container "${raw.name}", no such container exists`);
 
 		return undefined;
 	}
@@ -157,7 +187,7 @@ function normalizeContainer(
 
 	for (const key of STYLE_KEYS) {
 		if (props[key] !== undefined) {
-			console.warn(`Ignoring "${key}" on container "${raw.name}", use "span" instead`);
+			warnings.push(`Ignoring "${key}" on container "${raw.name}", use "span" instead`);
 
 			delete props[key];
 		}
@@ -170,7 +200,7 @@ function normalizeContainer(
 		// to the full twelve columns, so a silent drop renders a full-width box and
 		// looks like a layout bug rather than the typo it is.
 		if (span === undefined) {
-			console.warn(`Ignoring "span" on container "${raw.name}", it has to be a whole number`);
+			warnings.push(`Ignoring "span" on container "${raw.name}", it has to be a whole number`);
 		}
 
 		props.span = span;
@@ -181,21 +211,26 @@ function normalizeContainer(
 	// written yet would throw on the first page load rather than render as empty.
 	if (CONTAINS_CHILDREN.includes(raw.name)) {
 		props.items = (Array.isArray(props.items) ? props.items : [])
-			.map((child) => normalizeContainer(child, defaults))
+			.map((child) => normalizeContainer(child, defaults, warnings))
 			.filter((item): item is ConfigContainer => item !== undefined);
 	}
 
-	const missing = requiredProps[raw.name](props);
+	// Never `parse`: a hand-edited file has to degrade, so the failure comes back as a
+	// value and only this container is dropped. The sentence is ours rather than
+	// valibot's — it is the operator log channel, and the first issue names the prop.
+	const parsed = v.safeParse(containerSchemas[raw.name], props);
 
-	if (missing) {
-		console.warn(`Skipping container "${raw.name}", "${missing}" is missing or not a string`);
+	if (!parsed.success) {
+		const missing = v.getDotPath(parsed.issues[0]);
+
+		warnings.push(`Skipping container "${raw.name}", "${missing}" is missing or not a string`);
 
 		return undefined;
 	}
 
-	// The one unavoidable assertion in the whole pipeline: the props come from JSON,
-	// and only the name validated above says which container they belong to. The
-	// guard above is what makes it safe rather than hopeful.
+	// The one unavoidable assertion in the whole pipeline. `props` is returned rather
+	// than the parse output because `v.object` strips what it does not name, and only
+	// the name checked above says which container these props belong to.
 	return {
 		name: raw.name,
 		props,
@@ -207,18 +242,36 @@ function normalizeContainer(
  * containers and malformed entries are dropped, per-container defaults are merged
  * in, and spans are clamped. The file is hand-edited and read at runtime, so a bad
  * entry has to degrade instead of taking down every render.
+ *
+ * Every drop is RETURNED rather than printed: this is a framework-free model, so
+ * what a diagnostic is worth belongs to whoever called it. The sentences are the
+ * operator log channel — English on purpose, and never for a user's eye.
  */
-export function normalizeConfig(raw: unknown): Config {
-	if (!isRecord(raw)) {
-		return emptyConfig;
+export function normalizeConfig(raw: unknown): { config: Config; warnings: string[] } {
+	const warnings: string[] = [];
+	const file = v.safeParse(fileSchema, raw);
+
+	if (!file.success) {
+		return {
+			config: emptyConfig,
+			warnings,
+		};
 	}
 
-	const defaults = isRecord(raw.defaults) ? raw.defaults : {};
+	const { defaults } = file.output;
 	const pages: Config['pages'] = {};
-	const rawPages = isRecord(raw.pages) ? raw.pages : {};
 
-	for (const [path, rawPage] of Object.entries(rawPages)) {
+	for (const [path, rawPage] of Object.entries(file.output.pages)) {
+		// `v.object` accepts an array, and an array is not a page: it would parse as one
+		// with no containers, and the navigation links straight to every key it gets —
+		// a dead nav entry, which is the defect the leading-slash check below guards.
 		if (!isRecord(rawPage)) {
+			continue;
+		}
+
+		const page = v.safeParse(pageSchema, rawPage);
+
+		if (!page.success) {
 			continue;
 		}
 
@@ -227,21 +280,24 @@ export function normalizeConfig(raw: unknown): Config {
 		// /services resolves to /noslash under it and 404s. Dropped rather than warned
 		// about, because a link that navigates somewhere else is worse than no link.
 		if (!path.startsWith('/')) {
-			console.warn(`Skipping page "${path}", a page path has to start with "/"`);
+			warnings.push(`Skipping page "${path}", a page path has to start with "/"`);
 
 			continue;
 		}
 
 		pages[path] = {
-			name: typeof rawPage.name === 'string' ? rawPage.name : undefined,
-			containers: (Array.isArray(rawPage.containers) ? rawPage.containers : [])
-				.map((container) => normalizeContainer(container, defaults))
+			name: page.output.name,
+			containers: page.output.containers
+				.map((child) => normalizeContainer(child, defaults, warnings))
 				.filter((item): item is ConfigContainer => item !== undefined),
 		};
 	}
 
 	return {
-		pages,
+		config: {
+			pages,
+		},
+		warnings,
 	};
 }
 

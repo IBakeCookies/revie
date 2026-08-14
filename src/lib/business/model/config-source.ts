@@ -12,21 +12,50 @@
  * expensive half, and it is the part every request would otherwise repeat.
  */
 
+import type { AppError } from '$lib/utils/useAsyncErrorAsValue';
 import { type ConfigStamp, $readConfigFile, $readConfigStamp } from '$lib/data/config';
 import { type Config, emptyConfig, normalizeConfig } from '$lib/business/model/config';
 
-let cache: { stamp: ConfigStamp; config: Config } | undefined;
+/**
+ * The config plus everything that went wrong getting it. Nothing is printed here —
+ * a model has no business deciding what a diagnostic is worth — so the problems
+ * come back as values and `isFresh` tells the caller whether they are new.
+ */
+export type ConfigRead = {
+	config: Config;
+	warnings: string[];
+	/** Retained beside the cache, so a broken file is reported once, not once per request. */
+	error: AppError | null;
+	/** null when the stat itself failed, so there is no stamp to name. */
+	mtimeMs: number | null;
+	/** true only on the call that actually re-read and re-parsed the file. */
+	isFresh: boolean;
+};
 
-export async function readConfig(): Promise<Config> {
+let cache: { stamp: ConfigStamp; read: Omit<ConfigRead, 'isFresh'> } | undefined;
+/** The last stat failure, which has no mtime to be keyed on — so its message is the key. */
+let retainedStatError: AppError | null = null;
+
+export async function readConfig(): Promise<ConfigRead> {
 	const [statError, stamp] = await $readConfigStamp();
 
 	// A config that has become unreadable must not blank the dashboard: keep serving
 	// the last good one, and only fall back to empty if there never was one.
 	if (statError) {
-		console.error(statError.message, statError.cause ?? '');
+		const isFresh = statError.message !== retainedStatError?.message;
 
-		return cache?.config ?? emptyConfig;
+		retainedStatError = statError;
+
+		return {
+			config: cache?.read.config ?? emptyConfig,
+			warnings: [],
+			error: statError,
+			mtimeMs: null,
+			isFresh,
+		};
 	}
+
+	retainedStatError = null;
 
 	// Size as well as mtime, because mtime alone is not evidence of sameness: `cp -p` and
 	// a coarse mtime tick (drvfs, some network volumes) both serve a changed file forever.
@@ -34,29 +63,48 @@ export async function readConfig(): Promise<Config> {
 	// still stale — and hashing the bytes would cost a full read per request, which is the
 	// only thing the cache buys.
 	if (cache?.stamp.mtimeMs === stamp.mtimeMs && cache?.stamp.size === stamp.size) {
-		return cache.config;
+		return {
+			...cache.read,
+			isFresh: false,
+		};
 	}
 
 	const [readError, raw] = await $readConfigFile();
 
+	// Cache the failure against the stamp that produced it. A broken file under
+	// sustained traffic otherwise costs a read, a parse and a log line on EVERY
+	// request; fixing it changes the stamp, so the retry still happens.
 	if (readError) {
-		console.error(readError.message, readError.cause ?? '');
-
-		// Cache the failure against the stamp that produced it. A broken file under
-		// sustained traffic otherwise costs a read, a parse and a log line on EVERY
-		// request; fixing it changes the stamp, so the retry still happens.
 		cache = {
 			stamp,
-			config: cache?.config ?? emptyConfig,
+			read: {
+				config: cache?.read.config ?? emptyConfig,
+				warnings: [],
+				error: readError,
+				mtimeMs: stamp.mtimeMs,
+			},
 		};
 
-		return cache.config;
+		return {
+			...cache.read,
+			isFresh: true,
+		};
 	}
+
+	const { config, warnings } = normalizeConfig(raw);
 
 	cache = {
 		stamp,
-		config: normalizeConfig(raw),
+		read: {
+			config,
+			warnings,
+			error: null,
+			mtimeMs: stamp.mtimeMs,
+		},
 	};
 
-	return cache.config;
+	return {
+		...cache.read,
+		isFresh: true,
+	};
 }

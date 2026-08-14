@@ -50,14 +50,20 @@ afterAll(() => {
 
 beforeEach(() => {
 	vi.mocked(readConfig).mockResolvedValue({
-		pages: {
-			'/': {
-				containers: [
-					service('Listening', `http://127.0.0.1:${openPort}`),
-					service('Closed', `http://127.0.0.1:${CLOSED_PORT}`),
-				],
+		config: {
+			pages: {
+				'/': {
+					containers: [
+						service('Listening', `http://127.0.0.1:${openPort}`),
+						service('Closed', `http://127.0.0.1:${CLOSED_PORT}`),
+					],
+				},
 			},
 		},
+		warnings: [],
+		error: null,
+		mtimeMs: 1,
+		isFresh: false,
 	});
 });
 

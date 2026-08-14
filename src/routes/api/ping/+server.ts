@@ -45,7 +45,7 @@ function toEndpoint(href: string): Endpoint | undefined {
 
 /** Only endpoints the dashboard is configured to show may be probed. */
 async function configuredEndpoints(): Promise<Set<string>> {
-	const config = await readConfig();
+	const { config } = await readConfig();
 	const keys = new Set<string>();
 
 	for (const page of Object.values(config.pages)) {

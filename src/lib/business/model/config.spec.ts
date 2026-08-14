@@ -1,5 +1,5 @@
 import type { ConfigContainer } from '$lib/business/model/config';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
 	collectServiceHrefs,
 	findContainer,
@@ -65,7 +65,7 @@ const rawConfig = {
 	},
 };
 
-const config = normalizeConfig(rawConfig);
+const { config } = normalizeConfig(rawConfig);
 const home = config.pages['/'];
 const grid = home.containers[0];
 
@@ -74,19 +74,17 @@ function itemsOf(container: ConfigContainer): ConfigContainer[] {
 }
 
 function pageWith(...containers: unknown[]) {
-	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-	const page = normalizeConfig({
+	const { config, warnings } = normalizeConfig({
 		pages: {
 			'/': {
 				containers,
 			},
 		},
-	}).pages['/'];
+	});
 
 	return {
-		page,
-		warn,
+		page: config.pages['/'],
+		warnings,
 	};
 }
 
@@ -102,18 +100,16 @@ describe('normalizeConfig', () => {
 	});
 
 	it('drops a page path with no leading slash, which would emit a relative link', () => {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-		const pages = normalizeConfig({
+		const { config: dropped, warnings } = normalizeConfig({
 			pages: {
 				noslash: {
 					containers: [],
 				},
 			},
-		}).pages;
+		});
 
-		expect(Object.keys(pages)).toEqual([]);
-		expect(warn).toHaveBeenCalledWith(expect.stringContaining('noslash'));
+		expect(Object.keys(dropped.pages)).toEqual([]);
+		expect(warnings).toEqual([expect.stringContaining('noslash')]);
 	});
 
 	it('drops unregistered components and entries that are not containers', () => {
@@ -137,7 +133,7 @@ describe('normalizeConfig', () => {
 	});
 
 	it('warns about a span that is not a whole number, which would render full width', () => {
-		const { page, warn } = pageWith({
+		const { page, warnings } = pageWith({
 			name: 'BoxDate',
 			props: {
 				span: '6',
@@ -145,7 +141,7 @@ describe('normalizeConfig', () => {
 		});
 
 		expect(page.containers[0].props.span).toBeUndefined();
-		expect(warn).toHaveBeenCalledWith(expect.stringContaining('span'));
+		expect(warnings).toEqual([expect.stringContaining('span')]);
 	});
 
 	it('strips class names, which could never reach the Tailwind build', () => {
@@ -155,7 +151,7 @@ describe('normalizeConfig', () => {
 	});
 
 	it('strips gridClass as well as class', () => {
-		const { page, warn } = pageWith({
+		const { page, warnings } = pageWith({
 			name: 'Grid',
 			props: {
 				gridClass: 'grid-cols-3',
@@ -163,7 +159,7 @@ describe('normalizeConfig', () => {
 		});
 
 		expect((page.containers[0].props as Record<string, unknown>).gridClass).toBeUndefined();
-		expect(warn).toHaveBeenCalledWith(expect.stringContaining('gridClass'));
+		expect(warnings).toEqual([expect.stringContaining('gridClass')]);
 	});
 
 	it('applies per-component defaults at any nesting depth', () => {
@@ -174,16 +170,26 @@ describe('normalizeConfig', () => {
 	});
 
 	it('returns an empty config for anything that is not an object', () => {
-		expect(normalizeConfig('nope').pages).toEqual({});
-		expect(normalizeConfig(undefined).pages).toEqual({});
+		expect(normalizeConfig('nope').config.pages).toEqual({});
+		expect(normalizeConfig(undefined).config.pages).toEqual({});
 	});
 
 	it('returns an empty config for an object with no pages', () => {
 		expect(
 			normalizeConfig({
 				defaults: {},
-			}).pages,
+			}).config.pages,
 		).toEqual({});
+	});
+
+	it('drops a page that is an array, which would render as a dead nav link', () => {
+		const { config: dropped } = normalizeConfig({
+			pages: {
+				'/array': [],
+			},
+		});
+
+		expect(Object.keys(dropped.pages)).toEqual([]);
 	});
 
 	it('gives a page whose containers are not an array an empty list', () => {
@@ -193,7 +199,7 @@ describe('normalizeConfig', () => {
 					containers: 'not an array',
 				},
 			},
-		}).pages['/'];
+		}).config.pages['/'];
 
 		expect(page.containers).toEqual([]);
 	});
@@ -228,7 +234,7 @@ describe('containers that would throw while rendering', () => {
 	});
 
 	it('drops a BoxService with no img, which would throw during SSR', () => {
-		const { page, warn } = pageWith({
+		const { page, warnings } = pageWith({
 			name: 'BoxService',
 			props: {
 				title: 'Proxmox',
@@ -237,11 +243,11 @@ describe('containers that would throw while rendering', () => {
 		});
 
 		expect(page.containers).toEqual([]);
-		expect(warn).toHaveBeenCalledWith(expect.stringContaining('img.src'));
+		expect(warnings).toEqual([expect.stringContaining('img.src')]);
 	});
 
 	it('drops a BoxService with no href', () => {
-		const { page, warn } = pageWith({
+		const { page, warnings } = pageWith({
 			name: 'BoxService',
 			props: {
 				title: 'Proxmox',
@@ -252,7 +258,7 @@ describe('containers that would throw while rendering', () => {
 		});
 
 		expect(page.containers).toEqual([]);
-		expect(warn).toHaveBeenCalledWith(expect.stringContaining('href'));
+		expect(warnings).toEqual([expect.stringContaining('href')]);
 	});
 
 	it('drops a BoxService whose href is not a string', () => {
@@ -270,12 +276,12 @@ describe('containers that would throw while rendering', () => {
 	});
 
 	it('drops a BoxAdguard with no href', () => {
-		const { page, warn } = pageWith({
+		const { page, warnings } = pageWith({
 			name: 'BoxAdguard',
 		});
 
 		expect(page.containers).toEqual([]);
-		expect(warn).toHaveBeenCalledWith(expect.stringContaining('href'));
+		expect(warnings).toEqual([expect.stringContaining('href')]);
 	});
 
 	it('keeps a BoxDate, which requires nothing', () => {
