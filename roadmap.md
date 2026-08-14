@@ -17,14 +17,24 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 21 items are open; **1, 2, 3, 4, 5, 6, 7, 8, 11, 19, 31
-and 32 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+**Numbers are stable, so gaps mean landed.** 23 items are open — 20 from the review passes, plus
+items 34–36, which came from building the admin guard rather than from a review; **1, 2, 3, 4, 5,
+6, 7, 8, 11, 19, 23, 31 and 32 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
 the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
 `npm run format` — measured, #12 became #11 while the "#23 before #12" sequencing note still said 12.
 Where a whole section emptied (#5, #7, #31, #32) the note sits at section level, which is safe
 because there is no list left to renumber.
+
+**Two names below are stale everywhere they appear, and the replacement is the same each time.**
+`CONTAINER_NAMES` and `requiredProps` no longer exist: `business/model/config.ts` now declares one
+valibot `containerSchemas` object and infers every config type from it, so an item that says "add
+the name to `CONTAINER_NAMES` and a `requiredProps` entry" means **add one `v.object` entry to
+`containerSchemas`** — which is also what makes it a compile error to register a container without
+deciding what it needs. The second edit point, `config-container.svelte`'s `if/else` chain, is
+unchanged and still required. Line numbers cited against `config.ts` predate the migration; the
+names still resolve.
 
 ## Correctness
 
@@ -109,6 +119,12 @@ vitest project. See AGENTS.md's "Already done".)_
     recurses forever. Wrap the call and fall back to `cache?.config ?? emptyConfig` like the two
     read failures, and delete structural keys (`items`) arriving from `defaultProps` at
     config.ts:150 (`defaults` is documented as per-container props, README.md:61).
+    _Narrowed by #23 and the valibot migration:_ the first half is mostly closed — validation is
+    `safeParse` throughout, so `normalizeConfig` no longer throws on malformed input and now hands
+    its diagnostics back as values. What survives is the **recursion**, which no schema can catch
+    because `defaults` is merged before the parse: a `defaults` entry for `Grid`/`SubGrid` carrying
+    `items` still recurses until the stack goes. Deleting structural keys from `defaultProps` is the
+    fix, and it is the whole of what is left here.
     _Prevents:_ reproduced on the built server — `GET /` returns 500 twice in a row with SvelteKit's
     bare `Internal Error` shell (not `+error.svelte`), forever, because line 43 never completes so
     `cache` stays `undefined`; `+layout.server.ts:6` awaits the same function, so the header nav
@@ -312,38 +328,19 @@ vitest project. See AGENTS.md's "Already done".)_
     _Files:_ src/lib/presentation/components/{box-service,box-adguard,box-date,grid}.svelte,
     src/lib/business/model/config.ts:81-83,112-129,149-186, src/lib/business/model/config.spec.ts
 
-23. **Give config loading a return channel: diagnostics as values, `GET /api/health`, one log per
-    mtime** — `M`
-    `normalizeConfig` reports drops with five `console.warn`s from inside a framework-free model file
-    (config.ts:140,146,160,182,221) and `readConfig` `console.error`s and discards its `AppError`
-    (config-source.ts:25-41) — both violate the errors-as-values contract in AGENTS.md. Return them:
-    `normalizeConfig(raw): { config, warnings }`, and `readConfig` handing back the last-good config
-    plus the problems it hit; keep the retained error beside the cache and add `GET /api/health`
-    returning 200 with page count + config mtime, or 503 with the message.
-    _Prevents:_ measured with a trailing comma in config.json — every page 404s with
-    `No dashboard page is configured for "/"`, a message that blames the URL, while the real cause is
-    written only to stdout as **two** full SyntaxError stack traces _per request_ (55 log lines for 3
-    requests; `+layout.server.ts:6` and `+page.server.ts:52` both call `readConfig`, and
-    config-source.ts:31's mtime short-circuit never engages because the failing branch never populates
-    `cache`). Worse, the log never names the file: the operator sees
-    `Unexpected token '}' … is not valid JSON` with no path, because the thrown message wins over the
-    fallback at src/lib/data/config.ts:29. No health/readiness route exists for a systemd
-    `ExecStartPost` or compose `HEALTHCHECK`.
-    _Unlocks a lint rule:_ #8 has landed, so this is the last item in the way. Once it does,
-    `no-console` becomes enableable with only `[...slug]/+page.server.ts` and
-    `service-store.svelte.ts`'s probe diagnostic exempted — 11 sites now, 4 after, one of which is
-    #10's `dps.js`. Don't reach for zenith's answer to get there: a
-    root `logger.ts` plus `no-console: 'error'` everywhere is a fourth module below all three layers,
-    and it collides with the errors-as-values / injected-notify contract AGENTS.md records as
-    deliberate. If a logger is ever genuinely needed here it goes in `src/lib/utils/` and needs **no**
-    new lint rule — `leaf-not-to-upper-layers` already fences that directory. Zenith needed a
-    root-level file and a bespoke `logger-imports-nothing` rule precisely because it has no leaf.
-    _Sequencing:_ #12's two warnings write into this channel — land this first. `config.spec.ts`'s
-    `pageWith` helper already returns `{ page, warn }`, so those assertions are a mechanical rewrite;
-    page.server.spec.ts:54-58 needs a new case separating unreadable-config from unknown-path.
-    _Files:_ src/lib/business/model/config.ts:136-178, src/lib/business/model/config-source.ts:20-45,
-    src/lib/data/config.ts:29, src/routes/[...slug]/+page.server.ts:52-57,
-    src/routes/api/health/+server.ts (new)
+23. **Give config loading a return channel — LANDED.** `normalizeConfig` returns
+    `{ config, warnings }`, `readConfig` returns `{ config, warnings, error, mtimeMs, isFresh }`,
+    and `GET /api/health` answers 200 with page count + mtime or 503 with the message. Logging
+    moved to the two route callers, gated on `isFresh`, which is what makes it one log per stamp
+    instead of the measured 55 lines per 3 requests. `[...slug]/+page.server.ts` now answers 503
+    rather than 404 when the config is unreadable and no page matched, so the error stops blaming
+    the URL. Two things this item claimed turned out to be already fixed by the time it was worked:
+    `src/lib/data/config.ts:29` (the thrown message beating the context) was closed when
+    `useAsyncErrorAsValue` was made to compose, and the read-failure branch already cached against
+    the stamp — what did not cache was the **stat**-failure branch, and neither retained its
+    `AppError`. Both are fixed now. The rest moved into AGENTS.md's errors-as-values section.
+    _Unblocked:_ #12's two warnings now have a channel to write into. **`no-console` is enableable**
+    — nothing is in the way any more; see the console paragraph in AGENTS.md for the exemption list.
 
 ## Features
 
@@ -495,6 +492,44 @@ the same applies to a future 34.
     src/routes/[...slug]/+page.server.ts:16-48, messages/en.json, messages/de.json,
     README.md:65-74, .env.example
 
+## The admin area and the config editor
+
+The guard landed with the read-only `/admin` page; everything that makes it useful is here. The
+threat model is the reason for the ordering: `config.json` is the internal network map _and_ the
+source of `/api/ping`'s allowlist, so a write path without the guard in front of it would let
+anyone on the LAN rewrite the allowlist and turn the ping endpoint into an arbitrary internal port
+scanner. The guard exists now, so #34 is safe to build — but **`/api/ping` itself is still
+unauthenticated**, and that is by design only for as long as the allowlist can be trusted.
+
+34. **A validate-and-write path for `config.json`** — `M`
+    `data/config.ts` gets `$writeConfigFile`, `business/model/config-source.ts` gets `writeConfig`,
+    and the route calls business (a route server file may not reach `src/lib/data`). Two things are
+    not optional. **Write atomically** — `writeFile` to a `.tmp` beside the target then `rename`:
+    a plain write interrupted mid-flight leaves truncated JSON, and while the read path survives
+    that in memory, a restart then serves `emptyConfig` and the dashboard is blank. **Reject on
+    `warnings`, do not write and warn** — `normalizeConfig` already returns them (#23), so the
+    action can hand back exactly which containers would have been dropped instead of silently
+    eating them, which is the whole reason #23 came first. The stamp cache self-heals after a
+    write because the mtime changes; do not add a manual invalidation.
+    _Files:_ src/lib/data/config.ts, src/lib/business/model/config-source.ts,
+    src/routes/admin/+page.server.ts, messages/en.json, messages/de.json
+35. **A schema-driven form over the containers, not a JSON textarea** — `L`
+    A `<textarea>` of raw JSON in a browser is a worse VS Code and earns nothing over editing the
+    file. The win is picking a container from a list and filling in its props, which is what the
+    valibot schema now makes possible: `containerSchemas` is a runtime value, so the form can be
+    generated from it rather than hand-written per container — and generating it is the only way
+    the form does not become a fourth place to edit when a container is added. Needs #34 under it.
+    _Files:_ src/routes/admin/, src/lib/business/model/config.ts (schema introspection)
+36. **Close the two known gaps in the admin area** — `S`
+    Neither is accidental and both are documented in README.md, but both are real. **No login rate
+    limiting or lockout:** one shared secret with unlimited guesses is only safe because the token
+    is long and the dashboard is not meant to face the internet — a counter keyed on IP with a
+    backoff is enough, and it belongs in business, not the hook. **`.env.example` has no
+    `DASHBOARD_ADMIN_TOKEN` line**, so the one file that tells an operator what to set does not
+    mention the thing that switches the admin area on; it was left out only because the file is
+    outside what the agents doing this work were permitted to touch.
+    _Files:_ .env.example, src/lib/business/model/admin-auth.ts, README.md
+
 ## Ops & DX
 
 27. **Ship a production invocation that actually loads `.env`, and document the AdGuard contract** —
@@ -636,7 +671,10 @@ the repo's only automated a11y check.)_
 
 The order that matters, beyond the group ranking:
 
-- **#23 before #12** — item 12's two warnings need the diagnostics channel to write into.
+- ~~**#23 before #12**~~ — landed. #12's two warnings now have the channel to write into, and
+  `no-console` is enableable whenever someone wants it.
+- **#34 before #35** — the editor needs the validate-and-write path underneath it, and #35 needs
+  #34's returned diagnostics to tell the operator what it rejected.
 - **#25 is now overdue, not optional** — #2 has landed, so `/api/ping` opens a real TCP connection
   to whatever a `BoxService` names. `config.json:32-42`'s `tteck` entry points at
   community-scripts.github.io, which means four connects an hour to GitHub Pages to paint a

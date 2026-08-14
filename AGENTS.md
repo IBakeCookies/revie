@@ -199,6 +199,15 @@ whoever holds the state, not to the innermost function.
   failure (network drop, HTTP error) produced `message: undefined` and could not be reported at
   all.
 - `AppError.cause` is the original thrown value, **for the log only** — never render it.
+- **Config loading obeys this too, and that is what closed #23.** `normalizeConfig` returns
+  `{ config, warnings }` and `readConfig` returns `ConfigRead` — `{ config, warnings, error,
+mtimeMs, isFresh }`. Neither prints. `isFresh` is true only on the call that actually
+  re-read the file, which is what turns the diagnostics into **one log per stamp** instead of
+  one per request: both `+layout.server.ts` and `[...slug]/+page.server.ts` call `readConfig`,
+  and both log only when it is set. Two concurrent first hits can still log twice; an in-flight
+  promise cache to dedupe that race is more machinery than one duplicate pair is worth, and it
+  is written down here so nobody adds one. `GET /api/health` is the same values read a second
+  way — 200 with page count and mtime, 503 with the message.
 - **`useAsyncErrorAsValue`'s second parameter is `context`, and it COMPOSES** —
   `${context}: ${thrown}`, with either half standing alone. It used to be a _fallback_ the thrown
   message beat, so every call site's context was silently discarded: the probe diagnostic logged
@@ -256,7 +265,8 @@ carries its props.
 config.json ─(disk read, no caching)→ data/config.ts
             ─(stamp cache)→ business/model/config-source.ts   readConfig
             ─(validate + drop bad)→ business/model/config.ts  normalizeConfig
-            ─(page data)→ [...slug]/+page.server.ts
+            ─(page data + diagnostics)→ [...slug]/+page.server.ts
+            ─(one log per stamp)→ +layout.server.ts / [...slug]/+page.server.ts
             ─(recurse)→ page.svelte → config-container.svelte → the component
 ```
 
@@ -266,6 +276,25 @@ config.json ─(disk read, no caching)→ data/config.ts
   and that duplication is load-bearing: a component held in a variable has no statically
   known props, so spreading config props into it would need an `any`. **Adding a component
   means editing both.**
+- **The schema is a valibot value, and every config type is inferred from it.**
+  `containerSchemas` is the one declaration; `ContainerName` is its `keyof`,
+  `ConfigContainer<N>` is a mapped-then-indexed type over it, and `isContainerName` is
+  `Object.hasOwn` against it. There used to be a second, hand-written copy of the same
+  shapes — a `requiredProps` table — and nothing forced the two to agree. Two things resist
+  full inference and are closed at the type level instead, both deliberately: a Grid's
+  `items` (a container schema naming itself is a TS circular-inference failure, and children
+  must be parsed one at a time so a bad child doesn't fail its parent grid) and `ConfigPage`
+  (`pageSchema` is honestly file-facing — `v.array(v.unknown())` — because nothing there has
+  checked that the entries are containers yet). Validation is always `safeParse`, never
+  `parse`: a hand-edited file has to degrade.
+- **The warning sentences are asserted, so they are part of the contract.** They are minted
+  here, not taken from valibot — `v.getDotPath` names the prop and the sentence is ours.
+  `BoxService.img` is spelled `v.optional(v.object({ src: v.string() }), {} as { src: string })`,
+  a deliberately invalid default that walks a missing `img` one level deeper so the warning
+  names `img.src` rather than stopping at `img`. That is a type assertion earning its keep on
+  a technicality, and it is allowed **because `config.spec.ts` asserts both the drop and the
+  path** — if a valibot change ever stopped validating defaults, the test fails loudly instead
+  of silently turning a required prop optional.
 - `Grid` and `SubGrid` nest, so `config-container ↔ grid ↔ sub-grid` is a dependency cycle.
   It's deliberate (recursion), which is why `no-circular` exempts those three files by name
   rather than being turned down to a warning.
@@ -332,6 +361,52 @@ appearance cookie's name and write belong in the repository, its rules in busine
   mint would shift the scenery between server and client.
 - `business/model/theme.ts` is deliberately free of runes and of storage, so the SSR path can
   import it without pulling in the client-reactive store.
+
+### The admin area
+
+One operator, one shared secret, no user system. It exists because `config.json` is the
+internal network map _and_ the source of `/api/ping`'s allowlist: an unauthenticated write
+path would let anyone on the LAN rewrite that allowlist and turn the ping endpoint into an
+arbitrary internal port scanner. So auth landed **before** any write path, and the write path
+is still to come — today `/admin` only renders the config read-only.
+
+```
+DASHBOARD_ADMIN_TOKEN ─→ business/model/admin-auth.ts    every decision, owns no cookie name
+                      ─→ data/repository/admin-session-repository.ts   the cookie name + attributes
+                      ─→ hooks.server.ts   handleAdmin, second in the sequence
+```
+
+The same repository/business split the appearance pipeline uses, for the same reason. Five
+things about it are decisions:
+
+- **Unset token ⇒ the whole area 404s**, not 401, and with the same sentence the catch-all
+  404 uses. A feature that is switched off must not advertise that it exists. A hook-thrown
+  404 renders SvelteKit's static fallback rather than [+error.svelte](src/routes/+error.svelte),
+  so the chrome still differs from a config 404 — closing that would mean moving the guard
+  outside `handle`, which nothing can do: routes resolve before hooks, and `reroute` is
+  universal so it cannot read private env.
+- **`/admin` is reserved, and the guard wins over config.** A `pages` key of `/admin` still
+  renders in the navigation but stops being reachable the moment the token is set. A reserved
+  path a config file could take back is not reserved. It is a README note rather than a runtime
+  warning because `business/model/config.ts` is browser-safe and cannot read the env, so
+  detecting the collision would mean threading the enabled flag through normalization for one
+  diagnostic. The prefix is the **segment** — `/admin` or `/admin/…` — so `/administration` is
+  an ordinary config page.
+- **The comparison is constant-time over SHA-256 digests**, not over the raw strings.
+  `timingSafeEqual` throws on a length mismatch, so comparing 32-byte digests means a
+  wrong-length guess takes the same path as a wrong-value one instead of returning early.
+- **The cookie holds the token itself**, `httpOnly` + `SameSite=Strict` + `secure` outside dev.
+  A derived digest would be exactly as replayable, so it buys nothing; what limits exposure is
+  the attributes. Rotating `DASHBOARD_ADMIN_TOKEN` therefore signs everyone out, and that is the
+  whole revocation mechanism — no session store, no session ids, no expiry sweep. Deliberately
+  **not** `COOKIE_WRITE_OPTIONS`: the appearance cookies are read by the browser and ride along
+  on cross-site navigations, and this one must do neither.
+- **The route files do not re-check auth.** `handleAdmin` has already answered for every
+  `/admin` path, and a second check is a second place to get it wrong.
+
+Two gaps, both known and neither accidental: there is **no login rate limiting**, and
+`secure: !dev` means a production deployment on plain http will have the browser drop the
+cookie so the login never sticks — serve it over TLS. Both are in README.md.
 
 ## Invariants
 
@@ -613,21 +688,22 @@ file doesn't start the drift.
 ([vite.config.ts](vite.config.ts)). A spec that builds a fixture and forgets to assert is a
 green test that proves nothing, which is worse than no test.
 
-**`console` has exactly four homes, and no lint rule guards them yet.**
-`business/model/config.ts` (6 warns), `business/model/config-source.ts` (2 errors),
-`business/store/service-store.svelte.ts` (1 — the probe diagnostic), and
-`[...slug]/+page.server.ts` (2 — the operator channel). Measured: a global `no-console` reports
-13 — the other two are outside `src`, and neither is a home: `dps.js`, which
-[roadmap.md](roadmap.md) #10 deletes, and `scripts/screenshot.js`, a CLI whose whole job is to
-tell a terminal where it wrote a file. Eight of the eleven
-in `src` are #23's work — they are diagnostics a framework-free model should be **returning**,
-not printing. The other three are **deliberate and permanent**: they are the log half of the
-no-copy-crosses-a-layer rule, carrying the `AppError.message` that must never reach a toast.
-They are unconditional rather than injected precisely because a diagnostic has a fixed sink,
-and that is the one thing zenith uses its `logger.ts` for. Don't add a fifth home, and don't
-reach for zenith's `no-console: 'error'` + a `logger.ts` to force the issue: a logger module
-would be a second seam competing with the injected notify. Turn the rule on once #23 lands,
-with `+page.server.ts`, `service-store.svelte.ts` and `scripts/` exempted.
+**`console` has exactly three homes, all of them routes or stores, and no lint rule guards
+them yet.** `business/store/service-store.svelte.ts` (1 — the probe diagnostic),
+`+layout.server.ts` (2 — config diagnostics) and `[...slug]/+page.server.ts` (4 — config
+diagnostics plus the AdGuard operator channel). Measured: a global `no-console` reports 9, the
+other two being outside `src` and neither a home — `dps.js`, which [roadmap.md](roadmap.md) #10
+deletes, and `scripts/screenshot.js`, a CLI whose whole job is to tell a terminal where it wrote
+a file. **#23 has landed, and this is what it bought:** `business/model/config.ts` and
+`config-source.ts` printed eight of these and now print none, because a framework-free model
+returns its diagnostics instead. What is left is **deliberate and permanent** — the log half of
+the no-copy-crosses-a-layer rule, carrying the `AppError.message` that must never reach a toast.
+They are unconditional rather than injected precisely because a diagnostic has a fixed sink, and
+that is the one thing zenith uses its `logger.ts` for. Don't add a fourth home, and don't reach
+for zenith's `no-console: 'error'` + a `logger.ts` to force the issue: a logger module would be a
+second seam competing with the injected notify. **The rule is now enableable** — nothing is in
+the way any more — with `+layout.server.ts`, `[...slug]/+page.server.ts`,
+`service-store.svelte.ts` and `scripts/` exempted.
 
 **One definition per concept.** If you catch yourself writing "mirrors", "same as" or "keep in
 sync with", export the thing instead. This repo has exactly two exceptions, both documented
@@ -672,8 +748,10 @@ Comments explain _why_, not _what_; the existing ones are the house style, match
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 23 open items, all but #33 from three review
-passes and adversarially verified against the code, ordered by what breaks soonest. Several are straight ports from
+The open work lives in [roadmap.md](roadmap.md) — 23 open items, all but #33 and #34–36 from three
+review passes and adversarially verified against the code, ordered by what breaks soonest. #34–36
+are the config editor and the admin area's two known gaps, which came from building the guard
+rather than from a review. Several are straight ports from
 `zenith`, which has already solved them; those items name the upstream files. It is its own file
 because it churns as items land, while this one is the architecture and should not. **Nothing in it
 is fixed** — the section below is what is.
@@ -734,20 +812,29 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   and don't reintroduce `ComponentRegistry` / `ComponentName` — neither name exists in
   `src/` any more. A side effect worth keeping: the five Svelte components no longer
   leak into the `/api/ping` server bundle.
-- **`BoxService.title` is required**, in the schema and in `requiredProps`. It was
-  optional in the derived type while the component demanded it, so a title-less entry
-  passed validation and rendered an empty heading.
+- **`BoxService.title` is required**, in the schema — which is now the only place it could
+  be said. It was optional in the derived type while the component demanded it, so a
+  title-less entry passed validation and rendered an empty heading.
 - **Stores live in `business/store/`**, not presentation. The reactive holder is only
   half of what a store does; the other half is orchestration, and that is business. The
   split that makes it safe is `model/` staying framework-free for the SSR path.
 - **`readAdguardStats` and `readConfig` are business functions.** Route server files
   may not reach `src/lib/data` — see the layer rule.
-- **`normalizeContainer` guards required props.** `requiredProps` is a
-  `Record<ContainerName, …>`, so registering a container without deciding what it needs is a
-  compile error. `items` is set unconditionally for `Grid`/`SubGrid` — a grid written before
-  its children renders empty instead of throwing in `findContainer` on the next page load.
-  A container missing a required prop is dropped with a warning; its siblings and its parent
+- **`normalizeContainer` guards required props, and `requiredProps` is gone.** It was a
+  `Record<ContainerName, …>` table restating shapes the types already carried, with nothing
+  forcing the two to agree — the third "keep in sync" duplicate in a repo that sanctions
+  exactly two, and the only one that could be collapsed. The valibot schema is now the single
+  declaration and the types are inferred from it. Don't reintroduce the table. What did not
+  change: `items` is set unconditionally for `Grid`/`SubGrid` — a grid written before its
+  children renders empty instead of throwing in `findContainer` on the next page load — and a
+  container missing a required prop is dropped with a warning while its siblings and its parent
   grid survive.
+- **A page whose value is not a record is dropped, and `v.object` will not do it for you.**
+  `v.object` accepts an array, so `{"pages": {"/x": []}}` parses as a page with no containers
+  — and the navigation links straight to every key it gets, so the result is a dead nav entry,
+  which is the same defect the leading-slash check guards. The `isRecord(rawPage)` guard in
+  front of the `safeParse` is what stops it, and `config.spec.ts` fences it. It was lost once
+  in the valibot migration and caught in review; the test is there so it cannot go again.
 - **`Config` deliberately has no `defaults` field.** An earlier note said to add one; that was
   wrong. `Config` is the NORMALIZED shape, and defaults are consumed during normalization
   (merged into props), so nothing downstream ever sees them. The file format has no type at
