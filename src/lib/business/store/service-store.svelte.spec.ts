@@ -79,6 +79,51 @@ describe('ServicesStore', () => {
 		expect(notify).toHaveBeenCalledWith(href);
 	});
 
+	it('says nothing at all when the probe succeeds', async () => {
+		const notify = vi.fn();
+		const store = new ServicesStore(notify);
+
+		vi.mocked(readServiceState).mockResolvedValue([null, true]);
+		await store.refresh(href);
+
+		// Without this, moving the notify out of the failure branch toasts every healthy
+		// service on every 15-minute poll and no other case notices.
+		expect(notify).not.toHaveBeenCalled();
+	});
+
+	it('drops the answer of a probe whose page went away mid-flight', async () => {
+		const store = new ServicesStore();
+		const controller = new AbortController();
+
+		vi.mocked(readServiceState).mockResolvedValue([null, true]);
+		// The teardown ran while the probe was out; the check is after the await either way.
+		controller.abort();
+		await store.refresh(href, controller.signal);
+
+		expect(store.isAlive(href)).toBeNull();
+	});
+
+	it('does not report a failure to a page the user has already left', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const notify = vi.fn();
+		const store = new ServicesStore(notify);
+		const controller = new AbortController();
+
+		vi.mocked(readServiceState).mockResolvedValue([
+			{
+				message: 'boom',
+			},
+			null,
+		]);
+
+		controller.abort();
+		await store.refresh(href, controller.signal);
+
+		expect(notify).not.toHaveBeenCalled();
+		// Still logged: the diagnostic has a fixed sink, so nothing is swallowed.
+		expect(consoleError).toHaveBeenCalledWith('boom', '');
+	});
+
 	it('logs the technical detail either way, so nothing is swallowed', async () => {
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const store = new ServicesStore();

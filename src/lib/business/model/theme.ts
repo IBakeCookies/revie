@@ -43,7 +43,7 @@ export interface ThemeItem {
 	css: string[];
 }
 
-export const themes: ThemeItem[] = [
+export const themes = [
 	{
 		name: 'revie',
 		label: 'Revie',
@@ -179,7 +179,22 @@ export const themes: ThemeItem[] = [
 		label: 'City Windows',
 		css: ['city-windows', 'dark'],
 	},
-] as const;
+] satisfies ThemeItem[];
+
+type AssertNever<T extends never> = T;
+
+/**
+ * The compile fence for the direction nothing else checks, with no runtime part.
+ *
+ * `themes: ThemeItem[]` only ever proved catalogue → union; the annotation also
+ * widened every `name` back to `ThemeName`, which is why the `as const` that used
+ * to sit here was inert. `satisfies` keeps the literal names, so a `ThemeName` whose
+ * entry was deleted lands in the `Exclude` and fails the `never` constraint here —
+ * instead of type-checking fine and rendering the app with no theme classes at all.
+ */
+export type UncataloguedThemeName = AssertNever<
+	Exclude<ThemeName, (typeof themes)[number]['name']>
+>;
 
 /* Defaults for first visit (no cookie). hooks.server.ts injects both class
    lists into app.html's pre-paint script, so this stays the only definition.

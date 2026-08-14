@@ -4,7 +4,7 @@ import { browser } from '$app/environment';
 // data -> business -> presentation. Business also narrows the write signatures
 // to ThemeName, so a theme outside the catalogue cannot be persisted from here.
 import {
-	readClientTheme,
+	readClientAppearance,
 	updateScenerySeed,
 	updateSceneryMotion,
 	updateTheme,
@@ -16,11 +16,13 @@ import {
 	resolveThemeName,
 	randomScenerySeed,
 	themes,
-	type ThemeItem,
 	type ThemeName,
 } from '$lib/business/model/theme';
 
 const CONTEXT_KEY = Symbol();
+/* Every class any theme stamps, so a switch removes whatever the last one added.
+   Module scope, not `$derived`: the catalogue is a constant and has no reactive input. */
+const ALL_THEME_CLASSES = themes.map((t) => t.css).flat();
 
 /**
  * Appearance as shared reactive state: the active theme, the per-user scenery
@@ -34,7 +36,6 @@ const CONTEXT_KEY = Symbol();
  */
 export class ThemeStore {
 	#theme = $state<ThemeName>(DEFAULT_THEME);
-	#themes: ThemeItem[] = themes;
 
 	// per-user scenery seed: minted server-side (+layout.server.ts cookie),
 	// identical on both ends so the SSR-inlined style never shifts
@@ -52,20 +53,28 @@ export class ThemeStore {
 		return getClassesToAdd(this.#theme);
 	});
 
-	#classesToRemove = $derived.by<string[]>(() => {
-		return themes.map((t) => t.css).flat();
-	});
-
 	constructor(
 		initialTheme?: ThemeName,
 		initialScenerySeed?: number,
 		initialSceneryPaused?: boolean,
 	) {
-		this.#scenerySeed = initialScenerySeed ?? 0;
-		this.#sceneryPaused = initialSceneryPaused ?? false;
+		// A cached or prerendered document carries a serialized payload that may be
+		// stale — the cookie is the source of truth, and that holds for all three:
+		// the seed can have been rerolled and the motion toggled in another tab
+		// since this HTML was produced. Read once, applied below.
+		const cookie = browser ? readClientAppearance() : undefined;
+		// An explicit preference from EITHER source, so the OS query below still
+		// only seeds when neither has one. The cookie wins over the payload because
+		// it is the more recent record of the same choice.
+		const seededPaused = cookie?.sceneryPaused ?? initialSceneryPaused;
+
+		// No client-side mint: an absent seed falls back to the payload the server
+		// minted, never to a fresh number, which would shift the scenery.
+		this.#scenerySeed = cookie?.scenerySeed ?? initialScenerySeed ?? 0;
+		this.#sceneryPaused = seededPaused ?? false;
 
 		$effect(() => {
-			document.documentElement.classList.remove(...this.#classesToRemove);
+			document.documentElement.classList.remove(...ALL_THEME_CLASSES);
 			document.documentElement.classList.add(...this.#classesToAdd);
 		});
 
@@ -87,7 +96,7 @@ export class ThemeStore {
 
 			sync();
 
-			if (initialSceneryPaused === undefined && query.matches) {
+			if (seededPaused === undefined && query.matches) {
 				this.#sceneryPaused = true;
 			}
 
@@ -96,16 +105,12 @@ export class ThemeStore {
 			return () => query.removeEventListener('change', sync);
 		});
 
-		// a cached or prerendered document carries a serialized theme that may be
-		// stale — the cookie is the source of truth, so it wins over initialTheme
-		if (browser) {
-			const cookieTheme = readClientTheme();
+		// Already resolved against the catalogue by business, so it names a theme
+		// that exists — see the stale-cookie fall-through below for the other case.
+		if (cookie?.theme) {
+			this.#theme = cookie.theme;
 
-			if (cookieTheme) {
-				this.#theme = cookieTheme;
-
-				return;
-			}
+			return;
 		}
 
 		// a stale cookie may still name a deleted theme — fall through to defaults
@@ -138,7 +143,7 @@ export class ThemeStore {
 	}
 
 	get themes() {
-		return this.#themes;
+		return themes;
 	}
 
 	get scenerySeed() {

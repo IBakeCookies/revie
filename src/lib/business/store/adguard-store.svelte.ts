@@ -24,6 +24,7 @@ export function setAdguardStore(stats: () => AdguardStats | undefined): AdguardS
 	return setContext<AdguardStore>(CONTEXT_KEY, new AdguardStore(stats));
 }
 
-export function getAdguardStore(): AdguardStore {
-	return getContext<AdguardStore>(CONTEXT_KEY);
+/** `undefined` wherever no component above set the store — a story mounting a wrapper alone. */
+export function getAdguardStore(): AdguardStore | undefined {
+	return getContext<AdguardStore | undefined>(CONTEXT_KEY);
 }

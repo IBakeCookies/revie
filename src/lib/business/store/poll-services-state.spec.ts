@@ -50,7 +50,34 @@ describe('pollServicesState', () => {
 
 		pollServicesState(store, containers);
 
-		expect(store.refresh).toHaveBeenCalledExactlyOnceWith('https://proxmox.local');
+		expect(store.refresh).toHaveBeenCalledExactlyOnceWith(
+			'https://proxmox.local',
+			expect.any(AbortSignal),
+		);
+	});
+
+	it('probes a href named twice by the config only once', () => {
+		const store = fakeStore();
+
+		// Two probes of one endpoint per tick is two round trips for one answer. The
+		// dedupe lives in `collectServiceHrefs`; this holds it at the seam that needs it.
+		pollServicesState(store, [...containers, ...containers]);
+
+		expect(store.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it('aborts the probes it started once the returned teardown runs', () => {
+		const store = fakeStore();
+		const stop = pollServicesState(store, containers);
+		const [, signal] = vi.mocked(store.refresh).mock.calls[0];
+
+		expect(signal?.aborted).toBe(false);
+
+		stop();
+
+		// A probe still in flight resolves into an aborted signal, so it can neither
+		// write over the page that replaced this one nor toast it.
+		expect(signal?.aborted).toBe(true);
 	});
 
 	it('keeps refreshing on the interval', () => {

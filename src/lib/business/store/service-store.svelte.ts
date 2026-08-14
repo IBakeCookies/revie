@@ -29,20 +29,34 @@ export class ServicesStore {
 		return this.#states[href] ?? null;
 	}
 
-	async refresh(href: string): Promise<void> {
+	/**
+	 * `signal` is the caller's teardown, checked AFTER the await: the probe that was in
+	 * flight when the page went away must not write its answer over the page that
+	 * replaced it, nor report to a page nobody is looking at.
+	 */
+	async refresh(href: string, signal?: AbortSignal): Promise<void> {
 		const [err, isAlive] = await readServiceState(href);
 
 		if (err) {
 			// The probe failed, which says nothing about the service — keep the last
 			// known state rather than showing a false offline dot.
 			//
-			// Two channels, and the split is the point. `err.message` ("fetch failed")
-			// is for whoever is reading a log, so it stays here unconditionally rather
-			// than being injected: it is a diagnostic, not a report. The notify is the
-			// injected half, and it hands over the href alone.
+			// Two channels, and the split is the point. `err.message` ("Could not reach
+			// http://wled.local: fetch failed") is for whoever is reading a log, so it stays
+			// here unconditionally rather than being injected: it is a diagnostic, not a
+			// report. The notify is the injected half, and it hands over the href alone.
 			console.error(err.message, err.cause ?? '');
-			this.#notify(href);
 
+			// The log fires either way — a diagnostic has a fixed sink — so an aborted
+			// probe is not swallowed, it just has nobody left to tell.
+			if (!signal?.aborted) {
+				this.#notify(href);
+			}
+
+			return;
+		}
+
+		if (signal?.aborted) {
 			return;
 		}
 
@@ -54,6 +68,7 @@ export function setServicesStore(notify?: NotifyProbeFailed): ServicesStore {
 	return setContext<ServicesStore>(CONTEXT_KEY, new ServicesStore(notify));
 }
 
-export function getServicesStore(): ServicesStore {
-	return getContext<ServicesStore>(CONTEXT_KEY);
+/** `undefined` wherever no component above set the store — a story mounting a wrapper alone. */
+export function getServicesStore(): ServicesStore | undefined {
+	return getContext<ServicesStore | undefined>(CONTEXT_KEY);
 }

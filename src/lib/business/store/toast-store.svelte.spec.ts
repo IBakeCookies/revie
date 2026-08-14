@@ -62,6 +62,19 @@ describe('ToastStore', () => {
 		expect(store.messages).toEqual(['a']);
 	});
 
+	it('does not let a dismissed message cut the next one short', () => {
+		const store = new ToastStore();
+
+		store.show('a');
+		vi.advanceTimersByTime(1_000);
+		store.dismiss('a');
+		store.show('a');
+		// The first timer's 6s mark, one second into the second toast's own life.
+		vi.advanceTimersByTime(5_000);
+
+		expect(store.messages).toEqual(['a']);
+	});
+
 	it('can be dismissed before it clears', () => {
 		const store = new ToastStore();
 

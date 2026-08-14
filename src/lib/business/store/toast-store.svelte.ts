@@ -25,6 +25,14 @@ export class ToastStore {
 	 */
 	#messages = $state<string[]>([]);
 
+	/**
+	 * The auto-dismiss handle of each shown message, so `dismiss` can cancel it. Keyed
+	 * like `#messages` and deliberately NOT reactive — nothing renders a timer, and the
+	 * whole point of the `untrack` below is to keep this store out of the effect that
+	 * calls into it.
+	 */
+	#timers: Record<string, ReturnType<typeof setTimeout>> = {};
+
 	get messages(): readonly string[] {
 		return this.#messages;
 	}
@@ -50,11 +58,19 @@ export class ToastStore {
 			}
 
 			this.#messages.push(message);
-			setTimeout(() => this.dismiss(message), TOAST_MS);
+
+			this.#timers[message] = setTimeout(() => this.dismiss(message), TOAST_MS);
 		});
 	};
 
 	dismiss(message: string): void {
+		// The timer belongs to the message, so it dies with it. Left running, the timer of
+		// a dismissed toast went on to clear the NEXT toast of the same line early — show,
+		// dismiss a second later, show again, and the second one lasted 5s instead of 6.
+		// It is also what stops the handles piling up on a tab left open all day.
+		clearTimeout(this.#timers[message]);
+		delete this.#timers[message];
+
 		this.#messages = this.#messages.filter((existing) => existing !== message);
 	}
 }
