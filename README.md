@@ -101,6 +101,29 @@ works without regenerating CSS. Anything else that needs to be configurable shou
 follow the same shape — a named token in the config, mapped to literal classes in
 the components.
 
+## The admin area
+
+`DASHBOARD_ADMIN_TOKEN` is one shared secret for one operator — not a user system. Set it
+in `.env` (or the environment `node build` runs in) and `/admin` shows the config the
+server is currently serving, read-only:
+
+```sh
+DASHBOARD_ADMIN_TOKEN=$(openssl rand -hex 32)
+```
+
+- **Unset, the whole admin area returns 404**, not 401: a feature that is switched off
+  should not advertise that it exists.
+- Signing in at `/admin/login` sets a session cookie that is `httpOnly`, `SameSite=Strict`
+  and — outside `npm run dev` — `Secure`, so **serve production over TLS** or the browser
+  drops it and the login never sticks.
+- The cookie holds the token, so **rotating `DASHBOARD_ADMIN_TOKEN` signs everyone out**.
+  That is the whole revocation mechanism; there is no session store to clear.
+- **`/admin` and everything under it are reserved** once the token is set. A `pages` key
+  of `/admin` in `config.json` still renders in the navigation but is no longer reachable —
+  the guard answers first — so name that page something else.
+- There is no rate limiting on the login form. Pick a token long enough that this does not
+  matter, and don't expose the dashboard to the internet.
+
 ## Services and status dots
 
 Each `BoxService` is probed through `POST /api/ping` every 15 minutes. The probe opens a

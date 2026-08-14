@@ -27,6 +27,10 @@ export default defineConfig({
 		// their own instead of depending on the services of the machine they run on.
 		env: {
 			DASHBOARD_CONFIG: 'e2e/fixture-config.json',
+			// Switches the admin area on for this server — unset, every /admin path
+			// 404s. Spelled again in can-sign-in-as-admin.e2e.ts, because this reaches
+			// the server process and not the test one.
+			DASHBOARD_ADMIN_TOKEN: 'e2e-operator-token',
 		},
 	},
 	timeout: testTimeout,

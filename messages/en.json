@@ -19,6 +19,12 @@
 	"service_status_offline": "offline",
 	"service_status_unknown": "status unknown",
 	"service_probe_failed": "Could not check {href}",
+	"admin_title": "Administration",
+	"admin_config_heading": "Current configuration",
+	"admin_sign_in": "Sign in",
+	"admin_sign_in_failed": "That token was not accepted",
+	"admin_sign_out": "Sign out",
+	"admin_token_label": "Operator token",
 	"toast_dismiss": "Dismiss this message",
 	"error_unknown": "Something went wrong"
 }

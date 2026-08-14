@@ -19,6 +19,12 @@
 	"service_status_offline": "offline",
 	"service_status_unknown": "Status unbekannt",
 	"service_probe_failed": "{href} konnte nicht geprüft werden",
+	"admin_title": "Verwaltung",
+	"admin_config_heading": "Aktuelle Konfiguration",
+	"admin_sign_in": "Anmelden",
+	"admin_sign_in_failed": "Dieses Token wurde nicht akzeptiert",
+	"admin_sign_out": "Abmelden",
+	"admin_token_label": "Betreiber-Token",
 	"toast_dismiss": "Diese Meldung ausblenden",
 	"error_unknown": "Etwas ist schiefgelaufen"
 }
