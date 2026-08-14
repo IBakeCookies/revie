@@ -1,8 +1,10 @@
-import type { ConfigContainer } from '$lib/business/model/config';
+import type { ConfigContainer, ContainerField } from '$lib/business/model/config';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
 	collectServiceHrefs,
+	containerFields,
+	containerNames,
 	findContainer,
 	isBoxAdguard,
 	isGrid,
@@ -352,6 +354,101 @@ describe('collectServiceHrefs', () => {
 		});
 
 		expect(collectServiceHrefs(page.containers)).toEqual(['https://proxmox.local:8006']);
+	});
+});
+
+/**
+ * Fills a container's props the way a generated form does: one key per described field,
+ * at the path the description names. Nested, because `img.src` is two levels down.
+ */
+function fillFields(fields: ContainerField[], onlyRequired: boolean) {
+	const props: Record<string, unknown> = {};
+
+	for (const field of fields.filter((item) => item.isRequired || !onlyRequired)) {
+		const keys = field.path.split('.');
+		let node = props;
+
+		for (const key of keys.slice(0, -1)) {
+			const created = {};
+
+			node[key] = created;
+			node = created;
+		}
+
+		node[keys[keys.length - 1]] =
+			field.kind === 'children' ? [] : field.kind === 'number' ? 1 : 'x';
+	}
+
+	return props;
+}
+
+function normalizeFilled(onlyRequired: boolean) {
+	return normalizeConfig({
+		pages: {
+			'/': {
+				containers: containerNames.map((name) => ({
+					name,
+					props: fillFields(containerFields[name], onlyRequired),
+				})),
+			},
+		},
+	});
+}
+
+// The claim the generated form rests on: the descriptions are walked out of
+// `containerSchemas`, so a container added there is offered with its props and nothing
+// else has to be edited. Asserted over `containerNames` rather than the five names, so a
+// sixth container is covered the moment it is declared — and asserted THROUGH
+// `normalizeConfig`, which is what makes it a real check: a required prop the walk failed
+// to describe is a container the form cannot fill, and an unfillable container is dropped
+// with a warning here.
+describe('containerFields', () => {
+	it('describes every declared container', () => {
+		expect(Object.keys(containerFields)).toEqual(containerNames);
+		expect(containerNames.length).toBeGreaterThan(0);
+
+		for (const name of containerNames) {
+			expect(containerFields[name].length).toBeGreaterThan(0);
+		}
+	});
+
+	it('describes every required prop, so a form can fill a savable container', () => {
+		const { config, warnings } = normalizeFilled(true);
+
+		expect(warnings).toEqual([]);
+		expect(config.pages['/'].containers.map((item) => item.name)).toEqual(containerNames);
+	});
+
+	it('describes every optional prop with a kind the schema accepts', () => {
+		const { warnings } = normalizeFilled(false);
+
+		expect(warnings).toEqual([]);
+	});
+
+	it('walks a nested object down to the path an operator has to write', () => {
+		expect(containerFields.BoxService).toContainEqual({
+			path: 'img.src',
+			kind: 'string',
+			isRequired: true,
+		});
+	});
+
+	it('reports an optional with no default as omittable', () => {
+		expect(containerFields.BoxDate).toEqual([
+			{
+				path: 'span',
+				kind: 'number',
+				isRequired: false,
+			},
+		]);
+	});
+
+	it('reports a nested container list as children rather than as a value', () => {
+		expect(containerFields.Grid).toContainEqual({
+			path: 'items',
+			kind: 'children',
+			isRequired: true,
+		});
 	});
 });
 

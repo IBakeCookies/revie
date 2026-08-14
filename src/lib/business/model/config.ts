@@ -82,6 +82,95 @@ export function isContainerName(name: string): name is ContainerName {
 	return Object.hasOwn(containerSchemas, name);
 }
 
+/** Every name a config may use, in the order the schema declares them. */
+export const containerNames = Object.keys(containerSchemas) as ContainerName[];
+
+/**
+ * One editable prop, as an editor needs to see it.
+ *
+ * The schema is a runtime value, so a form is generated from it rather than restating
+ * it — which is what keeps a new container from needing a third edit point beside
+ * `containerSchemas` and `config-container.svelte`. This describes the fields as plain
+ * data on purpose: valibot's internals stop here, and presentation only ever reads a
+ * path, a kind and a flag.
+ */
+export type ContainerField = {
+	/** Dot path into the container's props — `img.src` for a nested object. */
+	path: string;
+	/** `children` is a nested container list, which an editor renders recursively. */
+	kind: 'string' | 'number' | 'children';
+	/** Leaving it out is a parse failure, so the container would be dropped. */
+	isRequired: boolean;
+};
+
+/**
+ * As much of valibot's runtime shape as the walk below reads. The schemas are typed
+ * values, but `GenericSchema` exposes neither `entries` nor `wrapped`, so the walk
+ * needs the structural view — assigned once here rather than asserted per access.
+ */
+type SchemaNode = {
+	type: string;
+	default?: unknown;
+	wrapped?: SchemaNode;
+	entries?: Record<string, SchemaNode>;
+};
+
+const schemaNodes: Record<ContainerName, SchemaNode> = containerSchemas;
+
+/**
+ * Anything that is not a number or a nested list is offered as text. A prop whose type
+ * text cannot express is then refused on save with a diagnostic naming it, where
+ * dropping it from the list would leave it unreachable from the editor with nothing said.
+ */
+function fieldKind(type: string): ContainerField['kind'] {
+	if (type === 'array') {
+		return 'children';
+	}
+
+	if (type === 'number') {
+		return 'number';
+	}
+
+	return 'string';
+}
+
+function describeFields(
+	entries: Record<string, SchemaNode>,
+	prefix: string,
+	isRequired: boolean,
+): ContainerField[] {
+	const fields: ContainerField[] = [];
+
+	for (const [key, entry] of Object.entries(entries)) {
+		const path = `${prefix}${key}`;
+		// An optional with no default may be left out entirely. One WITH a default has it
+		// substituted and then parsed, so what is under it stays required — which is how
+		// `BoxService.img`'s deliberately invalid `{}` default makes `img.src` required.
+		const isOmittable = entry.type === 'optional' && entry.default === undefined;
+		const node = entry.wrapped ?? entry;
+		const required = isRequired && !isOmittable;
+
+		if (node.entries) {
+			fields.push(...describeFields(node.entries, `${path}.`, required));
+
+			continue;
+		}
+
+		fields.push({
+			path,
+			kind: fieldKind(node.type),
+			isRequired: required,
+		});
+	}
+
+	return fields;
+}
+
+/** What each container carries, walked out of its schema once at module load. */
+export const containerFields = Object.fromEntries(
+	containerNames.map((name) => [name, describeFields(schemaNodes[name].entries ?? {}, '', true)]),
+) as Record<ContainerName, ContainerField[]>;
+
 /**
  * A container as it appears in the config file. Narrowing on `name` narrows the
  * props with it, so `ConfigContainer<'BoxService'>` is the BoxService member alone.

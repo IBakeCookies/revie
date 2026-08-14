@@ -136,17 +136,11 @@ export type ConfigWrite = {
 };
 
 /**
- * Validates submitted config text and writes it, or says why it was refused. Never
- * throws and never prints: a model has no business deciding what a failure is worth.
- *
- * The text is written VERBATIM rather than re-serialized from `Config`. The normalized
- * shape has already dropped `defaults`, every key the schema does not name and every
- * container it rejected — writing it back would silently destroy the operator's file.
- *
- * No cache invalidation: the write moves the file's stamp, so `readConfig` re-reads by
- * itself on the next call.
+ * Everything `writeConfig` decides before it touches the disk, on its own so that the
+ * editor can ask the same question about the file it is ABOUT to show. One definition:
+ * a second copy of the JSON guard is a second thing to keep in step with the write.
  */
-export async function writeConfig(text: string): Promise<ConfigWrite> {
+function reviewConfig(text: string): ConfigWrite {
 	let raw: unknown;
 
 	try {
@@ -180,10 +174,49 @@ export async function writeConfig(text: string): Promise<ConfigWrite> {
 		};
 	}
 
+	return {
+		rejection: null,
+		warnings: [],
+	};
+}
+
+/**
+ * Validates submitted config text and writes it, or says why it was refused. Never
+ * throws and never prints: a model has no business deciding what a failure is worth.
+ *
+ * The text is written VERBATIM rather than re-serialized from `Config`. The normalized
+ * shape has already dropped `defaults`, every key the schema does not name and every
+ * container it rejected — writing it back would silently destroy the operator's file.
+ *
+ * No cache invalidation: the write moves the file's stamp, so `readConfig` re-reads by
+ * itself on the next call.
+ */
+export async function writeConfig(text: string): Promise<ConfigWrite> {
+	const review = reviewConfig(text);
+
+	if (review.rejection) {
+		return review;
+	}
+
 	const [error] = await $writeConfigFile(text);
 
 	return {
 		rejection: error ? 'write-failed' : null,
 		warnings: [],
 	};
+}
+
+/**
+ * Whether a config's own bytes are beyond what a generated form can represent — which
+ * is the same question as whether they could be written back at all.
+ *
+ * A form can only offer what the schema declares, and refuse-on-warnings means a file
+ * producing ANY warning cannot be saved from one: an undeclared container, an entry that
+ * is not a container, a stripped `class`, a bad span. Each is invisible in the form and
+ * each blocks every other edit, so the operator would be stuck with a config that cannot
+ * be saved and no way to reach what is blocking it. Raw text is the repair path, and one
+ * predicate covers all of them without enumerating any.
+ */
+export function needsRawEditor(text: string): boolean {
+	return reviewConfig(text).rejection !== null;
 }
