@@ -80,6 +80,24 @@ describe('$readAppearance', () => {
 	});
 });
 
+describe('reading the browser jar', () => {
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('hands back a value that is not valid percent-encoding instead of throwing', () => {
+		// Cookies ignore the port, so another app on this host can set `theme`.
+		// `decodeURIComponent('100%')` throws, and this read runs during
+		// hydration — so it must not be able to take the client render down.
+		vi.stubGlobal('document', {
+			cookie: 'theme=100%; scenerySeed=7',
+		});
+
+		expect($readAppearance()).toMatchObject({
+			theme: '100%',
+			scenerySeed: 7,
+		});
+	});
+});
+
 describe('appearance writes', () => {
 	let written: string[];
 
@@ -101,7 +119,7 @@ describe('appearance writes', () => {
 	it('writes each cookie with the shared attributes', () => {
 		$updateTheme('abyss');
 
-		expect(written[0]).toBe('theme=abyss; path=/; max-age=31536000; SameSite=Lax');
+		expect(written[0]).toBe('theme=abyss; path=/; max-age=31536000; SameSite=lax');
 	});
 
 	it('serializes the seed and the motion flag to what the reader expects', () => {
