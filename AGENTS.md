@@ -493,9 +493,41 @@ things about it are decisions:
   the SSR payload, whether or not the link renders. That is the price of a UI entry point, and
   it is why the gate is the token rather than always-on.
 
-Two gaps, both known and neither accidental: there is **no login rate limiting**, and
-`secure: !dev` means a production deployment on plain http will have the browser drop the
-cookie so the login never sticks — serve it over TLS. Both are in README.md.
+- **The login backoff is process state in `business/model`, and the client address is a
+  parameter.** Five failures per address, then `min(5s × 2^(n − 6), 60s)`, cleared by a success
+  and pruned on write so the Map cannot grow without bound. **The prune is also the decay**: an
+  address that waits out the longest lockout loses its entry and starts from zero, so the sustained
+  ceiling is five guesses a minute per address rather than five ever — which is intended, because a
+  permanent memory of failures locks an operator out of their own dashboard forever. Four things
+  about it are decisions:
+  1. **It lives at module scope in `admin-auth.ts`**, on the same precedent as
+     `config-source.ts`'s stamp cache — a store is unreachable from the SSR path, and a `data/`
+     module would be a second file for one caller with no external name to own. The consequence
+     is honest and in README.md: the counter is per process, so a restart forgets it, and a
+     second instance behind a load balancer has its own.
+  2. **`clientAddress` is passed in** (R1) — the model imports nothing to get it, the route
+     hands it `getClientAddress()`.
+  3. **A locked address is refused even with the right token**, because the winning guess is the
+     only one that matters. And the cap is **60 seconds, not an hour**: behind a proxy that does
+     not forward the client address every request shares one bucket, so the backoff goes global
+     — a long cap would let a stranger's guessing lock the operator out of their own dashboard.
+     The limit is the second line of defence; the token's length is the first.
+  4. **`isAdminAuthenticated` does not touch the counter.** The cookie check runs on every admin
+     request, so counting it would fire on ordinary navigation and hand a spoofed address a
+     lockout of the real operator.
+
+  It returns a **kind plus a number** — `{ status: 'locked'; retryAfterSeconds }` — and the login
+  page picks every word, the same seam as `adguardFailed`. **There is deliberately no e2e for
+  it:** one preview server process serves the whole playwright run and every admin spec signs in
+  from `127.0.0.1`, so a lockout test would poison whichever admin spec ran next. The node spec
+  keys each case on its own fake address instead, which is also why no test-only reset export
+  exists. The live constraint that replaces the missing e2e is the free-attempt budget: the
+  suite's one deliberate wrong token, times CI's two retries, is 3 of the 5 — a second
+  wrong-token test has to check that sum, and there is a comment where it would be added.
+
+One gap is left, known and not accidental: `secure: !dev` means a production deployment on plain
+http will have the browser drop the cookie so the login never sticks — serve it over TLS. It is
+in README.md.
 
 ## Invariants
 
@@ -669,11 +701,13 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  38 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
-  **Two take parameters** — `service_probe_failed({ href })`, so the toast names the service it
-  could not reach, and `admin_container_add_at({ target, position })`, so each of a list's N+1
-  insertion buttons has an accessible name that says which list and where. They are the only
-  things the compiler's parameter typecheck has ever had to check. The four AdGuard keys are
+  39 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  **Three take parameters** — `service_probe_failed({ href })`, so the toast names the service it
+  could not reach, `admin_container_add_at({ target, position })`, so each of a list's N+1
+  insertion buttons has an accessible name that says which list and where, and
+  `admin_sign_in_locked({ seconds })`, so a locked-out operator knows whether to wait or to go
+  looking for the token. They are the only things the compiler's parameter typecheck has ever had
+  to check. The four AdGuard keys are
   labels, with `Intl.NumberFormat` formatting the
   readings themselves ([box-adguard.svelte](src/lib/presentation/components/box-adguard.svelte)).
   A parameter is how DATA reaches a message; it is never how copy leaves a lower layer — see the

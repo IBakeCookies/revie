@@ -18,7 +18,8 @@ integrations, so it is the one item no review pass produced, and the one whose e
 are not verified against this repo. It says so in place.
 
 **Numbers are stable, so gaps mean landed.** 21 items are open — 20 from the review passes, plus
-item 36, which came from building the admin guard rather than from a review; **1, 2, 3, 4, 5,
+item 36, which came from building the admin guard rather than from a review and is now down to a
+single line in `.env.example`, a file this environment will not let an agent write; **1, 2, 3, 4, 5,
 6, 7, 8, 11, 19, 23, 31, 32, 34 and 35 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
 the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
@@ -494,16 +495,19 @@ the same applies to a future 34.
 
 ## The admin area and the config editor
 
-The guard, the write path and the editor have all landed; #36 is what is left, and the two items
-above it are kept as numbered entries because the notes below still cross-reference them. The
+The guard, the write path, the editor and #36's login backoff have all landed; what is left of #36
+is one line in `.env.example`, and all three items are kept as numbered entries because the notes
+below still cross-reference them. The
 threat model is the reason for the ordering: `config.json` is the internal network map _and_ the
 source of `/api/ping`'s allowlist, so a write path without the guard in front of it would let
 anyone on the LAN rewrite the allowlist and turn the ping endpoint into an arbitrary internal port
 scanner. The guard landed first and #34 landed behind it, which is the whole ordering — but
 **`/api/ping` itself is still unauthenticated**, and that is by design only for as long as the
 allowlist can be trusted. That trust now rests on the guard rather than on the file being
-unwritable, so #36's missing rate limit is the thing standing between a guessed token and a
-rewritten allowlist.
+unwritable — which is what made #36's missing rate limit urgent, and why it landed next. What
+stands between a guessed token and a rewritten allowlist is now the token's own length plus a
+backoff that caps the guessing at five a minute per address; the remaining exposure is a
+distributed guess, which no per-address counter addresses and which a long token makes pointless.
 
 34. ~~**A validate-and-write path for `config.json`**~~ — **LANDED.** Kept as a numbered item so
     #35's "needs #34 under it" still resolves. `$writeConfigFile` → `writeConfig` → the `/admin`
@@ -548,15 +552,19 @@ rewritten allowlist.
       disambiguates within a list, not between lists that share a parent type.
       _Files:_ src/routes/admin/, src/lib/business/model/config.ts,
       src/lib/business/model/config-source.ts
-36. **Close the two known gaps in the admin area** — `S`
-    Neither is accidental and both are documented in README.md, but both are real. **No login rate
-    limiting or lockout:** one shared secret with unlimited guesses is only safe because the token
-    is long and the dashboard is not meant to face the internet — a counter keyed on IP with a
-    backoff is enough, and it belongs in business, not the hook. **`.env.example` has no
-    `DASHBOARD_ADMIN_TOKEN` line**, so the one file that tells an operator what to set does not
-    mention the thing that switches the admin area on; it was left out only because the file is
-    outside what the agents doing this work were permitted to touch.
-    _Files:_ .env.example, src/lib/business/model/admin-auth.ts, README.md
+36. **Close the two known gaps in the admin area** — **the rate limit LANDED; the
+    `.env.example` line is the operator's own paste**
+    Kept as a numbered item because the notes above and below cross-reference it. **The login
+    backoff is in:** five failures per client address, then `min(5s × 2^(n − 6), 60s)`, refusing
+    even a correct token while the wait runs, cleared by a success and pruned on write — which is
+    also the decay, so the sustained ceiling is five guesses a minute per address rather than five
+    ever. It went where this item said it belonged, in `business/model/admin-auth.ts` and not the
+    hook, and it returns `{ status: 'locked'; retryAfterSeconds }` so the login page picks the
+    words. The decisions are in AGENTS.md, including why there is deliberately **no e2e** for it
+    and what replaces one. **The `.env.example` line is still open and cannot be closed from
+    here:** the file is on this environment's permission deny list, so the agents doing this work
+    were never able to touch it — the text to paste was handed over in the conversation instead.
+    _Files:_ .env.example (open), src/lib/business/model/admin-auth.ts, README.md
 
 ## Ops & DX
 
@@ -703,9 +711,10 @@ The order that matters, beyond the group ranking:
   `no-console` is enableable whenever someone wants it.
 - ~~**#34 before #35**~~ — landed. #35 now has the action, the `ConfigWrite` kinds and the
   rendered diagnostics under it, and a `<textarea>` to replace.
-- **#36 is now the admin area's weakest point, not a nicety.** Before #34 a guessed token bought
-  read access to the config; it now buys a write to the file `/api/ping` derives its allowlist
-  from. The token being long is the only control, and it is doing more work than it was.
+- ~~**#36 is now the admin area's weakest point, not a nicety**~~ — the rate-limit half landed for
+  exactly this reason. Before #34 a guessed token bought read access to the config; it now buys a
+  write to the file `/api/ping` derives its allowlist from, which is what made an unlimited-guess
+  login form the wrong thing to leave open. The token's length is no longer the only control.
 - **#25 is now overdue, not optional** — #2 has landed, so `/api/ping` opens a real TCP connection
   to whatever a `BoxService` names. `config.json:32-42`'s `tteck` entry points at
   community-scripts.github.io, which means four connects an hour to GitHub Pages to paint a

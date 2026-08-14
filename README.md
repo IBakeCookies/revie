@@ -134,8 +134,13 @@ DASHBOARD_ADMIN_TOKEN=$(openssl rand -hex 32)
 - **`/admin` and everything under it are reserved** once the token is set. A `pages` key
   of `/admin` in `config.json` still renders in the navigation but is no longer reachable —
   the guard answers first — so name that page something else.
-- There is no rate limiting on the login form. Pick a token long enough that this does not
-  matter, and don't expose the dashboard to the internet.
+- **Five wrong tokens from one address, then a backoff** — 5 seconds, doubling to a minute,
+  and a correct token is refused while the wait is running. A successful sign-in clears it.
+  The counter is per server process, so a restart forgets it. Behind a reverse proxy that
+  does not forward the client address, every request looks like the proxy and the backoff
+  becomes global: still a limit, but someone else's guessing can make you wait. That is why
+  the wait caps at a minute rather than an hour — pick a token long enough that the limit
+  never has to be the thing protecting you, and don't expose the dashboard to the internet.
 
 ## Services and status dots
 
