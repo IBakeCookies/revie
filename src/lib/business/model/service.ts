@@ -11,11 +11,11 @@
  * belongs to whoever is holding the state, not to this function.
  */
 
-import { getServiceState } from '$lib/data/repository/service';
+import { $getServiceState } from '$lib/data/repository/service';
 import type { Result } from '$lib/utils/useAsyncErrorAsValue';
 
 export async function readServiceState(href: string): Promise<Result<boolean>> {
-	const [err, res] = await getServiceState(href);
+	const [err, res] = await $getServiceState(href);
 
 	if (err) {
 		return [err, null];

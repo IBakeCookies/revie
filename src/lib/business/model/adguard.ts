@@ -7,7 +7,7 @@
  * caller should not have to know that `avg_processing_time` is in seconds.
  */
 
-import { getAdguardStats, type GetAdguardStatsOutput } from '$lib/data/repository/adguard';
+import { $getAdguardStats, type GetAdguardStatsOutput } from '$lib/data/repository/adguard';
 import { type AdguardStats } from '$lib/business/type/adguard-stats';
 import type { Result } from '$lib/utils/useAsyncErrorAsValue';
 
@@ -32,7 +32,7 @@ export function transformAdguardStats(data: GetAdguardStatsOutput): AdguardStats
 export async function readAdguardStats(
 	input: ReadAdguardStatsInput,
 ): Promise<Result<AdguardStats>> {
-	const [err, raw] = await getAdguardStats(input);
+	const [err, raw] = await $getAdguardStats(input);
 
 	if (err) {
 		return [err, null];

@@ -35,13 +35,15 @@ async function loadAdguardStats(page: ConfigPage): Promise<Result<AdguardStats |
 	});
 
 	// Logged AND returned, and the two carry different things. The log is the operator
-	// channel: it names the host and the status, and outlives the tab. What crosses to
-	// the page is only THAT it failed — the route turns that into a translated line,
-	// because `err.message` is English minted in `data`. Not `err.cause` in either: a
-	// bounded fetch's timeout arrives as a DOMException whose stack is ten frames of
-	// undici internals naming neither AdGuard nor the host.
+	// channel: it names the host and the status, and outlives the tab. Both halves are
+	// already in `err.message` — the repository passes the href as the context
+	// `useAsyncErrorAsValue` prefixes — so prefixing it again here printed the host
+	// twice. What crosses to the page is only THAT it failed: the route turns that into
+	// a translated line, because `err.message` is English minted in `data`. Not
+	// `err.cause` in either: a bounded fetch's timeout arrives as a DOMException whose
+	// stack is ten frames of undici internals naming neither AdGuard nor the host.
 	if (err) {
-		console.error(`Could not read AdGuard stats from ${container.props.href}:`, err.message);
+		console.error(err.message);
 
 		return [err, null];
 	}

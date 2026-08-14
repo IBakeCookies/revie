@@ -1,6 +1,16 @@
-import type { GetAdguardStatsOutput } from '$lib/data/repository/adguard';
-import { describe, expect, it } from 'vitest';
-import { transformAdguardStats } from '$lib/business/model/adguard';
+import { $getAdguardStats, type GetAdguardStatsOutput } from '$lib/data/repository/adguard';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readAdguardStats, transformAdguardStats } from '$lib/business/model/adguard';
+
+vi.mock('$lib/data/repository/adguard', () => ({
+	$getAdguardStats: vi.fn(),
+}));
+
+const input = {
+	username: 'admin',
+	password: 'secret',
+	href: 'http://adguard.local',
+};
 
 const raw: GetAdguardStatsOutput = {
 	num_dns_queries: 1234,
@@ -36,13 +46,45 @@ describe('transformAdguardStats', () => {
 	});
 
 	it('survives a response without the top_blocked_domains field', () => {
-		const withoutDomains = {
-			...raw,
-			top_blocked_domains: undefined,
+		expect(
+			transformAdguardStats({
+				...raw,
+				top_blocked_domains: undefined,
+			}).topBlockedDomain,
+		).toBe('–');
+	});
+});
+
+describe('readAdguardStats', () => {
+	beforeEach(() => {
+		vi.mocked($getAdguardStats).mockReset();
+	});
+
+	it('hands the repository error back untouched', async () => {
+		const failure = {
+			message: 'answered 200 with a body that is not stats',
 		};
 
-		expect(
-			transformAdguardStats(withoutDomains as unknown as GetAdguardStatsOutput).topBlockedDomain,
-		).toBe('–');
+		vi.mocked($getAdguardStats).mockResolvedValue([failure, null]);
+
+		const [err, stats] = await readAdguardStats(input);
+
+		expect(stats).toBeNull();
+		expect(err).toBe(failure);
+	});
+
+	it('projects a successful read', async () => {
+		vi.mocked($getAdguardStats).mockResolvedValue([null, raw]);
+
+		const [err, stats] = await readAdguardStats(input);
+
+		expect(err).toBeNull();
+
+		expect(stats).toEqual({
+			dnsQueries: 1234,
+			numBlockedFiltering: 56,
+			avgProcessingTimeMs: 12,
+			topBlockedDomain: 'ads.example.com',
+		});
 	});
 });

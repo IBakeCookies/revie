@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getServiceState } from '$lib/data/repository/service';
+import { $getServiceState } from '$lib/data/repository/service';
 
 afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-describe('getServiceState', () => {
+describe('$getServiceState', () => {
 	it('posts the href to the ping endpoint', async () => {
 		const fetchMock = vi.fn(async () => ({
 			ok: true,
@@ -16,7 +16,7 @@ describe('getServiceState', () => {
 
 		vi.stubGlobal('fetch', fetchMock);
 
-		const [err, res] = await getServiceState('http://wled.local');
+		const [err, res] = await $getServiceState('http://wled.local');
 
 		expect(err).toBeNull();
 
@@ -28,6 +28,7 @@ describe('getServiceState', () => {
 			'/api/ping',
 			expect.objectContaining({
 				method: 'POST',
+				signal: expect.any(AbortSignal),
 				body: JSON.stringify({
 					href: 'http://wled.local',
 				}),
@@ -45,9 +46,23 @@ describe('getServiceState', () => {
 			})),
 		);
 
-		const [err, res] = await getServiceState('http://not-configured.local');
+		const [err, res] = await $getServiceState('http://not-configured.local');
 
 		expect(res).toBeNull();
 		expect((err?.cause as Error).message).toBe('Ping responded with 403 Forbidden');
+	});
+
+	it('names the service it could not reach, and keeps the thrown reason', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => {
+				// what undici throws for an unreachable host: it names no service
+				throw new TypeError('fetch failed');
+			}),
+		);
+
+		const [err] = await $getServiceState('http://wled.local');
+
+		expect(err?.message).toBe('Could not reach http://wled.local: fetch failed');
 	});
 });

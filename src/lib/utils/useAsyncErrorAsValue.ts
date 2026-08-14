@@ -9,7 +9,12 @@
  */
 
 export interface AppError {
-	/** Always present, always safe to show a user. A toast renders it verbatim. */
+	/**
+	 * Always present, always a string — so a failure is always reportable to a
+	 * LOG. Never render it: it is minted where no locale exists, so putting it
+	 * in front of a user puts an English line on a German page. Presentation
+	 * picks the words from the data or the kind that crossed the layer.
+	 */
 	message: string;
 	/** The original thrown value. For the log only — never render this. */
 	cause?: unknown;
@@ -20,15 +25,21 @@ export type Result<T> = [AppError, null] | [null, T];
 
 export async function useAsyncErrorAsValue<T>(
 	cb: () => Promise<T>,
-	/** Used only when the thrown value carries no message of its own. */
-	fallbackMessage = 'An unknown error occurred',
+	/**
+	 * What was being attempted — the href, the path. Prefixed to the thrown
+	 * message, and stands alone when the thrown value carries none.
+	 */
+	context?: string,
 ): Promise<Result<T>> {
 	try {
 		return [null, await cb()];
 	} catch (cause) {
-		// A thrown Error's own message is the more specific one — the repositories
-		// throw things like "AdGuard responded with 401 Unauthorized" — so it wins.
-		const message = cause instanceof Error && cause.message ? cause.message : fallbackMessage;
+		// Both halves are useful and neither is enough: `fetch failed` from undici
+		// names no service, while the context alone loses "401 Unauthorized". They
+		// used to compete, and the specific one always won — so every context was
+		// discarded at every call site.
+		const thrown = cause instanceof Error ? cause.message : '';
+		const message = [context, thrown].filter(Boolean).join(': ') || 'An unknown error occurred';
 
 		return [
 			{
