@@ -1,8 +1,18 @@
 <script module lang="ts">
+	import type { ConfigContainer as Container } from '$lib/business/model/config';
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect } from 'storybook/test';
 	import icon from '$lib/presentation/assets/favicon.svg';
 	import ConfigContainer from '$lib/presentation/components/config-container.svelte';
+
+	/* A name the schema does not declare, so the type has to be forced — which is the
+	   point of the {:else} branch: `unhandled()` takes `never`, so the only way to
+	   reach it is a container business declares and this component has no branch for,
+	   and that state cannot be built from a valid value. */
+	const unknownContainer = {
+		name: 'NotAComponent',
+		props: {},
+	} as unknown as Container;
 
 	const { Story } = defineMeta({
 		title: 'Components/Config Container',
@@ -92,16 +102,23 @@
 			},
 		},
 	}}
-	play={async ({ canvasElement }) => {
+	play={async ({ canvas, canvasElement }) => {
 		const subGrid = canvasElement.querySelector('div');
 
 		// The padding is a left rail now, so Grid's own p-box-xl has to lose to `p-0`.
 		await expect(subGrid).toHaveClass('pl-box-md');
 		await expect(subGrid).not.toHaveClass('p-box-xl');
 
+		// `title` is set in the args above and must not render: SubGrid overrides it
+		// after the spread, so a config that names one gets no h2 and no hairline.
+		await expect(canvas.queryByRole('heading')).not.toBeInTheDocument();
+
 		// A group draws no surface of its own — with Grid's fill and blur still on, a
-		// SubGrid was a second card inside the card it sits in.
-		await expect(subGrid).not.toHaveClass('bg-surface-card');
+		// SubGrid was a second card inside the card it sits in. The COMPUTED fill is
+		// the assertion: `bg-transparent` has to win the cn() merge against Grid's
+		// `bg-(--box-surface,var(--surface-card))`, and a class check passes happily
+		// while both survive.
+		await expect(getComputedStyle(subGrid!).backgroundColor).toBe('rgba(0, 0, 0, 0)');
 		await expect(subGrid).not.toHaveClass('backdrop-blur');
 
 		const inner = subGrid?.querySelector('.grid');
@@ -212,5 +229,23 @@
 
 		// No stats, so one line saying so instead of the four readings.
 		await expect(link?.querySelectorAll('p')).toHaveLength(1);
+	}}
+/>
+
+<!-- The {:else}: business declared a container this component has no branch for. It
+     is a compile error to reach it honestly, so the story forces the type — and it
+     is its own story rather than a step in a play function because axe only ever
+     sees a story's rest state, and this is a state a reader can land on. -->
+<Story
+	name="Unhandled container"
+	args={{
+		container: unknownContainer,
+	}}
+	play={async ({ canvas, canvasElement }) => {
+		// Names the container rather than rendering nothing: a hole in the grid gives
+		// whoever edited config.json nothing to search for.
+		await expect(canvas.getByText('No renderer for container "NotAComponent"')).toBeVisible();
+
+		await expect(canvasElement.querySelector('p')).toHaveClass('border-danger');
 	}}
 />

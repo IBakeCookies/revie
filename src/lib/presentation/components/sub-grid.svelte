@@ -21,9 +21,13 @@
      `--box-surface: inherit` for the same reason the surface is off: a group draws
      nothing, so its tiles sit on whatever the group itself sits on. Grid's items
      declare the next step down, which is right under a card and wrong here — it would
-     drop a top-level group's tiles a step below a page they are sitting directly on. -->
+     drop a top-level group's tiles a step below a page they are sitting directly on.
+     `title` is overridden AFTER the spread, which is what drops it: the schema hands
+     SubGrid the full GridProps, so a config file can set one and it used to ride
+     restProps into Grid and draw the h2 and hairline this comment says it does not. -->
 <Grid
 	{...restProps}
+	title={undefined}
 	class={cn(
 		'border-transparent border-l-2 border-l-line-strong self-start bg-transparent p-0 pl-box-md shadow-none backdrop-blur-none rounded-none',
 		className,

@@ -11,11 +11,19 @@
 			src: string;
 		};
 		isOnline?: boolean | null;
+		/**
+		 * Which level the title takes, chosen by whatever renders the tile — like the
+		 * fill, a tile cannot know its own. The layout's app title is the page's only
+		 * h1, so a tile sitting straight on the page is h2 or it skips a level; inside a
+		 * Grid card it sits under that card's h2 and is h3. Size is a class, so the two
+		 * render identically.
+		 */
+		headingLevel?: 2 | 3;
 		span?: number;
 		class?: ClassValue;
 	} & HTMLAnchorAttributes;
 
-	let { isOnline = null, title, href, img, span, ...restProps }: Props = $props();
+	let { isOnline = null, title, href, img, headingLevel = 2, span, ...restProps }: Props = $props();
 
 	const statusLabel = $derived(
 		isOnline === null
@@ -43,6 +51,21 @@
 	// instance, and a plain flag would keep the letter over the next tile's good icon.
 	let failedSrc = $state<string | undefined>();
 	const hasIcon = $derived(failedSrc !== img.src);
+
+	// `onerror` only catches what fails after hydration. An icon the SSR'd markup
+	// already asked for fails while the bundle is still loading, and the event is not
+	// replayed once the handler is attached — so the broken-image glyph stayed up on
+	// exactly the load that matters most. A finished image with no intrinsic width is
+	// one that failed, which is the only signal available after the fact.
+	let icon = $state<HTMLImageElement | undefined>();
+
+	$effect(() => {
+		const { src } = img;
+
+		if (icon?.complete && icon.naturalWidth === 0) {
+			failedSrc = src;
+		}
+	});
 </script>
 
 <a
@@ -57,10 +80,20 @@
 	)}
 >
 	<!-- No border of its own: a bordered plate inside a bordered tile, thirteen times
-	     over, is a page of nested boxes. The fill alone is enough to seat the icon. -->
-	<span class="bg-surface-card grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg">
+	     over, is a page of nested boxes. The fill is what seats it, and it has to be a
+	     step below the tile — which `surface-card` only was while the tile was nested:
+	     top-level the tile IS card, so the plate was the tile's own fill and vanished.
+	     `surface-inset` is the ladder's deepest step, so it is one below a top-level
+	     tile and, under a nested tile that is already inset, composites a step lighter
+	     over itself the way box-adguard's readings do. Named rather than read from
+	     `--box-surface`: that property carries the TILE's fill, so reading it would
+	     hand the plate the surface it is meant to sit on. -->
+	<span
+		class="bg-surface-inset grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg"
+	>
 		{#if hasIcon}
 			<img
+				bind:this={icon}
 				class="size-6 object-contain"
 				src={img.src}
 				alt=""
@@ -74,7 +107,8 @@
 	</span>
 
 	<div class="flex min-w-0 flex-col">
-		<h3 class="truncate font-semibold">{title}</h3>
+		<svelte:element this={`h${headingLevel}`} class="truncate font-semibold">{title}</svelte:element
+		>
 		<span class="text-ty-silent truncate text-2xs">{host}</span>
 	</div>
 

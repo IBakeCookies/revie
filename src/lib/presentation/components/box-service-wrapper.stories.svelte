@@ -3,6 +3,7 @@
 	import { expect, fn, waitFor } from 'storybook/test';
 	import icon from '$lib/presentation/assets/favicon.svg';
 	import BoxServiceWrapper from '$lib/presentation/components/box-service-wrapper.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	/* The store's notify callback. Injecting a spy is the whole point of that seam —
 	   and it lets a story assert that a failed probe told presentation WHICH href
@@ -97,7 +98,7 @@
 		// `null` is not `false`: an unprobed service must not show a red dot.
 		const dot = canvasElement.querySelector('[aria-label]');
 
-		await expect(dot).toHaveAttribute('aria-label', 'status unknown');
+		await expect(dot).toHaveAttribute('aria-label', m.service_status_unknown());
 		await expect(dot).toHaveClass('bg-ty-ghost');
 	}}
 />

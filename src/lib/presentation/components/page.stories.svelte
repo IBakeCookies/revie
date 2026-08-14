@@ -1,6 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { expect, spyOn } from 'storybook/test';
+	import { expect, fn, spyOn, waitFor } from 'storybook/test';
 	import type { ConfigContainer } from '$lib/business/model/config';
 	import icon from '$lib/presentation/assets/favicon.svg';
 	import Page from '$lib/presentation/components/page.svelte';
@@ -8,6 +8,12 @@
 	import { getLocale } from '$lib/paraglide/runtime';
 
 	const ADGUARD_HREF = 'http://adguard.test:3000';
+	const SERVICE_HREF = 'http://jellyfin.test:8096';
+
+	/* The store's report seam. Handed in as a prop rather than read from a toast store,
+	   because that is the shape page.svelte is built to: a getContext here would make it
+	   unmountable without a layout above it, which is exactly what a story is. */
+	const notify = fn();
 
 	/* Built from the same locale the box reads, so a render in the wrong locale cannot
 	   pass by matching a hardcoded string. */
@@ -41,7 +47,7 @@
 						name: 'BoxService',
 						props: {
 							title: 'Jellyfin',
-							href: 'http://jellyfin.test:8096',
+							href: SERVICE_HREF,
 							span: 6,
 							img: {
 								src: icon,
@@ -170,6 +176,33 @@
 		).toBeInTheDocument();
 
 		await expect(await canvas.findByLabelText('online')).toBeInTheDocument();
+	}}
+/>
+
+<!-- The report seam, which nothing else in the suite exercises: `setServicesStore(notify)`
+     is all this component does with the callback, so dropping the argument left every
+     other story green and every failed probe silent. What crosses is the href and
+     nothing else — the store's own message has no locale and goes to the log. -->
+<Story
+	name="Failed probe reaches the caller"
+	args={{
+		notify,
+		adguard: null,
+	}}
+	beforeEach={() => {
+		// Installed over the meta's answering stub, and before the mount for the same
+		// reason it is: the poll goes out from an $effect at mount, so a stub put up
+		// inside `play` arrives after the probe it is meant to fail.
+		const ping = spyOn(window, 'fetch').mockRejectedValue(new Error('unreachable'));
+
+		return () => ping.mockRestore();
+	}}
+	play={async ({ canvas }) => {
+		await waitFor(() => expect(notify).toHaveBeenCalledWith(SERVICE_HREF));
+
+		// A probe that failed is not a service that is down: the store keeps the last
+		// known state, which on first paint is none at all.
+		await expect(canvas.getByLabelText(m.service_status_unknown())).toBeInTheDocument();
 	}}
 />
 

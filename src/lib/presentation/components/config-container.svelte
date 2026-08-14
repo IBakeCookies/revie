@@ -8,9 +8,15 @@
 
 	export type Props = {
 		container: ConfigContainer;
+		/**
+		 * Passed straight through to whatever below has a heading whose level depends
+		 * on what it is rendered inside: a service tile's title, and a group's label
+		 * on a card that draws no title of its own.
+		 */
+		headingLevel?: 2 | 3;
 	};
 
-	let { container }: Props = $props();
+	let { container, headingLevel }: Props = $props();
 
 	/**
 	 * Compile-time exhaustiveness. Every branch below narrows `container`, so by the
@@ -36,11 +42,11 @@
 	{:else} says so out loud instead of rendering nothing.
 -->
 {#if container.name === 'Grid'}
-	<Grid {...container.props} />
+	<Grid {...container.props} {headingLevel} />
 {:else if container.name === 'SubGrid'}
-	<SubGrid {...container.props} />
+	<SubGrid {...container.props} {headingLevel} />
 {:else if container.name === 'BoxService'}
-	<BoxServiceWrapper {...container.props} />
+	<BoxServiceWrapper {...container.props} {headingLevel} />
 {:else if container.name === 'BoxAdguard'}
 	<BoxAdguardWrapper {...container.props} />
 {:else if container.name === 'BoxDate'}

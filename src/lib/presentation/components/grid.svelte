@@ -9,12 +9,22 @@
 		title?: string;
 		subTitle?: string;
 		items: ConfigContainer[];
+		/**
+		 * Which level the group label takes when this card draws no title of its own,
+		 * chosen by whatever renders it — a card cannot know its own depth any more
+		 * than a tile can. A SubGrid drops `title`, so its subtitle is its only
+		 * heading: straight on the page it sits under the layout's h1 and is h2,
+		 * inside a titled card it sits under that card's h2 and is h3. With a title
+		 * above it the subtitle is h3 either way. Size is a class, so all of them
+		 * render identically.
+		 */
+		headingLevel?: 2 | 3;
 		span?: number;
 		gridClass?: ClassValue;
 		class?: ClassValue;
 	} & HTMLAttributes<HTMLDivElement>;
 
-	let { title, subTitle, items, span, gridClass, ...restProps }: Props = $props();
+	let { title, subTitle, items, headingLevel = 2, span, gridClass, ...restProps }: Props = $props();
 </script>
 
 <div
@@ -51,15 +61,20 @@
 			{/if}
 
 			{#if subTitle}
-				<!-- h3, which is also what a BoxService title is: a repeat of a level is
-				     not a skip, so a group label above its boxes passes either way. Set as
-				     a section label rather than a smaller title — it is what carries the
-				     grouping now that SubGrid draws no surface of its own. `ty-secondary`
-				     and not `ty-silent` for that reason: an 11px uppercase label doing the
-				     page's structural work was also the quietest text on it. -->
-				<h3 class="text-ty-secondary text-xs font-semibold tracking-wider uppercase">
+				<!-- h3 under a title of this card's own — a repeat of a BoxService title's
+				     level, and a repeat is not a skip. With no title above it the label is
+				     the card's only heading, and a SubGrid is exactly that: hardcoded h3, a
+				     top-level group skipped straight from the layout's h1. Set as a section
+				     label rather than a smaller title — it is what carries the grouping now
+				     that SubGrid draws no surface of its own. `ty-secondary` and not
+				     `ty-silent` for that reason: an 11px uppercase label doing the page's
+				     structural work was also the quietest text on it. -->
+				<svelte:element
+					this={`h${title ? 3 : headingLevel}`}
+					class="text-ty-secondary text-xs font-semibold tracking-wider uppercase"
+				>
 					{subTitle}
-				</h3>
+				</svelte:element>
 			{/if}
 		</div>
 	{/if}
@@ -74,8 +89,14 @@
 	     property applies to the element that declares it, so a card that both
 	     declared and read it would hand itself its own children's fill. -->
 	<div class={cn('grid grid-cols-12 gap-grid-lg [--box-surface:var(--surface-inset)]', gridClass)}>
+		<!-- A tile cannot know which level its title takes, for the same reason it cannot
+		     know its own fill: the heading above it is this card's, and only the card
+		     knows whether it drew one. Under the block above, a tile is h3; with no
+		     heading of any kind there is nothing between it and the layout's h1, so it
+		     stays h2 rather than skipping one. Same condition as that block, so the two
+		     cannot disagree. -->
 		{#each items as item, index (index)}
-			<ConfigContainerView container={item} />
+			<ConfigContainerView container={item} headingLevel={title || subTitle ? 3 : 2} />
 		{/each}
 	</div>
 </div>

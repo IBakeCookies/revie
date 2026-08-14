@@ -31,9 +31,12 @@
 	play={async ({ args, canvas, canvasElement }) => {
 		// `title` is required, in the schema and in `requiredProps` — a title-less
 		// entry used to pass validation and render an empty heading.
+		//
+		// h2 is the default, which is the level of a tile sitting straight on the
+		// page: the layout's app title is the only h1, so h3 here skips a level.
 		await expect(
 			canvas.getByRole('heading', {
-				level: 3,
+				level: 2,
 			}),
 		).toHaveTextContent(args.title);
 
@@ -59,6 +62,31 @@
 		// inset that card declares, and one sitting straight on the page takes the
 		// fallback. A story mounts no card, so this is the second case.
 		await expect(box).toHaveClass('bg-(--box-surface,var(--surface-card))');
+	}}
+/>
+
+<!-- What a Grid card hands its tiles: they sit under that card's h2 title, so they
+     are h3 there and h2 on the page. Its own story and not a step inside the one
+     above, because the two states differ in nothing but the tag — a second render
+     is the only thing that can tell them apart. -->
+<Story
+	name="Inside a titled card"
+	args={{
+		headingLevel: 3,
+	}}
+	play={async ({ args, canvas }) => {
+		await expect(
+			canvas.getByRole('heading', {
+				level: 3,
+			}),
+		).toHaveTextContent(args.title);
+
+		// The one heading MOVED, rather than a second one appearing beside it.
+		await expect(
+			canvas.queryByRole('heading', {
+				level: 2,
+			}),
+		).not.toBeInTheDocument();
 	}}
 />
 

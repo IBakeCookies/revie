@@ -39,6 +39,11 @@ const customTwMerge = extendTailwindMerge({
 				'section-lg',
 				'empty-state',
 			],
+
+			// The one `--shadow-*` key tokens.css adds. Unlisted, tailwind-merge reads
+			// `shadow-card` as a shadow COLOR instead, so `shadow-none` did not merge it
+			// away and sub-grid's switch-off held only by CSS emission order.
+			shadow: ['card'],
 		},
 		conflictingClassGroups: {},
 	},

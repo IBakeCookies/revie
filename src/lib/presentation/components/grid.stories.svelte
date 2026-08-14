@@ -2,7 +2,25 @@
 	import type { ConfigContainer } from '$lib/business/model/config';
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect } from 'storybook/test';
+	import icon from '$lib/presentation/assets/favicon.svg';
 	import Grid from '$lib/presentation/components/grid.svelte';
+
+	// The one container below with a heading of its own, so it is what shows which
+	// level this card hands its tiles. It renders through a wrapper that reads the
+	// services store, which the instance script sets.
+	const tile: ConfigContainer[] = [
+		{
+			name: 'BoxService',
+			props: {
+				title: 'Jellyfin',
+				href: 'http://jellyfin.local:8096',
+				img: {
+					src: icon,
+				},
+				span: 6,
+			},
+		},
+	];
 
 	// Two clocks rather than one service box: `BoxService` / `BoxAdguard` render
 	// through a wrapper that reads a store, and a story mounts no page to set one.
@@ -58,6 +76,15 @@
 	});
 </script>
 
+<script lang="ts">
+	import { setServicesStore } from '$lib/business/store/service-store.svelte';
+
+	// A service tile arrives as a wrapper that reads its probe result out of context,
+	// so without a store there is no branch to render at all. The real store, empty:
+	// that is the state a page is in before the first ping answers.
+	setServicesStore();
+</script>
+
 <!-- The card every other container sits in: translucent, so it carries the blur -->
 <Story
 	name="A grid of boxes"
@@ -76,8 +103,22 @@
 		await expect(card).toHaveClass('backdrop-blur');
 		await expect(card).toHaveClass('bg-(--box-surface,var(--surface-card))');
 
-		await expect(canvas.getByText('Services')).toBeInTheDocument();
-		await expect(canvas.getByText('All of them')).toBeInTheDocument();
+		// h2 for the card's own title — the layout's app title is the page's only h1 —
+		// and h3 for the label under it, which is a repeat of a tile title's level and
+		// so never a skip.
+		await expect(
+			canvas.getByRole('heading', {
+				name: 'Services',
+				level: 2,
+			}),
+		).toBeInTheDocument();
+
+		await expect(
+			canvas.getByRole('heading', {
+				name: 'All of them',
+				level: 3,
+			}),
+		).toBeInTheDocument();
 
 		// Each child is rendered through config-container, so two descriptors mean
 		// two boxes — the recursion is what config.json's render tree is made of.
@@ -104,17 +145,28 @@
 	}}
 />
 
-<!-- No headings at all: the config named neither, so neither element exists -->
+<!-- No headings of its own: the config named neither, so neither element exists —
+     and a tile inside it has nothing to sit under. -->
 <Story
 	name="Untitled"
 	args={{
 		title: undefined,
-		items: [],
+		items: tile,
 	}}
 	play={async ({ canvas, canvasElement }) => {
+		// The card drew no heading, so there is nothing between its tile and the
+		// layout's h1: the tile stays h2 rather than skipping to h3. The level is the
+		// card's to pass down, and it can only pass 3 once it has drawn one itself.
 		// By role, not by tag: a tag-pinned selector keeps passing while silently
 		// covering nothing the next time a heading level moves.
-		await expect(canvas.queryAllByRole('heading')).toHaveLength(0);
+		await expect(canvas.getAllByRole('heading')).toHaveLength(1);
+
+		await expect(
+			canvas.getByRole('heading', {
+				name: 'Jellyfin',
+				level: 2,
+			}),
+		).toBeInTheDocument();
 
 		// The wrapper holding the headings carries the gap below them, so it must not
 		// render either — a grid given neither used to start with a blank strip.
@@ -130,8 +182,23 @@
 		items: nested,
 	}}
 	play={async ({ canvas, canvasElement }) => {
-		await expect(canvas.getByText('Smart Home')).toBeInTheDocument();
-		await expect(canvas.getByText('Lights')).toBeInTheDocument();
+		// h3, because both groups sit under THIS card's h2 title. A group draws no
+		// title of its own, so the level of its label is the container's to choose —
+		// top-level it is h2, and hardcoding h3 skipped a level on every page that
+		// puts a group straight on it.
+		await expect(
+			canvas.getByRole('heading', {
+				name: 'Smart Home',
+				level: 3,
+			}),
+		).toBeInTheDocument();
+
+		await expect(
+			canvas.getByRole('heading', {
+				name: 'Lights',
+				level: 3,
+			}),
+		).toBeInTheDocument();
 
 		// The headings live in their own wrapper now, so reach the sub-grid root by the
 		// column class every Grid carries rather than by counting hops.

@@ -24,9 +24,11 @@
 		});
 
 		// Ghost at rest: the header seats it in a recessed track, so the fill is what
-		// hovering adds, not what the trigger carries.
+		// hovering adds, not what the trigger carries. The COMPUTED fill is what says
+		// so — `hover:bg-surface-card` and `bg-surface-card` are two different tokens,
+		// so a `.not` on the class name passes however the trigger is filled.
 		await expect(trigger).toHaveClass('hover:bg-surface-card');
-		await expect(trigger).not.toHaveClass('bg-surface-card');
+		await expect(getComputedStyle(trigger).backgroundColor).toBe('rgba(0, 0, 0, 0)');
 
 		// `invisible` hides the panel, it does not remove it — the options are in the
 		// DOM before anything is opened. That is only safe because `visibility: hidden`
@@ -42,12 +44,17 @@
 	}}
 >
 	{#snippet template(args)}
-		<!-- `children` is the panel, so it cannot come through a spread of `args` -->
-		<Dropdown panelClass={args.panelClass}>
-			{#snippet trigger()}Theme{/snippet}
+		<!-- Padded so the dropdown is not under the pointer's resting (0, 0): the wrapper
+		     is full-width, so at the canvas origin `group-hover` opens the panel and every
+		     rest-state assertion above measures the OPEN dropdown. -->
+		<div class="p-16">
+			<!-- `children` is the panel, so it cannot come through a spread of `args` -->
+			<Dropdown panelClass={args.panelClass}>
+				{#snippet trigger()}Theme{/snippet}
 
-			<button onclick={() => choose('solid-dark')}>solid-dark</button>
-		</Dropdown>
+				<button onclick={() => choose('solid-dark')}>solid-dark</button>
+			</Dropdown>
+		</div>
 	{/snippet}
 </Story>
 

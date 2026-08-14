@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import BoxDate from '$lib/presentation/components/box-date.svelte';
-import { spanOf } from '$lib/test/dom';
 
 beforeEach(() => {
 	vi.useFakeTimers();
@@ -13,13 +12,10 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
+// Two cases, and only two: what the box renders is asserted by the story beside this
+// file. These are here because the interval is a second long — fake timers are the
+// only deterministic cover of it, and a story would catch a tick by luck.
 describe('box-date.svelte', () => {
-	it('shows the current time down to the second', async () => {
-		const screen = await render(BoxDate);
-
-		expect(screen.container.textContent).toMatch(/\d{1,2}:\d{2}:\d{2}/);
-	});
-
 	it('keeps the clock ticking', async () => {
 		const screen = await render(BoxDate);
 
@@ -42,13 +38,5 @@ describe('box-date.svelte', () => {
 		screen.unmount();
 
 		expect(vi.getTimerCount()).toBe(0);
-	});
-
-	it('passes the column span as a custom property', async () => {
-		const screen = await render(BoxDate, {
-			span: 3,
-		});
-
-		expect(spanOf(screen.container)).toBe('3');
 	});
 });

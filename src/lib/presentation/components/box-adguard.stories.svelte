@@ -152,9 +152,11 @@
 		span: undefined,
 	}}
 	play={async ({ canvas }) => {
-		const link = canvas.getByRole('link');
-
-		await expect(link).toHaveAttribute('style');
-		await expect(link.getAttribute('style')).toContain('--span');
+		// The VALUE, not just the property: `spanStyle()` falls back to the full
+		// twelve, and a smaller default collapses every unset box to a sliver of a
+		// row while an assertion that only looks for `--span` stays green.
+		await expect(canvas.getByRole('link')).toHaveStyle({
+			'--span': '12',
+		});
 	}}
 />

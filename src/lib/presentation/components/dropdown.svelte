@@ -23,7 +23,17 @@
 	     page with: the trigger sits in a recessed track that already separates it from the
 	     bar, so a border and a fill of its own made the two menus the heaviest thing in a
 	     header whose job is to stay out of the way. -->
+	<!-- `type="button"`: the default is `submit`, which is a live bug the day this sits
+	     inside a form. No `aria-expanded` and no `aria-haspopup` on purpose — the panel
+	     is opened by `group-hover` / `group-focus-within` and there is no state to
+	     report: the attribute could only ever be a constant, and a constant "expanded"
+	     is a lie the moment a reader arrows over the trigger without focusing it, while
+	     a constant "collapsed" is a lie whenever it is focused. `haspopup` announces
+	     menu semantics — arrow-key navigation between the items — which a panel of
+	     plain buttons does not implement. Wiring either one honestly means holding the
+	     open state in JS, which is the CSS's job here. -->
 	<button
+		type="button"
 		class="hover:bg-surface-card hover:shadow-card focus-visible:ring-ring flex w-full cursor-pointer items-center justify-center gap-text-2xs rounded-full px-box-sm py-box-3xs text-sm transition focus-visible:ring-2 focus-visible:outline-none"
 	>
 		{@render trigger()}

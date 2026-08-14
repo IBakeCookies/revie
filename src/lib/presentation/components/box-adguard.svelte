@@ -27,9 +27,10 @@
 	});
 
 	const readings = $derived.by(() => {
-		if (!stats) {
-			return [];
-		}
+		// `$derived` is lazy and `readings` is only ever read under the template's
+		// `{#if stats}`, so this never evaluates without stats — the guard that used to
+		// stand here was unreachable, and only the compiler needs telling.
+		const known = stats!;
 
 		// `wide` is the domain reading, and the only thing that differs about it: it is
 		// the one value that is not a number, so it takes the row to itself and a
@@ -42,25 +43,25 @@
 		return [
 			{
 				label: m.adguard_dns_queries(),
-				value: counts.format(stats.dnsQueries),
+				value: counts.format(known.dnsQueries),
 				accent: 'border-l-success',
 				wide: false,
 			},
 			{
 				label: m.adguard_blocked(),
-				value: counts.format(stats.numBlockedFiltering),
+				value: counts.format(known.numBlockedFiltering),
 				accent: 'border-l-danger',
 				wide: false,
 			},
 			{
 				label: m.adguard_delay(),
-				value: millis.format(stats.avgProcessingTimeMs),
+				value: millis.format(known.avgProcessingTimeMs),
 				accent: 'border-l-info',
 				wide: false,
 			},
 			{
 				label: m.adguard_top_blocked_domain(),
-				value: stats.topBlockedDomain,
+				value: known.topBlockedDomain,
 				accent: 'border-l-warning',
 				wide: true,
 			},
@@ -100,7 +101,10 @@
 		<dl
 			class="grid grid-cols-2 gap-grid-xs [--box-surface:var(--surface-inset)] @2xl/box-adguard:grid-cols-3 @3xl/box-adguard:grid-cols-4"
 		>
-			{#each readings as reading (reading.label)}
+			<!-- Keyed by index, not by the label: the labels are translated, so two locales
+			     colliding on one would be an `each_key_duplicate` for nothing — the list is
+			     four entries long and rebuilt whole above. -->
+			{#each readings as reading, index (index)}
 				<div
 					class={[
 						'flex min-w-0 flex-col gap-text-3xs rounded-lg border-l-2 bg-(--box-surface,var(--surface-card)) p-box-sm',

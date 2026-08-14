@@ -73,9 +73,11 @@
 		span: undefined,
 	}}
 	play={async ({ canvasElement }) => {
-		const box = canvasElement.querySelector('div');
-
-		await expect(box).toHaveAttribute('style');
-		await expect(box?.getAttribute('style')).toContain('--span');
+		// The VALUE, not just the property: `spanStyle()` falls back to the full
+		// twelve, and a smaller default collapses every unset box to a sliver of a
+		// row while an assertion that only looks for `--span` stays green.
+		await expect(canvasElement.querySelector('div')).toHaveStyle({
+			'--span': '12',
+		});
 	}}
 />

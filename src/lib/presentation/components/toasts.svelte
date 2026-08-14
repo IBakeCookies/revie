@@ -30,6 +30,7 @@
 			<span class="bg-danger size-2 shrink-0 rounded-full" aria-hidden="true"></span>
 			<p class="text-ty-secondary min-w-0 text-sm">{message}</p>
 			<button
+				type="button"
 				onclick={() => ondismiss(message)}
 				aria-label={m.toast_dismiss()}
 				class="text-ty-silent hover:text-ty-primary focus-visible:ring-ring ml-auto shrink-0 cursor-pointer rounded-full px-box-3xs text-sm focus-visible:ring-2 focus-visible:outline-none"

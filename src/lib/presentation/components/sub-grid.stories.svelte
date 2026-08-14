@@ -8,7 +8,9 @@
 		component: SubGrid,
 		tags: ['autodocs'],
 		args: {
-			title: 'Media',
+			// `subTitle`, not `title`: SubGrid overrides `title` after the spread, so a
+			// group label is the only heading it can draw.
+			subTitle: 'Media',
 			span: 6,
 			items: [
 				{
@@ -37,9 +39,13 @@
 		const box = canvasElement.querySelector('div');
 		const inner = canvasElement.querySelector('.grid-cols-12');
 
+		// h2, because a story mounts no card above this group: its label is then the
+		// first thing under the layout's h1, and the hardcoded h3 it used to draw
+		// skipped a level on every page that puts a group straight on it.
 		await expect(
 			canvas.getByRole('heading', {
 				name: 'Media',
+				level: 2,
 			}),
 		).toBeVisible();
 
@@ -48,13 +54,13 @@
 		await expect(inner?.childElementCount).toBe(2);
 
 		// The whole point of the component: a group is not a second card, so Grid's
-		// fill and shadow have to lose the `cn()` merge.
+		// fill and shadow have to lose the `cn()` merge. `shadow-card` only loses it
+		// because `shadow: ['card']` is listed in extendTailwindMerge — unlisted,
+		// tailwind-merge reads it as a shadow *colour*, both survive, and the
+		// switch-off holds by CSS emission order alone.
 		await expect(box).toHaveClass('bg-transparent');
-		await expect(box).not.toHaveClass('bg-surface-card');
-		// No `.not` for `shadow-card`: tailwind-merge reads it as a shadow *colour*
-		// (its value comes from a `--shadow-*` token, not a t-shirt size), so it
-		// survives the merge and `shadow-none`'s later declaration is what wins.
 		await expect(box).toHaveClass('shadow-none');
+		await expect(box).not.toHaveClass('shadow-card');
 
 		// Nothing to blur once there is no surface — and a blur here would make the
 		// element a backdrop root, cutting the children off from the scenery.
@@ -83,7 +89,7 @@
 <Story
 	name="Empty"
 	args={{
-		title: undefined,
+		subTitle: undefined,
 		items: [],
 	}}
 	play={async ({ canvas, canvasElement }) => {
