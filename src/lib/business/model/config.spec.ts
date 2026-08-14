@@ -1,5 +1,6 @@
 import type { ConfigContainer } from '$lib/business/model/config';
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
 	collectServiceHrefs,
 	findContainer,
@@ -352,4 +353,18 @@ describe('collectServiceHrefs', () => {
 
 		expect(collectServiceHrefs(page.containers)).toEqual(['https://proxmox.local:8006']);
 	});
+});
+
+// The admin editor REFUSES to write a config that produces warnings, so a shipped
+// config that produces one could never be saved from it — not even unedited. Read from
+// disk, because the point is the files themselves and not a copy of them.
+describe('the configs this repo ships', () => {
+	it.each(['config.example.json', 'e2e/fixture-config.json'])(
+		'%s normalizes without a single warning',
+		(path) => {
+			const { warnings } = normalizeConfig(JSON.parse(readFileSync(path, 'utf8')));
+
+			expect(warnings).toEqual([]);
+		},
+	);
 });

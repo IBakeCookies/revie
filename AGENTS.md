@@ -308,6 +308,45 @@ config.json ─(disk read, no caching)→ data/config.ts
   against its stamp too, so a broken `config.json` costs one read + parse + log per mtime instead
   of per request, and still recovers when the file is fixed.
   Nothing in it reaches the Tailwind compiler — see Invariants.
+- **The write path is the read path in reverse, and it writes the operator's bytes.**
+  `$writeConfigFile` → `writeConfig` → the `/admin` `save` action. Four decisions:
+  1. **The submitted text is written VERBATIM, never re-serialized from `Config`.** The
+     normalized shape has already dropped `defaults`, every key the schema does not name
+     and every container it rejected — writing it back destroys the operator's file. Same
+     reason `load` hands the editor `$readConfigText`'s bytes rather than `readConfig`'s
+     config: an operator who opens the editor must find their own file.
+  2. **`writeFile` to a `.tmp` beside the target, then `rename`.** A plain write
+     interrupted mid-flight leaves truncated JSON, which the read path survives in memory
+     but a restart does not — it would serve `emptyConfig` and blank the dashboard. Beside
+     the target so both are on one filesystem, which is what makes the rename atomic.
+  3. **A write is REFUSED when `normalizeConfig` returns warnings**, not written-and-warned:
+     every warning names something that would have been dropped, so writing anyway is how
+     an operator loses a box without being told. That is what #23 bought. It has a
+     consequence — a config already on disk that produces a warning can never be saved from
+     the editor, not even unedited — so `config.spec.ts` asserts both shipped configs
+     (`config.example.json`, `e2e/fixture-config.json`) normalize warning-free.
+  4. **`not-an-object` is its own rejection kind**, because `[]`, `null` and `"x"` are all
+     valid JSON that `normalizeConfig` accepts in silence: `fileSchema` falls back to no
+     pages and warns about nothing, so the write would go through and blank the dashboard.
+     Reachable through a form is what makes it worth a guard — on the read path it takes a
+     deliberate hand-edit. Calling valid JSON invalid would lie to the one person who has to
+     fix it. The guard is `writeConfig`'s own, NOT a new `normalizeConfig` warning: those
+     sentences are contract, asserted by `config.spec.ts`.
+
+  There is no cache invalidation, and adding one is a second mechanism for the same job —
+  the write moves the file's stamp, so `readConfig` re-reads by itself.
+
+- **The admin diagnostics are the one sanctioned crossing of the no-copy rule.**
+  `ConfigWrite.rejection` is a KIND (`'invalid-json' | 'not-an-object' | 'warnings' |
+'write-failed' | null`) and the route picks the words, exactly like `adguardFailed` — but
+  `warnings` rides along as `normalizeConfig`'s own English sentences and `/admin` renders
+  them verbatim. The carve-out: the admin area's only audience is the operator who set
+  `DASHBOARD_ADMIN_TOKEN` and reads the server log, and these are the same sentences in the
+  same words, so the framing is Paraglide and the diagnostic lines are the log. Rendering
+  them anywhere a visitor can reach is still the defect the rule exists for. `AppError`
+  deliberately does not cross: it has no sink on this page — presentation cannot render
+  `message` and `/admin` is not one of the three `console` homes — so a parse or write
+  failure becomes a kind and its message is dropped.
 - **A `pages` key is a URL path, and the route is `[...slug]`** — a rest parameter, so
   `/media/plex` and other grouped paths match. It was `[[slug]]`, whose compiled pattern
   (`/^(?:\/([^/]+))?\/?$/`) took one segment: a nested key rendered as a nav link and then
@@ -580,7 +619,7 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  21 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  33 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
   **Exactly one takes a parameter** — `service_probe_failed({ href })`, so the toast names the
   service it could not reach — and it is the only thing the compiler's parameter typecheck has
   ever had to check. The four AdGuard keys are labels, with `Intl.NumberFormat` formatting the
@@ -748,10 +787,10 @@ Comments explain _why_, not _what_; the existing ones are the house style, match
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 23 open items, all but #33 and #34–36 from three
-review passes and adversarially verified against the code, ordered by what breaks soonest. #34–36
-are the config editor and the admin area's two known gaps, which came from building the guard
-rather than from a review. Several are straight ports from
+The open work lives in [roadmap.md](roadmap.md) — 22 open items, all but #33, #35 and #36 from three
+review passes and adversarially verified against the code, ordered by what breaks soonest. Those
+three are the config editor's remaining half and the admin area's two known gaps, which came from
+building the guard rather than from a review. Several are straight ports from
 `zenith`, which has already solved them; those items name the upstream files. It is its own file
 because it churns as items land, while this one is the architecture and should not. **Nothing in it
 is fixed** — the section below is what is.

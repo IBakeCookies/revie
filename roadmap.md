@@ -498,21 +498,27 @@ The guard landed with the read-only `/admin` page; everything that makes it usef
 threat model is the reason for the ordering: `config.json` is the internal network map _and_ the
 source of `/api/ping`'s allowlist, so a write path without the guard in front of it would let
 anyone on the LAN rewrite the allowlist and turn the ping endpoint into an arbitrary internal port
-scanner. The guard exists now, so #34 is safe to build — but **`/api/ping` itself is still
-unauthenticated**, and that is by design only for as long as the allowlist can be trusted.
+scanner. The guard landed first and #34 landed behind it, which is the whole ordering — but
+**`/api/ping` itself is still unauthenticated**, and that is by design only for as long as the
+allowlist can be trusted. That trust now rests on the guard rather than on the file being
+unwritable, so #36's missing rate limit is the thing standing between a guessed token and a
+rewritten allowlist.
 
-34. **A validate-and-write path for `config.json`** — `M`
-    `data/config.ts` gets `$writeConfigFile`, `business/model/config-source.ts` gets `writeConfig`,
-    and the route calls business (a route server file may not reach `src/lib/data`). Two things are
-    not optional. **Write atomically** — `writeFile` to a `.tmp` beside the target then `rename`:
-    a plain write interrupted mid-flight leaves truncated JSON, and while the read path survives
-    that in memory, a restart then serves `emptyConfig` and the dashboard is blank. **Reject on
-    `warnings`, do not write and warn** — `normalizeConfig` already returns them (#23), so the
-    action can hand back exactly which containers would have been dropped instead of silently
-    eating them, which is the whole reason #23 came first. The stamp cache self-heals after a
-    write because the mtime changes; do not add a manual invalidation.
-    _Files:_ src/lib/data/config.ts, src/lib/business/model/config-source.ts,
-    src/routes/admin/+page.server.ts, messages/en.json, messages/de.json
+34. ~~**A validate-and-write path for `config.json`**~~ — **LANDED.** Kept as a numbered item so
+    #35's "needs #34 under it" still resolves. `$writeConfigFile` → `writeConfig` → the `/admin`
+    `save` action, atomic via `.tmp` + `rename`, refusing any config that produces warnings. The
+    architecture is in [AGENTS.md](AGENTS.md) under "Config-driven rendering" — four decisions
+    about the write plus the diagnostics carve-out. Three things landed that this item did not ask
+    for and that are worth knowing: the editor loads `$readConfigText`'s **bytes** rather than the
+    normalized config (which has already eaten `defaults`); `not-an-object` is its own rejection
+    kind, because `[]` / `null` / `"x"` are valid JSON that `normalizeConfig` accepts in silence and
+    a form made that reachable; and `config.spec.ts` now asserts both shipped configs normalize
+    warning-free, because refuse-on-warnings means a config already on disk that warns could never
+    be saved from the editor. **The successful write is node-spec'd, not e2e'd** — one preview
+    server points `DASHBOARD_CONFIG` at the tracked `e2e/fixture-config.json`, so a green write
+    test would dirty the tree and poison every later test through the stamp cache; the e2e covers
+    the rejection, where nothing is written. Interim UI only: a plain `<textarea>`, which is #35's
+    to replace.
 35. **A schema-driven form over the containers, not a JSON textarea** — `L`
     A `<textarea>` of raw JSON in a browser is a worse VS Code and earns nothing over editing the
     file. The win is picking a container from a list and filling in its props, which is what the
@@ -673,8 +679,11 @@ The order that matters, beyond the group ranking:
 
 - ~~**#23 before #12**~~ — landed. #12's two warnings now have the channel to write into, and
   `no-console` is enableable whenever someone wants it.
-- **#34 before #35** — the editor needs the validate-and-write path underneath it, and #35 needs
-  #34's returned diagnostics to tell the operator what it rejected.
+- ~~**#34 before #35**~~ — landed. #35 now has the action, the `ConfigWrite` kinds and the
+  rendered diagnostics under it, and a `<textarea>` to replace.
+- **#36 is now the admin area's weakest point, not a nicety.** Before #34 a guessed token bought
+  read access to the config; it now buys a write to the file `/api/ping` derives its allowlist
+  from. The token being long is the only control, and it is doing more work than it was.
 - **#25 is now overdue, not optional** — #2 has landed, so `/api/ping` opens a real TCP connection
   to whatever a `BoxService` names. `config.json:32-42`'s `tteck` entry points at
   community-scripts.github.io, which means four connects an hour to GitHub Pages to paint a

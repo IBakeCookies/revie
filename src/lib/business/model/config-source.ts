@@ -12,8 +12,14 @@
  * expensive half, and it is the part every request would otherwise repeat.
  */
 
-import type { AppError } from '$lib/utils/useAsyncErrorAsValue';
-import { type ConfigStamp, $readConfigFile, $readConfigStamp } from '$lib/data/config';
+import type { AppError, Result } from '$lib/utils/useAsyncErrorAsValue';
+import {
+	type ConfigStamp,
+	$readConfigFile,
+	$readConfigStamp,
+	$readConfigText,
+	$writeConfigFile,
+} from '$lib/data/config';
 import { type Config, emptyConfig, normalizeConfig } from '$lib/business/model/config';
 
 /**
@@ -106,5 +112,78 @@ export async function readConfig(): Promise<ConfigRead> {
 	return {
 		...cache.read,
 		isFresh: true,
+	};
+}
+
+/**
+ * The file's own bytes, for an editor — what `readConfig` returns is the normalized
+ * shape. A pass-through, and it exists because a route may not reach the data layer.
+ */
+export async function readConfigText(): Promise<Result<string>> {
+	return $readConfigText();
+}
+
+/**
+ * Why a submitted config was refused, as a KIND — the words are presentation's, so
+ * nothing here is a sentence. `warnings` is the exception and the carve-out: those
+ * sentences are `normalizeConfig`'s operator log channel, and the admin page renders
+ * them as exactly that.
+ */
+export type ConfigWrite = {
+	rejection: 'invalid-json' | 'not-an-object' | 'warnings' | 'write-failed' | null;
+	/** Only ever set for `'warnings'`: the containers that would have been dropped. */
+	warnings: string[];
+};
+
+/**
+ * Validates submitted config text and writes it, or says why it was refused. Never
+ * throws and never prints: a model has no business deciding what a failure is worth.
+ *
+ * The text is written VERBATIM rather than re-serialized from `Config`. The normalized
+ * shape has already dropped `defaults`, every key the schema does not name and every
+ * container it rejected — writing it back would silently destroy the operator's file.
+ *
+ * No cache invalidation: the write moves the file's stamp, so `readConfig` re-reads by
+ * itself on the next call.
+ */
+export async function writeConfig(text: string): Promise<ConfigWrite> {
+	let raw: unknown;
+
+	try {
+		raw = JSON.parse(text);
+	} catch {
+		return {
+			rejection: 'invalid-json',
+			warnings: [],
+		};
+	}
+
+	// `[]`, `"x"` and `null` are all valid JSON that `normalizeConfig` accepts in
+	// silence: its `fileSchema` falls back to no pages and produces no warning, so the
+	// write would go through and blank the dashboard. Its own kind, because calling
+	// valid JSON invalid would lie to the one person who has to fix it.
+	if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+		return {
+			rejection: 'not-an-object',
+			warnings: [],
+		};
+	}
+
+	const { warnings } = normalizeConfig(raw);
+
+	// Refused, not written-and-warned: every warning names something that would have
+	// been DROPPED, so writing anyway is how an operator loses a box without being told.
+	if (warnings.length > 0) {
+		return {
+			rejection: 'warnings',
+			warnings,
+		};
+	}
+
+	const [error] = await $writeConfigFile(text);
+
+	return {
+		rejection: error ? 'write-failed' : null,
+		warnings: [],
 	};
 }

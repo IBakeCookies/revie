@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('node:fs/promises', () => ({
 	stat: vi.fn(),
 	readFile: vi.fn(),
+	writeFile: vi.fn(),
+	rename: vi.fn(),
 }));
 
 vi.mock('$env/dynamic/private', () => ({
@@ -12,10 +14,12 @@ vi.mock('$env/dynamic/private', () => ({
 	},
 }));
 
-/** Only the two calls the module makes, so the mocks need no casting per call. */
+/** Only the calls the module makes, so the mocks need no casting per call. */
 type FsMock = {
 	stat: Mock<(path: string) => Promise<{ mtimeMs: number; size: number }>>;
 	readFile: Mock<(path: string, encoding: string) => Promise<string>>;
+	writeFile: Mock<(path: string, text: string, encoding: string) => Promise<void>>;
+	rename: Mock<(from: string, to: string) => Promise<void>>;
 };
 
 const file = JSON.stringify({
@@ -39,11 +43,12 @@ async function loadModule() {
 	vi.resetModules();
 
 	const fs = (await import('node:fs/promises')) as unknown as FsMock;
-	const { readConfig } = await import('$lib/business/model/config-source');
+	const { readConfig, writeConfig } = await import('$lib/business/model/config-source');
 
 	return {
 		fs,
 		readConfig,
+		writeConfig,
 	};
 }
 
@@ -248,5 +253,105 @@ describe('readConfig', () => {
 		);
 
 		expect((await readConfig()).warnings).toEqual([expect.stringContaining('NotAComponent')]);
+	});
+});
+
+describe('writeConfig', () => {
+	// `defaults` is the half a re-serialized `Config` would silently destroy: it is
+	// consumed during normalization, so it exists in the file and nowhere downstream.
+	const submitted = JSON.stringify(
+		{
+			defaults: {
+				BoxService: {
+					span: 6,
+				},
+			},
+			pages: {
+				'/': {
+					containers: [],
+				},
+			},
+		},
+		null,
+		2,
+	);
+
+	it('writes the submitted text verbatim, through a temp file it then renames', async () => {
+		const { fs, writeConfig } = await loadModule();
+		const { rejection } = await writeConfig(submitted);
+
+		expect(rejection).toBeNull();
+		expect(fs.writeFile).toHaveBeenCalledWith('/etc/dashboard.json.tmp', submitted, 'utf8');
+		expect(fs.rename).toHaveBeenCalledWith('/etc/dashboard.json.tmp', '/etc/dashboard.json');
+
+		// The rename is what makes the write atomic, so it has to come second: the temp
+		// file exists to be the only thing a torn write can truncate.
+		expect(fs.writeFile.mock.invocationCallOrder[0]).toBeLessThan(
+			fs.rename.mock.invocationCallOrder[0],
+		);
+	});
+
+	it('refuses text that is not JSON, and touches nothing', async () => {
+		const { fs, writeConfig } = await loadModule();
+
+		expect(await writeConfig('{ not json')).toEqual({
+			rejection: 'invalid-json',
+			warnings: [],
+		});
+
+		expect(fs.writeFile).not.toHaveBeenCalled();
+	});
+
+	// Valid JSON that `normalizeConfig` accepts in silence — no warning to reject on —
+	// so without its own guard this writes and blanks the dashboard.
+	it.each(['[]', '"a config"', 'null'])('refuses %s, which is not a config', async (text) => {
+		const { fs, writeConfig } = await loadModule();
+
+		expect(await writeConfig(text)).toEqual({
+			rejection: 'not-an-object',
+			warnings: [],
+		});
+
+		expect(fs.writeFile).not.toHaveBeenCalled();
+	});
+
+	// Rejected rather than written-and-warned: a warning names a container that would
+	// have been dropped, so the operator gets told instead of losing the box.
+	it('refuses a config that would drop a container, and hands back the diagnostics', async () => {
+		const { fs, writeConfig } = await loadModule();
+
+		const { rejection, warnings } = await writeConfig(
+			JSON.stringify({
+				pages: {
+					'/': {
+						containers: [
+							{
+								name: 'BoxService',
+								props: {
+									title: 'No href',
+								},
+							},
+						],
+					},
+				},
+			}),
+		);
+
+		expect(rejection).toBe('warnings');
+		expect(warnings).toEqual([expect.stringContaining('Skipping container "BoxService"')]);
+		expect(fs.writeFile).not.toHaveBeenCalled();
+	});
+
+	it('reports a failed write as a value', async () => {
+		const { fs, writeConfig } = await loadModule();
+
+		fs.writeFile.mockRejectedValue(new Error('EACCES'));
+
+		expect(await writeConfig(submitted)).toEqual({
+			rejection: 'write-failed',
+			warnings: [],
+		});
+
+		expect(fs.rename).not.toHaveBeenCalled();
 	});
 });

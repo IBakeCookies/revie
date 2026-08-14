@@ -1,5 +1,5 @@
 /**
- * Reading the dashboard config file. I/O only — no validation, no shaping, no
+ * Reading and writing the dashboard config file. I/O only — no validation, no shaping, no
  * caching. What the bytes MEAN is business's problem, in
  * `business/model/config-source.ts`; this layer fetches them and hands back whatever
  * happened.
@@ -9,7 +9,7 @@
  * it can reach the Tailwind compiler.
  */
 
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { env } from '$env/dynamic/private';
 import { type Result, useAsyncErrorAsValue } from '$lib/utils/useAsyncErrorAsValue';
 
@@ -38,4 +38,26 @@ export async function $readConfigFile(): Promise<Result<unknown>> {
 		async () => JSON.parse(await readFile(configPath, 'utf8')),
 		`Could not read the dashboard config at "${configPath}"`,
 	);
+}
+
+/** The bytes as they are, for an editor that must show the operator their own file. */
+export async function $readConfigText(): Promise<Result<string>> {
+	return useAsyncErrorAsValue(
+		async () => readFile(configPath, 'utf8'),
+		`Could not read the dashboard config at "${configPath}"`,
+	);
+}
+
+/**
+ * Writes to a temp file beside the target and renames it over: a plain write that is
+ * interrupted mid-flight leaves truncated JSON, which the read path survives in memory
+ * but a restart does not — it would serve an empty config and blank the dashboard.
+ * `.tmp` sits beside the target so both are on one filesystem, which is what makes the
+ * rename atomic.
+ */
+export async function $writeConfigFile(text: string): Promise<Result<void>> {
+	return useAsyncErrorAsValue(async () => {
+		await writeFile(`${configPath}.tmp`, text, 'utf8');
+		await rename(`${configPath}.tmp`, configPath);
+	}, `Could not write the dashboard config at "${configPath}"`);
 }
