@@ -34,6 +34,7 @@
 	"admin_container_remove": "Remove container",
 	"admin_sign_in": "Sign in",
 	"admin_sign_in_failed": "That token was not accepted",
+	"admin_sign_in_locked": "Too many attempts. Try again in {seconds} seconds.",
 	"admin_sign_out": "Sign out",
 	"admin_token_label": "Operator token",
 	"toast_dismiss": "Dismiss this message",

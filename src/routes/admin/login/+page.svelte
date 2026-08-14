@@ -33,6 +33,14 @@
 			<p class="text-sm" role="alert">{m.admin_sign_in_failed()}</p>
 		{/if}
 
+		{#if form?.locked}
+			<p class="text-sm" role="alert">
+				{m.admin_sign_in_locked({
+					seconds: form.retryAfterSeconds,
+				})}
+			</p>
+		{/if}
+
 		<button
 			type="submit"
 			class="bg-surface-inset hover:bg-surface-hover focus-visible:ring-ring cursor-pointer rounded-md px-box-md py-text-2xs text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"

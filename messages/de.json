@@ -34,6 +34,7 @@
 	"admin_container_remove": "Container entfernen",
 	"admin_sign_in": "Anmelden",
 	"admin_sign_in_failed": "Dieses Token wurde nicht akzeptiert",
+	"admin_sign_in_locked": "Zu viele Versuche. Bitte versuchen Sie es in {seconds} Sekunden erneut.",
 	"admin_sign_out": "Abmelden",
 	"admin_token_label": "Betreiber-Token",
 	"toast_dismiss": "Diese Meldung ausblenden",
