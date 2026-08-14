@@ -164,7 +164,16 @@ function normalizeContainer(
 	}
 
 	if (props.span !== undefined) {
-		props.span = normalizeSpan(props.span);
+		const span = normalizeSpan(props.span);
+
+		// As loud as the `class` case above: a rejected span (`"6"`, `1.5`) falls back
+		// to the full twelve columns, so a silent drop renders a full-width box and
+		// looks like a layout bug rather than the typo it is.
+		if (span === undefined) {
+			console.warn(`Ignoring "span" on container "${raw.name}", it has to be a whole number`);
+		}
+
+		props.span = span;
 	}
 
 	// Set unconditionally, not just when present: every traversal (findContainer,
@@ -268,7 +277,13 @@ export function findContainer(
 	}
 }
 
-/** Every service href on a page, at any nesting depth. */
+/**
+ * Every service href on a page, at any nesting depth, each one once.
+ *
+ * Deduped because the caller probes what it gets back on a timer: the same href in
+ * two boxes would be probed twice per tick, doubling the requests and the window for
+ * two answers to land out of order.
+ */
 export function collectServiceHrefs(containers: ConfigContainer[]): string[] {
 	const hrefs: string[] = [];
 
@@ -282,5 +297,5 @@ export function collectServiceHrefs(containers: ConfigContainer[]): string[] {
 		}
 	}
 
-	return hrefs;
+	return [...new Set(hrefs)];
 }

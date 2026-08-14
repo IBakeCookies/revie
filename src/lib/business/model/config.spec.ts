@@ -73,6 +73,23 @@ function itemsOf(container: ConfigContainer): ConfigContainer[] {
 	return isGrid(container) ? container.props.items : [];
 }
 
+function pageWith(...containers: unknown[]) {
+	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+	const page = normalizeConfig({
+		pages: {
+			'/': {
+				containers,
+			},
+		},
+	}).pages['/'];
+
+	return {
+		page,
+		warn,
+	};
+}
+
 describe('normalizeConfig', () => {
 	it('keeps only well-formed pages and containers', () => {
 		expect(Object.keys(config.pages)).toEqual(['/', '/media/plex']);
@@ -108,10 +125,45 @@ describe('normalizeConfig', () => {
 		expect(grid.props.span).toBe(12);
 	});
 
+	it('clamps span up to a single column', () => {
+		const { page } = pageWith({
+			name: 'BoxDate',
+			props: {
+				span: 0,
+			},
+		});
+
+		expect(page.containers[0].props.span).toBe(1);
+	});
+
+	it('warns about a span that is not a whole number, which would render full width', () => {
+		const { page, warn } = pageWith({
+			name: 'BoxDate',
+			props: {
+				span: '6',
+			},
+		});
+
+		expect(page.containers[0].props.span).toBeUndefined();
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('span'));
+	});
+
 	it('strips class names, which could never reach the Tailwind build', () => {
 		// Cast because the schema deliberately has no `class` — this asserts the
 		// runtime object does not carry one either.
 		expect((grid.props as Record<string, unknown>).class).toBeUndefined();
+	});
+
+	it('strips gridClass as well as class', () => {
+		const { page, warn } = pageWith({
+			name: 'Grid',
+			props: {
+				gridClass: 'grid-cols-3',
+			},
+		});
+
+		expect((page.containers[0].props as Record<string, unknown>).gridClass).toBeUndefined();
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('gridClass'));
 	});
 
 	it('applies per-component defaults at any nesting depth', () => {
@@ -125,26 +177,29 @@ describe('normalizeConfig', () => {
 		expect(normalizeConfig('nope').pages).toEqual({});
 		expect(normalizeConfig(undefined).pages).toEqual({});
 	});
-});
 
-describe('containers that would throw while rendering', () => {
-	function pageWith(...containers: unknown[]) {
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+	it('returns an empty config for an object with no pages', () => {
+		expect(
+			normalizeConfig({
+				defaults: {},
+			}).pages,
+		).toEqual({});
+	});
 
+	it('gives a page whose containers are not an array an empty list', () => {
 		const page = normalizeConfig({
 			pages: {
 				'/': {
-					containers,
+					containers: 'not an array',
 				},
 			},
 		}).pages['/'];
 
-		return {
-			page,
-			warn,
-		};
-	}
+		expect(page.containers).toEqual([]);
+	});
+});
 
+describe('containers that would throw while rendering', () => {
 	it('gives a Grid written before its children an empty items array', () => {
 		// The most likely half-finished hand edit. `items` used to stay undefined,
 		// which threw in every traversal below and took the page to a 500.
@@ -268,5 +323,27 @@ describe('findContainer', () => {
 describe('collectServiceHrefs', () => {
 	it('collects hrefs at any nesting depth', () => {
 		expect(collectServiceHrefs(home.containers)).toEqual(['https://proxmox.local:8006']);
+	});
+
+	it('returns one href however many boxes on the page name it', () => {
+		const box = {
+			name: 'BoxService',
+			props: {
+				title: 'Proxmox',
+				href: 'https://proxmox.local:8006',
+				img: {
+					src: 'https://icons.local/p.svg',
+				},
+			},
+		};
+
+		const { page } = pageWith(box, {
+			name: 'Grid',
+			props: {
+				items: [box],
+			},
+		});
+
+		expect(collectServiceHrefs(page.containers)).toEqual(['https://proxmox.local:8006']);
 	});
 });

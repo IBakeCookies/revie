@@ -14,7 +14,7 @@ vi.mock('$env/dynamic/private', () => ({
 
 /** Only the two calls the module makes, so the mocks need no casting per call. */
 type FsMock = {
-	stat: Mock<(path: string) => Promise<{ mtimeMs: number }>>;
+	stat: Mock<(path: string) => Promise<{ mtimeMs: number; size: number }>>;
 	readFile: Mock<(path: string, encoding: string) => Promise<string>>;
 };
 
@@ -57,6 +57,7 @@ describe('readConfig', () => {
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 1,
+			size: 10,
 		});
 
 		fs.readFile.mockResolvedValue(file);
@@ -78,6 +79,7 @@ describe('readConfig', () => {
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 1,
+			size: 10,
 		});
 
 		fs.readFile.mockResolvedValue(file);
@@ -93,6 +95,7 @@ describe('readConfig', () => {
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 1,
+			size: 10,
 		});
 
 		fs.readFile.mockResolvedValue(file);
@@ -101,6 +104,30 @@ describe('readConfig', () => {
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 2,
+			size: 10,
+		});
+
+		await readConfig();
+
+		expect(fs.readFile).toHaveBeenCalledTimes(2);
+	});
+
+	// A restore that preserves timestamps, or two edits inside one coarse mtime tick.
+	it('re-reads the file when its size changes but its mtime does not', async () => {
+		const { fs, readConfig } = await loadModule();
+
+		fs.stat.mockResolvedValue({
+			mtimeMs: 1,
+			size: 10,
+		});
+
+		fs.readFile.mockResolvedValue(file);
+
+		await readConfig();
+
+		fs.stat.mockResolvedValue({
+			mtimeMs: 1,
+			size: 11,
 		});
 
 		await readConfig();
@@ -115,6 +142,7 @@ describe('readConfig', () => {
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 1,
+			size: 10,
 		});
 
 		fs.readFile.mockResolvedValue(file);
@@ -137,6 +165,33 @@ describe('readConfig', () => {
 		});
 	});
 
+	it('reads a broken file once per mtime, and again once it is fixed', async () => {
+		const { fs, readConfig } = await loadModule();
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		fs.stat.mockResolvedValue({
+			mtimeMs: 1,
+			size: 10,
+		});
+
+		fs.readFile.mockResolvedValue('{ not json');
+
+		await readConfig();
+		await readConfig();
+
+		expect(fs.readFile).toHaveBeenCalledOnce();
+		expect(error).toHaveBeenCalledOnce();
+
+		fs.stat.mockResolvedValue({
+			mtimeMs: 2,
+			size: 10,
+		});
+
+		fs.readFile.mockResolvedValue(file);
+
+		expect((await readConfig()).pages['/'].name).toBe('Home');
+	});
+
 	it('falls back to an empty config when the file is not valid JSON', async () => {
 		const { fs, readConfig } = await loadModule();
 
@@ -144,6 +199,7 @@ describe('readConfig', () => {
 
 		fs.stat.mockResolvedValue({
 			mtimeMs: 1,
+			size: 10,
 		});
 
 		fs.readFile.mockResolvedValue('{ not json');

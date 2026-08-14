@@ -15,12 +15,22 @@ import { type Result, useAsyncErrorAsValue } from '$lib/utils/useAsyncErrorAsVal
 
 const configPath = env.DASHBOARD_CONFIG || 'config.json';
 
-/** When the file last changed — the cheap call, used to decide whether to re-read. */
-export async function $readConfigMtime(): Promise<Result<number>> {
-	return useAsyncErrorAsValue(
-		async () => (await stat(configPath)).mtimeMs,
-		`Could not reach the dashboard config at "${configPath}"`,
-	);
+/** What the file looks like from the outside — both halves ride on one `stat`. */
+export interface ConfigStamp {
+	mtimeMs: number;
+	size: number;
+}
+
+/** The cheap call, used to decide whether to re-read. */
+export async function $readConfigStamp(): Promise<Result<ConfigStamp>> {
+	return useAsyncErrorAsValue(async () => {
+		const { mtimeMs, size } = await stat(configPath);
+
+		return {
+			mtimeMs,
+			size,
+		};
+	}, `Could not reach the dashboard config at "${configPath}"`);
 }
 
 export async function $readConfigFile(): Promise<Result<unknown>> {
