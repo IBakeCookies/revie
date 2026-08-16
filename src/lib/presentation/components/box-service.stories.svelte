@@ -29,8 +29,8 @@
 <Story
 	name="Status unknown"
 	play={async ({ args, canvas, canvasElement }) => {
-		// `title` is required, in the schema and in `requiredProps` — a title-less
-		// entry used to pass validation and render an empty heading.
+		// `title` is required in the schema — a title-less entry used to pass
+		// validation and render an empty heading.
 		//
 		// h2 is the default, which is the level of a tile sitting straight on the
 		// page: the layout's app title is the only h1, so h3 here skips a level.
