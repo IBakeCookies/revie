@@ -790,6 +790,13 @@ points the preview server at [e2e/fixture-config.json](e2e/fixture-config.json) 
 `DASHBOARD_CONFIG`, so the suite never depends on the services of the machine it runs on:
 one host that resolves, one that never does, an AdGuard instance on a closed port.
 
+**The fixture's env is part of the fixture.** `webServer.env` spells `ADGUARD_USERNAME` /
+`ADGUARD_PASSWORD` alongside `DASHBOARD_ADMIN_TOKEN` for the same reason the config is
+pinned: unset, `loadAdguardStats` returns `[null, null]` — an absence, no toast — so the
+two toast cases in [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts) find an
+empty live region. That was green on a developer machine off a gitignored `.env` and red on
+CI, which has none. The values are arbitrary; the port they point at is closed either way.
+
 The host that resolves is the preview server itself, which is why
 [playwright.config.ts](playwright.config.ts) pins **IPv4 on both sides** — `--host 127.0.0.1`,
 `webServer.url`, and `use.baseURL` all spell the same literal as the fixture's `href`. Left

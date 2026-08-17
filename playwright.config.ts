@@ -31,6 +31,13 @@ export default defineConfig({
 			// 404s. Spelled again in can-sign-in-as-admin.e2e.ts, because this reaches
 			// the server process and not the test one.
 			DASHBOARD_ADMIN_TOKEN: 'e2e-operator-token',
+			// Without these the load treats the box as an ABSENCE and reports nothing,
+			// so the two toast tests find an empty live region — green locally off a
+			// gitignored `.env`, red on CI, which has none. The fixture's AdGuard port
+			// is closed, so the fetch fails whatever the values are; they only have to
+			// exist.
+			ADGUARD_USERNAME: 'e2e-adguard-user',
+			ADGUARD_PASSWORD: 'e2e-adguard-password',
 		},
 	},
 	timeout: testTimeout,
