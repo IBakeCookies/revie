@@ -394,6 +394,10 @@ missing or not valid` rather than `not a string`: `probe` is the first prop wher
   every other edit and no way to reach what is blocking it. One predicate covers all of them
   without enumerating any. The choice is made from the bytes on DISK, so fixing the file
   brings the form back on the next load.
+- **`defaults` carries props, never structural keys.** `items` is stripped from every
+  `defaults` entry with a warning, once at the root of `normalizeConfig`: a default `items` is
+  re-supplied to each child it produces, which inherits it again until the stack goes — and no
+  schema can catch it, because the merge happens before the parse.
 - **A `pages` key is a URL path, and the route is `[...slug]`** — a rest parameter, so
   `/media/plex` and other grouped paths match. It was `[[slug]]`, whose compiled pattern
   (`/^(?:\/([^/]+))?\/?$/`) took one segment: a nested key rendered as a nav link and then

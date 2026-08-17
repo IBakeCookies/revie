@@ -17,10 +17,10 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 20 items are open — 19 from the review passes, plus
+**Numbers are stable, so gaps mean landed.** 19 items are open — 18 from the review passes, plus
 item 36, which came from building the admin guard rather than from a review and is now down to a
 single line in `.env.example`, a file this environment will not let an agent write; **1, 2, 3, 4, 5,
-6, 7, 8, 11, 19, 23, 25, 31, 32, 34 and 35 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+6, 7, 8, 11, 14, 19, 23, 25, 31, 32, 34 and 35 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
 the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -112,27 +112,18 @@ vitest project. See AGENTS.md's "Already done".)_
 
 ## Correctness & security (second review)
 
-14. **Guard `normalizeConfig` inside `readConfig` and stop `defaults` from re-supplying children** —
-    `S`
-    `config-source.ts:43` calls `normalizeConfig(raw)` bare while both disk reads above it are
-    Result-wrapped; `normalizeContainer` threads `defaults` into its own recursion
-    (config.ts:147-152 → 169-173), so a `defaults` entry for `Grid`/`SubGrid` carrying `items`
-    recurses forever. Wrap the call and fall back to `cache?.config ?? emptyConfig` like the two
-    read failures, and delete structural keys (`items`) arriving from `defaultProps` at
-    config.ts:150 (`defaults` is documented as per-container props, README.md:61).
-    _Narrowed by #23 and the valibot migration:_ the first half is mostly closed — validation is
-    `safeParse` throughout, so `normalizeConfig` no longer throws on malformed input and now hands
-    its diagnostics back as values. What survives is the **recursion**, which no schema can catch
-    because `defaults` is merged before the parse: a `defaults` entry for `Grid`/`SubGrid` carrying
-    `items` still recurses until the stack goes. Deleting structural keys from `defaultProps` is the
-    fix, and it is the whole of what is left here.
-    _Prevents:_ reproduced on the built server — `GET /` returns 500 twice in a row with SvelteKit's
-    bare `Internal Error` shell (not `+error.svelte`), forever, because line 43 never completes so
-    `cache` stays `undefined`; `+layout.server.ts:6` awaits the same function, so the header nav
-    dies too. README.md:63 promises "a malformed container is dropped with a warning instead of
-    breaking the page".
-    _Files:_ src/lib/business/model/config-source.ts:43, src/lib/business/model/config.ts:147-173,
-    src/routes/[...slug]/page.server.spec.ts
+14. _(**Guard `normalizeConfig` inside `readConfig` and stop `defaults` from re-supplying
+    children** — landed. `STRUCTURAL_KEYS = ['items']` is stripped from every `defaults` entry,
+    with a warning naming the key and the container, **once at the root of `normalizeConfig`**
+    rather than inside `normalizeContainer` — so the container merge receives defaults it can
+    trust and one offending entry reports once instead of once per Grid on the page. Reproduced
+    before the fix (`RangeError: Maximum call stack size exceeded`) and fenced by two cases in
+    [config.spec.ts](src/lib/business/model/config.spec.ts): the drop, and the warning count with
+    two Grids inheriting one entry. **Only the `defaults` vector is closed:** `config-source.ts:100`
+    is still un-wrapped and `normalizeConfig` still throws `RangeError` on nesting the FILE itself
+    declares, around depth 2000. `STRUCTURAL_KEYS` is deliberately **not** derived
+    from the schema types: that derivation is #22's scope. Recorded in AGENTS.md under
+    "Config-driven rendering".)_
 
 15. **State `secure` explicitly on all three appearance cookies** — `S`
     Neither write path types it: `cookie.ts:41` omits the attribute, and `COOKIE_WRITE_OPTIONS`

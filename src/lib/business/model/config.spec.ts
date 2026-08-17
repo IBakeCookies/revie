@@ -172,6 +172,69 @@ describe('normalizeConfig', () => {
 		expect(nested[1].props.span).toBe(6);
 	});
 
+	it('strips items from a defaults entry, leaving a container its own children', () => {
+		const { config, warnings } = normalizeConfig({
+			defaults: {
+				Grid: {
+					items: [
+						{
+							name: 'Grid',
+						},
+					],
+				},
+			},
+			pages: {
+				'/': {
+					containers: [
+						{
+							name: 'Grid',
+							props: {
+								items: [
+									{
+										name: 'BoxDate',
+									},
+								],
+							},
+						},
+					],
+				},
+			},
+		});
+
+		expect(itemsOf(config.pages['/'].containers[0]).map((item) => item.name)).toEqual(['BoxDate']);
+		expect(warnings).toEqual([expect.stringContaining('items')]);
+	});
+
+	// Each inherited Grid has no own `items`, so it inherits the entry again: unstripped,
+	// this recurses until the stack goes and every request 500s.
+	it('warns once per defaults entry however many containers inherit it', () => {
+		const { warnings } = normalizeConfig({
+			defaults: {
+				Grid: {
+					items: [
+						{
+							name: 'Grid',
+						},
+					],
+				},
+			},
+			pages: {
+				'/': {
+					containers: [
+						{
+							name: 'Grid',
+						},
+						{
+							name: 'Grid',
+						},
+					],
+				},
+			},
+		});
+
+		expect(warnings).toEqual([expect.stringContaining('items')]);
+	});
+
 	it('returns an empty config for anything that is not an object', () => {
 		expect(normalizeConfig('nope').config.pages).toEqual({});
 		expect(normalizeConfig(undefined).config.pages).toEqual({});

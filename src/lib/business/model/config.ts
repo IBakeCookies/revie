@@ -282,6 +282,13 @@ export function isBoxAdguard(item: ConfigContainer): item is ConfigContainer<'Bo
  * would silently do nothing. Column width is configured with `span` instead.
  */
 const STYLE_KEYS = ['class', 'gridClass'] as const;
+/**
+ * `defaults` carries per-container props, and children are not a prop. A default
+ * `items` is re-supplied to every child it produces, and each of those inherits it
+ * again — the recursion never bottoms out and the stack goes, taking every request
+ * with it. No schema can catch it: the merge happens before the parse.
+ */
+const STRUCTURAL_KEYS = ['items'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -368,6 +375,35 @@ function normalizeContainer(
 	} as ConfigContainer;
 }
 
+function withoutStructuralDefaults(
+	defaults: Record<string, unknown>,
+	warnings: string[],
+): Record<string, unknown> {
+	const cleaned: Record<string, unknown> = {};
+
+	for (const [name, props] of Object.entries(defaults)) {
+		if (!isRecord(props)) {
+			continue;
+		}
+
+		const kept = {
+			...props,
+		};
+
+		for (const key of STRUCTURAL_KEYS) {
+			if (kept[key] !== undefined) {
+				warnings.push(`Ignoring "${key}" in the defaults for "${name}", it is not a prop`);
+
+				delete kept[key];
+			}
+		}
+
+		cleaned[name] = kept;
+	}
+
+	return cleaned;
+}
+
 /**
  * Turns the parsed config file into containers that are safe to render: unknown
  * containers and malformed entries are dropped, per-container defaults are merged
@@ -389,7 +425,9 @@ export function normalizeConfig(raw: unknown): { config: Config; warnings: strin
 		};
 	}
 
-	const { defaults } = file.output;
+	// At the root rather than inside `normalizeContainer`, so one offending `defaults` entry
+	// is reported once instead of once per container instance on the page.
+	const defaults = withoutStructuralDefaults(file.output.defaults, warnings);
 	const pages: Config['pages'] = {};
 
 	for (const [path, rawPage] of Object.entries(file.output.pages)) {
