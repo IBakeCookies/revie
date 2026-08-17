@@ -17,10 +17,10 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 21 items are open — 20 from the review passes, plus
+**Numbers are stable, so gaps mean landed.** 20 items are open — 19 from the review passes, plus
 item 36, which came from building the admin guard rather than from a review and is now down to a
 single line in `.env.example`, a file this environment will not let an agent write; **1, 2, 3, 4, 5,
-6, 7, 8, 11, 19, 23, 31, 32, 34 and 35 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+6, 7, 8, 11, 19, 23, 25, 31, 32, 34 and 35 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
 the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -169,7 +169,8 @@ vitest project. See AGENTS.md's "Already done".)_
 17. **Key AdGuard stats by href, and validate the wire shape before transforming** — `M`
     `loadAdguardStats` resolves `findContainer(page, 'BoxAdguard')` — first match at any depth — and
     `AdguardStore` holds one value that box-adguard-wrapper.svelte:11 hands to every instance without
-    reading `props.href`. Add `collectAdguardHrefs` beside `collectServiceHrefs` (config.ts:272-286),
+    reading `props.href`. Add `collectAdguardHrefs` beside `collectServiceProbes` (renamed from
+    `collectServiceHrefs` when #25 landed),
     `Promise.all` the fetches so the 3s bound stays 3s total, return `Record<href, AdguardStats>`, and
     make the store `stats(href)` (the wrapper edit is one line — `props.href` is already typed in).
     Separately, add a numeric check right after `raw.json()` in `getAdguardStats`, matching the
@@ -323,7 +324,7 @@ vitest project. See AGENTS.md's "Already done".)_
     misspelled _optional_ prop (`spann: 6`, `subTitel`) renders wrong with no diagnostic. Adding a
     third nesting container today gets 2 of 4 compile prompts; `CONTAINS_CHILDREN` and `isGrid` are the
     two silent ones, and missing them means children are never normalized (a BoxService without `img`
-    then 500s SSR) and `collectServiceHrefs` skips the subtree. Verified: the derived
+    then 500s SSR) and `collectServiceProbes` skips the subtree. Verified: the derived
     `Record<NestingName, true>` errors TS2741 where the array form compiles silently. Not an
     injection vector — Svelte's SSR renderer skips `on*` attributes.
     _Files:_ src/lib/presentation/components/{box-service,box-adguard,box-date,grid}.svelte,
@@ -362,22 +363,29 @@ vitest project. See AGENTS.md's "Already done".)_
     src/lib/presentation/components/box-search.svelte (new), messages/en.json, messages/de.json,
     README.md:63-66
 
-25. **Add a `BoxBookmark` container so link-only boxes stop being probed** — `S`
-    Same three edit points as #24 (`CONTAINER_NAMES`, `requiredProps`, one config-container branch):
-    `title` required, `img.src`/`subtitle` optional, no status dot, no store. Because
-    `collectServiceHrefs` (config.ts:272) walks only `isBoxService`, a bookmark is automatically
-    excluded from the poll set and from `/api/ping`'s allowlist (api/ping/+server.ts:45) — zero
-    changes to the probing path. Then migrate the one offending config entry.
-    _Payoff:_ BoxService is the only link container and it demands `title` + `href` + `img.src`
-    (config.ts:114-120), renders the status `<span>` unconditionally (box-service.svelte:47-54 —
-    `bg-primary` + `aria-label="status unknown"` forever), and gets POSTed every 15 minutes
-    (`POLL_INTERVAL_MS`, poll-services-state.ts:5). config.json:32-42 abuses it for `tteck` →
-    `https://community-scripts.github.io/ProxmoxVE/`, so the server probes GitHub Pages four times an
-    hour to paint a meaningless dot. Prefer a new name over a `probe: false` flag: a flag would force
-    `collectServiceHrefs` and the ping allowlist to start reading props.
-    _Files:_ src/lib/business/model/config.ts:15,112-127,
-    src/lib/presentation/components/config-container.svelte:38-52,
-    src/lib/presentation/components/box-bookmark.svelte (new), config.json:32-42, README.md:63-66
+25. ~~**Add a `BoxBookmark` container so link-only boxes stop being probed**~~ — **LANDED as a
+    `probe` mode instead, which is not what this item asked for.** Kept as a numbered item
+    because the Sequencing note below cross-references it. `BoxService` now takes
+    `probe: 'tcp' | 'http' | 'none'`, and `none` is the bookmark: no dot, no poll, and — the
+    half that matters — absent from `collectServiceProbes`, so it never enters `/api/ping`'s
+    allowlist. The architecture is in [AGENTS.md](AGENTS.md) under "Already done", six
+    decisions.
+    **This item's own reasoning was wrong on the point it turned on.** It said to prefer a new
+    container over a flag because "a flag would force `collectServiceHrefs` and the ping
+    allowlist to start reading props" — but the allowlist CALLS `collectServiceHrefs`, so there
+    was one reader and not two, and it already read `item.props.href`. Weighed against that, a
+    second container was a near-duplicate of `box-service.svelte` differing only by the status
+    span. Don't re-derive the container.
+    **What it got right and what landed with it:** the `tteck` entry was the real complaint, and
+    it is `probe: "http"` now rather than a bookmark — a `HEAD` to the page answers the question
+    a TCP connect to GitHub Pages never could. Two things this item did not foresee: `probe` is
+    the first container prop that is neither a free-form string nor a number, so
+    `ContainerField` grew an `enum` kind and `options` for the editor to offer (AGENTS.md
+    records why a `v.boolean()` would have cost the same), and the drop warning became `is
+missing or not valid` because a rejected enum value can still be a string.
+    _Not done, and deliberately:_ the two remaining `probe: 'none'` candidates in `config.json`
+    were left alone — that file is the operator's and gitignored, so only the entry under
+    discussion was touched.
 
 26. **Add `preferredLanguage` to the Paraglide strategy, then localize the AdGuard counters** — `M`
     `paraglide/runtime.js:35-39` is `strategy = ["cookie", "globalVariable", "baseLocale"]` and
@@ -715,10 +723,11 @@ The order that matters, beyond the group ranking:
   exactly this reason. Before #34 a guessed token bought read access to the config; it now buys a
   write to the file `/api/ping` derives its allowlist from, which is what made an unlimited-guess
   login form the wrong thing to leave open. The token's length is no longer the only control.
-- **#25 is now overdue, not optional** — #2 has landed, so `/api/ping` opens a real TCP connection
-  to whatever a `BoxService` names. `config.json:32-42`'s `tteck` entry points at
-  community-scripts.github.io, which means four connects an hour to GitHub Pages to paint a
-  meaningless dot (`POLL_INTERVAL_MS` 15min). Move that entry to a bookmark.
+- ~~**#25 is now overdue, not optional**~~ — landed, as a `probe` mode rather than the
+  `BoxBookmark` container the item asked for. The `tteck` entry is `probe: "http"`, so the four
+  connects an hour now ask the question they were pretending to answer; `probe: "none"` is the
+  bookmark, and it is the value that keeps an entry out of the allowlist. The item records why
+  its own argument against a flag did not survive checking.
 - **#17 before #16** — #17 changes the load's return type to a record, rippling into
   page.svelte:10-21 and, since #8 landed, into `[...slug]/+page.svelte`, which now spreads the
   load's `adguard` / `adguardError` into the component by hand.

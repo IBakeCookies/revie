@@ -271,6 +271,33 @@
 						name,
 					)}
 				</div>
+			{:else if field.kind === 'enum'}
+				<!-- A choice, not a text box. Text is the one kind a free-form field can always
+				     satisfy; an enum is the first prop where a typo costs a REFUSED SAVE, and
+				     offering the schema's own values is what makes that unreachable. -->
+				<label class="text-ty-secondary flex flex-col gap-text-3xs text-xs" for="{id}-{field.path}">
+					{field.path}
+
+					<select
+						id="{id}-{field.path}"
+						class={inputClass}
+						aria-required={field.isRequired}
+						value={readField(container, field.path)}
+						onchange={(event) => writeField(container, field, event.currentTarget.value)}
+					>
+						<!-- Blank is "not written", which is a different state from any of the values
+						     and the one every existing config is in. It has to be selectable, or the
+						     form would show a value the file does not carry — and picking it deletes
+						     the key, because `writeField` treats empty as an absence. A dash rather
+						     than a word: naming the schema's default here would put a second copy of
+						     it in presentation, and this snippet is generic over every enum. -->
+						<option value="">—</option>
+
+						{#each field.options ?? [] as option (option)}
+							<option value={option}>{option}</option>
+						{/each}
+					</select>
+				</label>
 			{:else}
 				<label class="text-ty-secondary flex flex-col gap-text-3xs text-xs" for="{id}-{field.path}">
 					{field.path}

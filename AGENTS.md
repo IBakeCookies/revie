@@ -366,7 +366,17 @@ config.json ─(disk read, no caching)→ data/config.ts
      Containers nest arbitrarily, and a second component would have joined the
      `config-container ↔ grid ↔ sub-grid` cycle that `no-circular` exempts **by name** — a
      fourth member means editing that exemption. A snippet adds no module edge at all.
-  4. **`$state` wraps an assigned array or object in its own proxy**, so writing through the
+  4. **An `enum` is a kind of its own, and it had to become one.** `probe` is the first
+     container prop that is neither a free-form string nor a number, and the walk hands over
+     `options` — the picklist's own values — so the form renders a `<select>` rather than a
+     text box. Without them the editor offers a field whose every near-miss is a REFUSED save,
+     for a prop the form itself invited. It is also what made the drop warning read `is
+missing or not valid` rather than `not a string`: `probe` is the first prop where a
+     value can be a string and still be rejected. The fence is in `config.spec.ts`, which
+     fills every described field and asserts zero warnings — an enum filled with the `'x'`
+     every other kind accepts is a dropped container, so that spec fails if `options` ever
+     stops being carried. A `v.boolean()` would hit the identical wall.
+  5. **`$state` wraps an assigned array or object in its own proxy**, so writing through the
      reference that went IN mutates the raw target behind it, where neither the render nor
      the payload will find it. Adding a container therefore assigns a whole new array
      (`slice(0, i)` + the new entry + `slice(i)`, which is also what gives every position an
@@ -983,6 +993,43 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   reintroduce the `ping` package: it also cost a fork+exec per unauthenticated POST, threw an
   unhandled rejection when the binary was missing from a slim image, and kept the brackets on
   an IPv6 literal (`new URL('http://[fd00::5]/').hostname`). `toEndpoint` strips them.
+- **A `BoxService` chooses its own probe, and the endpoint resolves the mode from the FILE.**
+  `probe: 'tcp' | 'http' | 'none'` — `collectServiceProbes` in
+  [config.ts](src/lib/business/model/config.ts) carries it, `configuredTargets` in
+  [+server.ts](src/routes/api/ping/+server.ts) maps `host:port` → mode, and the poll ships the
+  href alone. Six things about it are decisions:
+  1. **`tcp` stays the default because it is more accurate for the thing this app is for.**
+     Proxmox, TrueNAS, Unifi and Portainer all ship self-signed certificates that Node's
+     `fetch` rejects outright with no per-request escape hatch (the same wall
+     [roadmap.md](roadmap.md) #33 hits), and several answer `401`/`302` at `/`. An HTTP probe
+     calls all of those offline. Going the other way is not a matter of taste either — see
+     the ladder in the README table; rung 2 is what a LAN service can actually answer.
+  2. **`http` exists because a connect to a shared origin is a CONSTANT, not a measurement.**
+     GitHub Pages accepts every connection, so `tcp` on
+     `https://community-scripts.github.io/ProxmoxVE/` is green whether or not the page is
+     there. That is not a wrong answer — it is a true answer to a question nobody asked, which
+     is why the fix was a second mode rather than a change to the first.
+  3. **The mode is NEVER taken from the request.** The endpoint is unauthenticated, so a
+     client-supplied mode is a client-supplied behaviour: anyone on the LAN could ask the
+     server to issue HTTP requests instead of opening a socket. The href in the body selects
+     an allowlist entry and nothing more — the URL actually fetched is the config's, which is
+     also why `Target` carries `href` beside `endpoint`.
+  4. **`redirect: 'manual'`, and a 3xx counts as answering.** Following redirects would let an
+     allowlisted host bounce the probe at an address the operator never configured, turning it
+     into a boolean oracle for that address. Counting a 3xx as alive is what keeps that choice
+     from calling every `http:`→`https:` entry offline. Both halves are fenced in
+     [ping.spec.ts](src/routes/api/ping/ping.spec.ts), which runs a real `node:http` server
+     because the `net` listener that covers `tcp` accepts a connection and then says nothing —
+     precisely the case `http` exists to tell apart.
+  5. **`none` is excluded from `collectServiceProbes`, not filtered by each caller.** Both
+     callers are consequences of appearing in that list: the poll measures it, and the
+     allowlist lets an unauthenticated POST reach it. A bookmark that was merely undrawn would
+     still be probed on request. This is why the mode beat the `BoxBookmark` container
+     [roadmap.md](roadmap.md) #25 proposed — one prop, no second near-identical component, and
+     `collectServiceProbes` was already reading `props.href` so it is not a new crossing.
+  6. **The component drops BOTH marks, not just the dot.** The word alone still asserts a
+     state; the dot alone puts colour back in sole charge of what the pair exists to carry.
+     Its own story, because axe only ever sees a story's rest state.
 - **`config.json` is gitignored; [config.example.json](config.example.json) is the tracked
   one.** It is production's default read path _and_ the internal network map, so tracking it
   meant a `git pull` during an update silently reverted the live dashboard.

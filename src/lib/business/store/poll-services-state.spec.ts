@@ -60,10 +60,30 @@ describe('pollServicesState', () => {
 		const store = fakeStore();
 
 		// Two probes of one endpoint per tick is two round trips for one answer. The
-		// dedupe lives in `collectServiceHrefs`; this holds it at the seam that needs it.
+		// dedupe lives in `collectServiceProbes`; this holds it at the seam that needs it.
 		pollServicesState(store, [...containers, ...containers]);
 
 		expect(store.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it('never polls a probe:none box, which has no state to measure', () => {
+		const store = fakeStore();
+
+		pollServicesState(store, [
+			{
+				name: 'BoxService',
+				props: {
+					title: 'Bookmark',
+					href: 'https://bookmark.local',
+					img: {
+						src: '',
+					},
+					probe: 'none',
+				},
+			},
+		]);
+
+		expect(store.refresh).not.toHaveBeenCalled();
 	});
 
 	it('aborts the probes it started once the returned teardown runs', () => {

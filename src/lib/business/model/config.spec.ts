@@ -2,7 +2,7 @@ import type { ConfigContainer, ContainerField } from '$lib/business/model/config
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-	collectServiceHrefs,
+	collectServiceProbes,
 	containerFields,
 	containerNames,
 	findContainer,
@@ -233,7 +233,7 @@ describe('containers that would throw while rendering', () => {
 		});
 
 		expect(() => findContainer(page, 'BoxAdguard')).not.toThrow();
-		expect(() => collectServiceHrefs(page.containers)).not.toThrow();
+		expect(() => collectServiceProbes(page.containers)).not.toThrow();
 	});
 
 	it('drops a BoxService with no img, which would throw during SSR', () => {
@@ -329,22 +329,68 @@ describe('findContainer', () => {
 	});
 });
 
-describe('collectServiceHrefs', () => {
-	it('collects hrefs at any nesting depth', () => {
-		expect(collectServiceHrefs(home.containers)).toEqual(['https://proxmox.local:8006']);
-	});
-
-	it('returns one href however many boxes on the page name it', () => {
-		const box = {
+describe('collectServiceProbes', () => {
+	function boxAt(href: string, probe?: string) {
+		return {
 			name: 'BoxService',
 			props: {
 				title: 'Proxmox',
-				href: 'https://proxmox.local:8006',
+				href,
 				img: {
 					src: 'https://icons.local/p.svg',
 				},
+				...(probe === undefined
+					? undefined
+					: {
+							probe,
+						}),
 			},
 		};
+	}
+
+	it('collects services at any nesting depth, defaulting the mode to tcp', () => {
+		expect(collectServiceProbes(home.containers)).toEqual([
+			{
+				href: 'https://proxmox.local:8006',
+				probe: 'tcp',
+			},
+		]);
+	});
+
+	it('carries the mode the config chose', () => {
+		const { page } = pageWith(boxAt('https://pages.local/docs/', 'http'));
+
+		expect(collectServiceProbes(page.containers)).toEqual([
+			{
+				href: 'https://pages.local/docs/',
+				probe: 'http',
+			},
+		]);
+	});
+
+	/**
+	 * The whole point of the mode. Both callers are consequences of appearing in this list:
+	 * the poll measures it, and `/api/ping` will connect to it for anyone who asks. A
+	 * bookmark has to be absent, not filtered downstream by each of them in turn.
+	 */
+	it('leaves out a probe:none box, so it is neither polled nor allowlisted', () => {
+		const { page } = pageWith(boxAt('https://bookmark.local/', 'none'), {
+			name: 'Grid',
+			props: {
+				items: [boxAt('https://real.local:8006')],
+			},
+		});
+
+		expect(collectServiceProbes(page.containers)).toEqual([
+			{
+				href: 'https://real.local:8006',
+				probe: 'tcp',
+			},
+		]);
+	});
+
+	it('returns one entry however many boxes on the page name the same href', () => {
+		const box = boxAt('https://proxmox.local:8006');
 
 		const { page } = pageWith(box, {
 			name: 'Grid',
@@ -353,7 +399,20 @@ describe('collectServiceHrefs', () => {
 			},
 		});
 
-		expect(collectServiceHrefs(page.containers)).toEqual(['https://proxmox.local:8006']);
+		expect(collectServiceProbes(page.containers)).toEqual([
+			{
+				href: 'https://proxmox.local:8006',
+				probe: 'tcp',
+			},
+		]);
+	});
+
+	it('drops an unknown mode with a warning rather than probing it', () => {
+		const { warnings, page } = pageWith(boxAt('https://proxmox.local:8006', 'htpp'));
+
+		expect(warnings).toEqual(['Skipping container "BoxService", "probe" is missing or not valid']);
+
+		expect(collectServiceProbes(page.containers)).toEqual([]);
 	});
 });
 
@@ -375,11 +434,30 @@ function fillFields(fields: ContainerField[], onlyRequired: boolean) {
 			node = created;
 		}
 
-		node[keys[keys.length - 1]] =
-			field.kind === 'children' ? [] : field.kind === 'number' ? 1 : 'x';
+		node[keys[keys.length - 1]] = fillValue(field);
 	}
 
 	return props;
+}
+
+function fillValue(field: ContainerField): unknown {
+	if (field.kind === 'children') {
+		return [];
+	}
+
+	if (field.kind === 'number') {
+		return 1;
+	}
+
+	// The reason `enum` had to become a kind of its own. Every other field is satisfied by
+	// any value of its type, so `'x'` fills them; an enum accepts only what the schema
+	// names, and `'x'` would be dropped with a warning — which is what these tests assert
+	// does not happen to a form-filled container.
+	if (field.kind === 'enum') {
+		return field.options?.[0];
+	}
+
+	return 'x';
 }
 
 function normalizeFilled(onlyRequired: boolean) {
@@ -430,6 +508,20 @@ describe('containerFields', () => {
 			path: 'img.src',
 			kind: 'string',
 			isRequired: true,
+		});
+	});
+
+	/**
+	 * The editor offers a choice instead of a text box only if the walk hands over the
+	 * values. Without them it renders an ordinary field, and every save where an operator
+	 * typed a near-miss is refused with a diagnostic — for a prop the form itself offered.
+	 */
+	it('carries an enum field the values the schema accepts', () => {
+		expect(containerFields.BoxService).toContainEqual({
+			path: 'probe',
+			kind: 'enum',
+			isRequired: false,
+			options: ['tcp', 'http', 'none'],
 		});
 	});
 

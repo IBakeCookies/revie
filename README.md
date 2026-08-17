@@ -69,6 +69,29 @@ props:
 ```
 
 - `defaults` holds per-container props applied to every instance of that container.
+- `BoxService` takes an optional `"probe"` deciding how its status dot is measured. It
+  is the one prop with a fixed set of values, so the editor offers them as a list:
+
+  | `probe`         | What it measures                                                                 |
+  | --------------- | -------------------------------------------------------------------------------- |
+  | `tcp` (default) | A TCP connection to the host and port in `href`                                  |
+  | `http`          | A `HEAD` request to the whole `href` — the path has to answer, not just the port |
+  | `none`          | Nothing. No dot, never polled, never reachable through `/api/ping`               |
+
+  Leave it out for anything on your own network. `tcp` is what tells a dead service on
+  a live box from a healthy one, and it is the only mode that works for the many
+  self-hosted services behind a self-signed certificate (Proxmox, TrueNAS, Unifi,
+  Portainer) or answering `401` at `/` — `http` reports both of those as offline.
+
+  Reach for `http` when the host itself proves nothing: a page on a shared origin like
+  GitHub Pages always accepts a connection, so `tcp` shows a green dot whether or not
+  the page exists. Note a `401`, `403` or a `405` to `HEAD` reads as offline here; a
+  redirect counts as online, and is not followed.
+
+  Use `none` for a plain bookmark. It is the only mode that keeps the entry out of
+  `/api/ping`'s allowlist, so it is what you want for a link to somewhere on the public
+  internet that you never wanted a status for.
+
 - A page key is a URL path and has to start with `/`. It may have more than one
   segment, so `"/media/plex"` works and is how pages are grouped. A key without the
   leading slash is dropped with a warning, because the navigation links straight to it

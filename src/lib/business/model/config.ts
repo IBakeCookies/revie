@@ -17,6 +17,25 @@ import { normalizeSpan } from '$lib/utils/style';
 
 /** Carried by every container: how many of the twelve grid columns it takes. */
 const spanProp = v.optional(v.number());
+/**
+ * How a service's state is measured, chosen per box because no single probe is right
+ * for every entry a config names.
+ *
+ * `tcp` is the default and the right answer for a LAN service: Proxmox, TrueNAS, Unifi
+ * and Portainer all ship self-signed certificates that Node's `fetch` rejects outright,
+ * and several of them answer 401 or 302 at `/` while being perfectly up — so an HTTP
+ * probe would call a healthy box offline. A connect to `host:port` avoids both.
+ *
+ * `http` is for a host that says nothing useful on its own: a page on a shared origin
+ * like GitHub Pages always accepts a connection, so the connect is a constant and the
+ * PATH is the actual question. It is opt-in because it inherits the two failures above.
+ *
+ * `none` is a link with nothing to measure — a bookmark. It draws no dot, is never
+ * polled, and never enters `/api/ping`'s allowlist.
+ */
+const probeModes = ['tcp', 'http', 'none'] as const;
+
+export type ProbeMode = (typeof probeModes)[number];
 
 /**
  * A Grid's children are `unknown` in the schema and containers in the type. A
@@ -52,6 +71,11 @@ const containerSchemas = {
 		span: spanProp,
 		title: v.string(),
 		href: v.string(),
+		// Deliberately no default, unlike `img` below: a default would make the walk
+		// describe it as required (an `optional` WITH one keeps what is under it
+		// required), so the editor would mark a prop nobody has to write. The two
+		// readers default to `tcp` instead, the same way `span` and `headingLevel` do.
+		probe: v.optional(v.picklist(probeModes)),
 		// The default is deliberately not a valid `img`: it walks a missing `img` one
 		// level further into the parse, so the warning names `img.src` — the prop an
 		// operator has to write — instead of stopping at `img`. It never reaches the
@@ -98,9 +122,16 @@ export type ContainerField = {
 	/** Dot path into the container's props — `img.src` for a nested object. */
 	path: string;
 	/** `children` is a nested container list, which an editor renders recursively. */
-	kind: 'string' | 'number' | 'children';
+	kind: 'string' | 'number' | 'enum' | 'children';
 	/** Leaving it out is a parse failure, so the container would be dropped. */
 	isRequired: boolean;
+	/**
+	 * Every value the schema accepts, set only where it names them — an `enum`. An editor
+	 * has to offer these rather than a text box: text is the one kind a free-form field
+	 * can always satisfy, and an enum is the first prop where a typo is a refused save
+	 * instead of a saved mistake.
+	 */
+	options?: readonly string[];
 };
 
 /**
@@ -113,6 +144,8 @@ type SchemaNode = {
 	default?: unknown;
 	wrapped?: SchemaNode;
 	entries?: Record<string, SchemaNode>;
+	/** A picklist's accepted values. `undefined` on every other node, which is the test. */
+	options?: readonly string[];
 };
 
 const schemaNodes: Record<ContainerName, SchemaNode> = containerSchemas;
@@ -129,6 +162,10 @@ function fieldKind(type: string): ContainerField['kind'] {
 
 	if (type === 'number') {
 		return 'number';
+	}
+
+	if (type === 'picklist') {
+		return 'enum';
 	}
 
 	return 'string';
@@ -160,6 +197,8 @@ function describeFields(
 			path,
 			kind: fieldKind(node.type),
 			isRequired: required,
+			// `undefined` for every kind but `enum`: only a picklist carries them.
+			options: node.options,
 		});
 	}
 
@@ -296,7 +335,7 @@ function normalizeContainer(
 	}
 
 	// Set unconditionally, not just when present: every traversal (findContainer,
-	// collectServiceHrefs) iterates `items`, so a grid whose children have not been
+	// collectServiceProbes) iterates `items`, so a grid whose children have not been
 	// written yet would throw on the first page load rather than render as empty.
 	if (CONTAINS_CHILDREN.includes(raw.name)) {
 		props.items = (Array.isArray(props.items) ? props.items : [])
@@ -312,7 +351,10 @@ function normalizeContainer(
 	if (!parsed.success) {
 		const missing = v.getDotPath(parsed.issues[0]);
 
-		warnings.push(`Skipping container "${raw.name}", "${missing}" is missing or not a string`);
+		// "not a string" until `probe` arrived, which is the first prop where a value CAN be
+		// a string and still be rejected — an enum names what it accepts. The sentence has
+		// to cover both, and it is the operator's only account of why a box vanished.
+		warnings.push(`Skipping container "${raw.name}", "${missing}" is missing or not valid`);
 
 		return undefined;
 	}
@@ -422,25 +464,54 @@ export function findContainer(
 	}
 }
 
-/**
- * Every service href on a page, at any nesting depth, each one once.
- *
- * Deduped because the caller probes what it gets back on a timer: the same href in
- * two boxes would be probed twice per tick, doubling the requests and the window for
- * two answers to land out of order.
- */
-export function collectServiceHrefs(containers: ConfigContainer[]): string[] {
-	const hrefs: string[] = [];
+/** A service that is meant to be measured, and how. `none` never reaches this shape. */
+export type ServiceProbe = {
+	href: string;
+	probe: Exclude<ProbeMode, 'none'>;
+};
 
-	for (const item of containers) {
-		if (isBoxService(item)) {
-			hrefs.push(item.props.href);
+function collectProbes(items: ConfigContainer[], into: Map<string, ServiceProbe['probe']>): void {
+	for (const item of items) {
+		if (isGrid(item)) {
+			collectProbes(item.props.items, into);
+
+			continue;
 		}
 
-		if (isGrid(item)) {
-			hrefs.push(...collectServiceHrefs(item.props.items));
+		if (!isBoxService(item)) {
+			continue;
+		}
+
+		const mode = item.props.probe ?? 'tcp';
+
+		if (mode !== 'none' && !into.has(item.props.href)) {
+			into.set(item.props.href, mode);
 		}
 	}
+}
 
-	return [...new Set(hrefs)];
+/**
+ * Every service on a page that is meant to be probed, at any nesting depth, each href
+ * once, carrying the mode config chose for it.
+ *
+ * `probe: 'none'` is EXCLUDED rather than reported, and that is the whole point of the
+ * mode: both callers are consequences of appearing here. The poll would measure a link
+ * that has nothing to measure, and `/api/ping`'s allowlist would put its host among the
+ * endpoints an unauthenticated POST can reach — so a bookmark is left out of the list
+ * rather than filtered by each caller in turn.
+ *
+ * Deduped because the caller probes what it gets back on a timer: the same href in two
+ * boxes would be probed twice per tick, doubling the requests and the window for two
+ * answers to land out of order. The first PROBED occurrence wins the mode — two boxes
+ * naming one href with two modes is a config to fix, not a case worth arbitrating.
+ */
+export function collectServiceProbes(containers: ConfigContainer[]): ServiceProbe[] {
+	const probes = new Map<string, ServiceProbe['probe']>();
+
+	collectProbes(containers, probes);
+
+	return [...probes].map(([href, probe]) => ({
+		href,
+		probe,
+	}));
 }

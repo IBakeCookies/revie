@@ -156,6 +156,26 @@
 	}}
 />
 
+<!-- A bookmark: a link with nothing to measure. Its own story rather than a step in a
+     play function, because axe only ever sees a story's REST state and this one is a
+     tile with two fewer children — the state where nothing is claiming a status. -->
+<Story
+	name="Bookmark, nothing to probe"
+	args={{
+		probe: 'none',
+	}}
+	play={async ({ args, canvas }) => {
+		// No dot AND no word. The word alone would still assert a state; the dot alone
+		// would put colour back in sole charge of the fact the pair exists to carry.
+		await expect(canvas.queryByLabelText(m.service_status_unknown())).not.toBeInTheDocument();
+		await expect(canvas.queryByText(m.service_status_unknown())).not.toBeInTheDocument();
+
+		// Still a link, and still says where it goes — that is all a bookmark is.
+		await expect(canvas.getByRole('link')).toHaveAttribute('href', args.href);
+		await expect(canvas.getByRole('heading')).toHaveTextContent(args.title);
+	}}
+/>
+
 <!-- `span` is a token (1-12) mapped to a custom property, never a class name: a
      class that only ever appears in runtime config produces no CSS at all. -->
 <Story

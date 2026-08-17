@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { HTMLAnchorAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
+	import type { ProbeMode } from '$lib/business/model/config';
 	import { cn, spanStyle } from '$lib/utils/style';
 	import { m } from '$lib/paraglide/messages';
 
@@ -11,6 +12,14 @@
 			src: string;
 		};
 		isOnline?: boolean | null;
+		/**
+		 * Whether this tile has a state worth drawing. `none` is a bookmark — a link with
+		 * nothing to measure — so it shows no dot and no status word rather than a
+		 * permanent "unknown", which would assert a pending measurement that never comes.
+		 * The same value keeps the href out of the poll and out of the ping allowlist
+		 * upstream; this half is only what the tile renders.
+		 */
+		probe?: ProbeMode;
 		/**
 		 * Which level the title takes, chosen by whatever renders the tile — like the
 		 * fill, a tile cannot know its own. The layout's app title is the page's only
@@ -23,7 +32,16 @@
 		class?: ClassValue;
 	} & HTMLAnchorAttributes;
 
-	let { isOnline = null, title, href, img, headingLevel = 2, span, ...restProps }: Props = $props();
+	let {
+		isOnline = null,
+		probe = 'tcp',
+		title,
+		href,
+		img,
+		headingLevel = 2,
+		span,
+		...restProps
+	}: Props = $props();
 
 	const statusLabel = $derived(
 		isOnline === null
@@ -112,44 +130,49 @@
 		<span class="text-ty-silent truncate text-2xs">{host}</span>
 	</div>
 
-	<!-- A tile is far wider than its name and host, so the state used to be a 10px dot
-	     at the end of an empty half-tile — the one place on the row the eye is least
-	     likely to be. The word fills that gap and says the state without colour;
-	     `aria-hidden`, because the dot beside it is already announcing it once.
-	     Container-queried rather than a viewport breakpoint: the same tile is a third of
-	     a row here and a full phone width there, and only the tile knows which. -->
-	<span
-		class="text-ty-silent ml-auto hidden shrink-0 text-2xs tracking-wider uppercase @xs/box-service:block"
-		aria-hidden="true"
-	>
-		{statusLabel}
-	</span>
+	<!-- Both marks go, not just the dot: a bookmark with the word alone would still be
+	     claiming a state, and a bookmark with the dot alone puts colour back in sole
+	     charge of the one fact the pair exists to carry. -->
+	{#if probe !== 'none'}
+		<!-- A tile is far wider than its name and host, so the state used to be a 10px dot
+		     at the end of an empty half-tile — the one place on the row the eye is least
+		     likely to be. The word fills that gap and says the state without colour;
+		     `aria-hidden`, because the dot beside it is already announcing it once.
+		     Container-queried rather than a viewport breakpoint: the same tile is a third of
+		     a row here and a full phone width there, and only the tile knows which. -->
+		<span
+			class="text-ty-silent ml-auto hidden shrink-0 text-2xs tracking-wider uppercase @xs/box-service:block"
+			aria-hidden="true"
+		>
+			{statusLabel}
+		</span>
 
-	<!-- `role="img"` is what makes the label count: `aria-label` is ignored on an
-	     element with no role and no text, so without it the dot's state reached nobody
-	     and colour was the only carrier.
+		<!-- `role="img"` is what makes the label count: `aria-label` is ignored on an
+		     element with no role and no text, so without it the dot's state reached nobody
+		     and colour was the only carrier.
 
-	     Unknown is `ty-ghost`, not `primary`: a theme is free to make its accent the
-	     same green as `success` — `revie` deliberately does — and then a service whose
-	     probe has not answered yet reads as online to everyone not using the label.
+		     Unknown is `ty-ghost`, not `primary`: a theme is free to make its accent the
+		     same green as `success` — `revie` deliberately does — and then a service whose
+		     probe has not answered yet reads as online to everyone not using the label.
 
-	     The ring is a halo of the dot's own colour at 20%, not a second element: a 10px
-	     disc is the smallest mark on the page and was carrying the one fact the page
-	     exists to show. `ring` draws as a shadow, so the halo costs no layout — and it
-	     is why the transition is `transition` and not `transition-colors`, which does
-	     not cover box-shadow. Every dot starts unknown and flips once its probe
-	     answers, so without it a page settling in reads as a rank of things blinking. -->
-	<span
-		role="img"
-		class={[
-			'ml-auto size-2.5 shrink-0 rounded-full ring-4 transition @xs/box-service:ml-text-2xs',
-			isOnline === true
-				? 'bg-success ring-success/20'
-				: isOnline === false
-					? 'bg-danger ring-danger/20'
-					: 'bg-ty-ghost ring-ty-ghost/20',
-		]}
-		aria-label={statusLabel}
-	>
-	</span>
+		     The ring is a halo of the dot's own colour at 20%, not a second element: a 10px
+		     disc is the smallest mark on the page and was carrying the one fact the page
+		     exists to show. `ring` draws as a shadow, so the halo costs no layout — and it
+		     is why the transition is `transition` and not `transition-colors`, which does
+		     not cover box-shadow. Every dot starts unknown and flips once its probe
+		     answers, so without it a page settling in reads as a rank of things blinking. -->
+		<span
+			role="img"
+			class={[
+				'ml-auto size-2.5 shrink-0 rounded-full ring-4 transition @xs/box-service:ml-text-2xs',
+				isOnline === true
+					? 'bg-success ring-success/20'
+					: isOnline === false
+						? 'bg-danger ring-danger/20'
+						: 'bg-ty-ghost ring-ty-ghost/20',
+			]}
+			aria-label={statusLabel}
+		>
+		</span>
+	{/if}
 </a>
