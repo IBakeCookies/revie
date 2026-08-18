@@ -434,6 +434,19 @@ missing or not valid` rather than `not a string`: `probe` is the first prop wher
   `defaults` entry with a warning, once at the root of `normalizeConfig`: a default `items` is
   re-supplied to each child it produces, which inherits it again until the stack goes — and no
   schema can catch it, because the merge happens before the parse.
+- **A `defaults` KEY is checked against the container names, and an entry that is not a set of
+  props warns too.** Both were silent skips. The merge only ever looks `defaults[raw.name]` up
+  for a name the schema already knows, so a misspelled key (`BoxServices`) is not a merge that
+  fails — it is a merge that never happens, and the operator's defaults simply never apply with
+  nothing anywhere to say so; `defaults: { BoxService: "x" }` went the same way. Both sentences
+  are minted in the model and returned in `warnings`, never printed, and both fire **once per
+  `defaults` entry at the root** — the same place and the same rule the `items` strip above uses,
+  so one bad entry reports once instead of once per container that inherits it. The consequence
+  ties into refuse-on-warnings: a warning now routes the operator to `needsRawEditor`'s raw
+  `<textarea>`, which is the designed repair path for exactly the file a generated form cannot
+  represent. Both shipped configs still normalize warning-free — `config.example.json`'s
+  `defaults.BoxStats` and `e2e/fixture-config.json`'s `defaults.BoxService` — so both stay
+  saveable from `/admin`, which is what `config.spec.ts` asserts.
 - **A `pages` key is a URL path, and the route is `[...slug]`** — a rest parameter, so
   `/media/plex` and other grouped paths match. It was `[[slug]]`, whose compiled pattern
   (`/^(?:\/([^/]+))?\/?$/`) took one segment: a nested key rendered as a nav link and then
@@ -569,11 +582,14 @@ ends up in a **`style` attribute**. Grepping [app.html](src/app.html) for a seed
 finds nothing.
 
 ```
-cookies ─→ data/repository/appearance-repository.ts   the 3 cookie names, parsing, and ALL writes
-        ─→ business/model/appearance.ts               every decision: does this theme still exist? mint a seed?
+cookies + the request URL
+        ─→ data/repository/appearance-repository.ts   the 3 cookie names, parsing, and ALL writes
+        ─→ business/model/appearance.ts               every decision: does this theme still exist?
+                                                      mint a seed? may its cookie carry `Secure`?
         ─→ hooks.server.ts        replaces %theme% / %scenery-paused% + the two
                                   %theme.default*% in app.html                    (classes)
-        ─→ +layout.server.ts      passes theme / seed / paused as INIT SEEDS
+        ─→ +layout.server.ts      hands the mint `event.url`; passes theme / seed / paused as
+                                  INIT SEEDS
         ─→ ThemeStore             owns it from here; mirrors every change back to the cookie
         ─→ +layout.svelte         seed → sceneryStyle() → style attribute on .theme-scenery
 ```
@@ -589,9 +605,11 @@ appearance cookie's name and write belong in the repository, its rules in busine
   it was handed — while its early `return` made the blocks under it look conditional when they
   were not. What went with it: `readClientAppearance` in `business/model/appearance.ts` and
   `documentCookies` in [cookie.ts](src/lib/data/storage/cookie.ts), so `CookieSource` is now
-  server-only, over `event.cookies` alone, and the data layer has no browser read left. The
-  cookie WRITES are untouched — the store still mirrors every change back through business, which
-  is the direction the diagram above shows. The trade is named: a theme switched in another tab
+  server-only, over `event.cookies` alone, and the data layer has no cookie READ in the browser
+  left. It is not free of browser reads: `writeCookie` reads `location.protocol` to decide
+  `secure` — see the two-sources carve-out below. The cookie WRITES are untouched — the store
+  still mirrors every change back through business, which is the direction the diagram above
+  shows. The trade is named: a theme switched in another tab
   while this one is loading no longer snaps in on hydration, and that is the better paint, because
   `hooks.server.ts` had already stamped the old theme's classes pre-paint.
 - `prefers-reduced-motion` is **tracked**, not read once, and its `onMount` is
@@ -611,6 +629,48 @@ appearance cookie's name and write belong in the repository, its rules in busine
 - The scenery seed is minted **server-side** during the root layout load. It has to be: the
   server is the only place that can write it before the SSR'd `style` attribute, and a second
   mint would shift the scenery between server and client.
+- **`secure` is STATED on all three cookies rather than left to SvelteKit's default.** The
+  browser half derives it from `location.protocol` inside `writeCookie`; the server half is
+  decided by `readOrMintScenerySeed`, which takes the request URL the route hands it (R1 — the
+  model imports nothing to get it) and passes a boolean down to `$createScenerySeedCookie`.
+  Kit's own default is `secure` unless the hostname is `localhost` over http, and that is wrong
+  in both directions once deployed. Measured against `node build` on plain http: the mint
+  shipped `set-cookie: scenerySeed=3894586632; Max-Age=31536000; Path=/; Secure; SameSite=Lax`,
+  and three cookie-less GETs to one process came back with three distinct seeds (4259248967,
+  2267366104, 3601781080) — a dropped cookie is re-minted on every response, so the scenery
+  re-arranges on every navigation and the document is permanently unshareable.
+- **The browser DROP is not universal, which is the sharper reason this was invisible.**
+  `http://localhost` and `http://127.0.0.1` are potentially-trustworthy origins and ACCEPT a
+  `Secure` cookie — measured: curl stored one served from `127.0.0.1` and sent it back over
+  plain http — so the failure belongs to LAN-address deployments alone
+  (`http://192.168.x.x:3000`). `npm run dev`, `vite preview` and CI all talk to loopback, so
+  none of the three can reach it.
+- **The server half is only honest when adapter-node is told the real protocol, and no code
+  change compensates.** `get_origin`
+  (`node_modules/@sveltejs/adapter-node/files/handler.js:208-210`) defaults the protocol to
+  `https` when `PROTOCOL_HEADER` is unset and never consults the socket, so `event.url.protocol`
+  reads `https:` on a plain-http server and an operator who sets neither that nor `ORIGIN` still
+  gets `Secure`; with `ORIGIN=http://127.0.0.1:PORT` the attribute is absent, measured. Guessing
+  the other way is not on offer, because the failure is asymmetric: `secure: true` where it is
+  wrong BREAKS the cookie, while `secure: false` where it is wrong costs one hardening flag on a
+  public random integer that already ships in the SSR payload. And `ORIGIN` is required for the
+  admin area regardless — measured, `POST /admin/login` over plain http without it answers 403
+  (kit's `Cross-site POST form submissions are forbidden`, comparing the request origin to
+  `url.origin`) and 200 with it, a requirement that PREDATES this. So the fix is the operator
+  doc, in README.md beside the TLS note, which is the same shape as the gap at the end of "The
+  admin area" — and `ORIGIN` does not close that one: the successful login response still
+  carries `Secure` on `adminSession`.
+- **The `secure` decision has TWO sources, and that is a carve-out rather than drift** — two
+  reviewers read it as drift, so it is written down. Business decides it for the server-minted
+  seed, because a request exists there to read it off; `data/storage/cookie.ts` decides it for
+  the three browser-written cookies by reading `location` itself. Threading a boolean out of
+  `ThemeStore` and through business was considered and REFUSED: on the client there is no
+  request to thread, `location` IS the scheme, and reading it in the write path is I/O — which
+  is what this layer is for — rather than a judgment, so the alternative is three widened
+  signatures whose only job is to let a store tell the browser what scheme the browser is on.
+  `location` is read INSIDE `writeCookie` and never at module scope, because the module sits on
+  the SSR import path (`appearance-repository` → `business/model/appearance` →
+  `hooks.server.ts`), where there is no `location` to read.
 - `business/model/theme.ts` is deliberately free of runes and of storage, so the SSR path can
   import it without pulling in the client-reactive store.
 
@@ -652,7 +712,7 @@ things about it are decisions:
   A derived digest would be exactly as replayable, so it buys nothing; what limits exposure is
   the attributes. Rotating `DASHBOARD_ADMIN_TOKEN` therefore signs everyone out, and that is the
   whole revocation mechanism — no session store, no session ids, no expiry sweep. Deliberately
-  **not** `COOKIE_WRITE_OPTIONS`: the appearance cookies are read by the browser and ride along
+  **not** `cookieWriteOptions`: the appearance cookies are read by the browser and ride along
   on cross-site navigations, and this one must do neither.
 - **The route files do not re-check auth.** `handleAdmin` has already answered for every
   `/admin` path, and a second check is a second place to get it wrong.
@@ -703,7 +763,12 @@ things about it are decisions:
 
 One gap is left, known and not accidental: `secure: !dev` means a production deployment on plain
 http will have the browser drop the cookie so the login never sticks — serve it over TLS. It is
-in README.md.
+in README.md. Two measured refinements, both from #15: the drop is a LAN-ADDRESS one, because
+`http://localhost` and `http://127.0.0.1` accept a `Secure` cookie — see the `secure` bullets in
+the appearance pipeline — and on plain http the login POST never gets that far without `ORIGIN`
+anyway, because kit answers 403 `Cross-site POST form submissions are forbidden`, comparing the
+request origin against a `url.origin` adapter-node guessed as `https`. `ORIGIN` closes that 403
+and nothing else: the successful response still carries `Secure` on `adminSession`.
 
 ## Invariants
 
@@ -922,6 +987,18 @@ the browser project. Test files are not compiled as rune modules, so they cannot
 The `client` project's `exclude` is `src/lib/data/**` where zenith's is `src/lib/server/**`
 (there is no `src/lib/server/` here). That line is a **deliberate divergence, not drift** —
 copy zenith's over it and the three data-layer specs silently start running in real chromium.
+
+**A `*.svelte.spec.ts` does not have to mount anything — the suffix means "needs a DOM", not
+"renders a component".**
+[poll-services-state.svelte.spec.ts](src/lib/business/store/poll-services-state.svelte.spec.ts) is
+the repo's first non-component one and it renders nothing: the module registers `visibilitychange`
+/ `focus` listeners and reads `document.hidden`, so its first call throws under the node project,
+and the suffix is purely the chromium project's include pattern — the same glob the node project
+excludes by. `document.hidden` is a prototype getter, so a spec can only SHADOW it —
+`Object.defineProperty(document, 'hidden', { value, configurable: true })`, with
+`delete (document as { hidden?: boolean }).hidden` in `afterEach` to hand the real getter back.
+`configurable` is what makes that delete possible at all; without it the shadow outlives the file
+that set it.
 
 **A `*.svelte.spec.ts` sees no CSS, so it cannot assert a CSS-driven state.** The `client` project
 loads no app stylesheet, which makes a class like `invisible` inert there — and inert is not
@@ -1214,9 +1291,12 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   5. **The refresh interval is 60s and must stay `>=` the TTL.** Shorter, and a tick only re-reads
      the cache and the box never moves. It is `depends('dashboard:stats')` in the load plus a
      `setInterval` in [+page.svelte](src/routes/[...slug]/+page.svelte) gated on
-     `document.visibilityState === 'visible'` and cleared by its effect's teardown. Nothing was
-     extracted out of `poll-services-state.ts`: one guarded interval is not a duplication, and
-     [roadmap.md](roadmap.md) #18 is where the second one makes it so.
+     `document.visibilityState === 'visible'` and cleared by its effect's teardown. **Nothing was
+     extracted out of `poll-services-state.ts`, and #18 landing is what settled that** rather
+     than making it a duplication: this gate exists to SUPPRESS a tick nobody is reading, while
+     #18's wake listeners exist to CREATE the tick the interval never delivered, so one helper
+     serving both would carry a flag telling the two apart. Two callers were the argument for
+     extracting; the two wanting opposite things is the reason against.
   6. **`invalidate` re-runs the WHOLE load, and everything that re-runs with it needs a gate.**
      Four of them, each a named failure rather than caution:
      - `readConfig` runs again per tick — accepted, it is mtime-cached, so a tick that changes
@@ -1261,6 +1341,32 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   decision), and not a message key crossing into business. `ToastStore.show`'s `untrack` is
   untouched — it closes the self-retrigger loop and was never about an external one — but this
   flag is what took its e2e fence away, which the "Errors are values" section spells out.
+- **The service poll re-polls on a wake, and BOTH halves are gated.** `pollServicesState` is
+  still one `poll()`, one `setInterval(poll, 15min)` and one teardown, plus a `visibilitychange`
+  listener on `document` and a `focus` listener on `window` — both are needed, because switching
+  to another application leaves `visibilityState` at `visible` while a tab switch inside the
+  browser raises `visibilitychange` — and both are removed by the teardown that already cleared
+  the interval and aborted the signal. Three decisions sit on top of the item as written:
+  1. **The `document.hidden` guard lives in `poll()` itself**, so the interval AND the eager
+     first poll are both gated by it. Throttled is not the same as not firing: an 8-hour
+     background stint still delivers ~32 ticks, which for a dozen services is hundreds of round
+     trips, each carrying a diagnostic and a toast for a reader who is not there. The corollary
+     is accepted rather than patched: a page loaded into a background tab skips its first poll,
+     and the `visibilitychange` listener is what covers it on the way back.
+  2. **The wake path carries an ELAPSED guard — a wake polls only once `POLL_INTERVAL_MS` has
+     passed since the last poll — and that is not caution.** Without it the re-poll rate is
+     bounded by nothing but how often somebody changes windows, and it re-raised a probe failure
+     the user had already dismissed: `ToastStore` dedupes against what is CURRENTLY on screen and
+     a toast clears itself after `TOAST_MS` (6s), so dismiss, click into another app, click back
+     handed it straight back — where before #18 a dismissal bought 15 minutes. That is the defect
+     class `reportedFailures` exists for, one bullet up. The guard is also the item's own
+     rationale stated as a condition — "has a tick been MISSED", because `setInterval` does not
+     catch up — and it is what makes both events firing on one return a single poll rather than a
+     duplicate round trip.
+  3. **`lastPolledAt` is assigned AFTER the hidden guard**, so a throttled tick that returned
+     early does not count as a poll and therefore cannot suppress the wake behind it. Mutating
+     that order is what a mutation audit of the file turned up; nothing else separates the two
+     guards.
 - **The docs were corrected against the code**, so don't restore the old wording from memory or
   from an older checkout. What changed: the seven module paths the `refactor(layers)` commit
   stranded (three were 404 links); the render-pipeline diagram, which named a `server/config.ts`

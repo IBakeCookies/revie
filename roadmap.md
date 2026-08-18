@@ -17,10 +17,11 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 11 items are open — 10 from the review passes, plus #33
+**Numbers are stable, so gaps mean landed.** 8 items are open — 7 from the review passes, plus #33
 above, which came from asking what no review pass had proposed; **1, 2, 3, 4, 5,
-6, 7, 8, 9, 11, 13, 14, 16, 17, 19, 23, 24, 25, 26, 30, 31, 32, 34, 35 and 36 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
-the rest of the numbering stays put so the cross-references below keep resolving. A landed item
+6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 23, 24, 25, 26, 30, 31, 32, 34, 35 and 36 are
+done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
 `npm run format` — measured, #12 became #11 while the "#23 before #12" sequencing note still said 12.
@@ -113,9 +114,21 @@ vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Alre
     not `.test.ts` because all 19 node specs in this repo are `.spec.ts` and AGENTS.md's
     Conventions say so. It pins no output, as the item required. The two-PRNG-streams invariant is
     out of AGENTS.md, replaced by the per-theme one and its rename caveat.)_
-12. **Two missing config warnings**: a non-integer `span` is dropped silently and falls back to full
-    width, and a `defaults` key naming an unknown component never matches and never warns. Both
-    write into #23's diagnostics channel — land that first.
+12. _(**Two missing config warnings** — landed, and the item was half stale by the time it ran. The
+    `defaults` half is what this pass added: `withoutStructuralDefaults` now warns on a key naming
+    no container (`Ignoring the defaults for "BoxServices", no such container exists`) and on an
+    entry that is not a set of props, both minted in the model and returned in `warnings` like
+    every other one — neither prints — and both **once per `defaults` entry at the root**, not once
+    per container that inherits it. The merge is why they were silent: it only ever looks
+    `defaults[raw.name]` up for a name the schema already knows, so a typo'd key is never looked up
+    and the operator's defaults simply never apply. Fenced by one case in
+    [config.spec.ts](src/lib/business/model/config.spec.ts) asserting both sentences, beside the two
+    that keep both shipped configs normalizing warning-free — which is what keeps them saveable
+    from `/admin` under refuse-on-warnings.
+    **The `span` half was already in the tree before this pass**: `normalizeConfig` warns
+    `Ignoring "span" on container "…", it has to be a whole number`, next to the `class` /
+    `gridClass` strip. Nothing was changed for it, and this item is where that doc drift went
+    unnoticed. Recorded in AGENTS.md under "Config-driven rendering".)_
 13. _(**`src/hooks.ts` is inert** — landed as the deletion. The file is gone, and
     [eslint.config.js](eslint.config.js)'s presentation block narrowed from `src/hooks*.ts` to
     `src/hooks.server.ts` with it, so the glob no longer covers a file that does not exist.
@@ -142,22 +155,25 @@ vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Alre
     from the schema types: that derivation is #22's scope. Recorded in AGENTS.md under
     "Config-driven rendering".)_
 
-15. **State `secure` explicitly on all three appearance cookies** — `S`
-    Neither write path types it: `cookie.ts:41` omits the attribute, and `COOKIE_WRITE_OPTIONS`
-    (cookie.ts:45-50) omits the key, so SvelteKit merges in its own default —
-    `secure: url.hostname === 'localhost' && url.protocol === 'http:' ? false : true`. Derive it
-    from `location.protocol` in the browser and the request URL on the server;
-    `COOKIE_WRITE_OPTIONS` is `as const` and consumed as a type at appearance-repository.ts:69, so a
-    per-request value widens that signature.
-    _Prevents:_ on plain HTTP (`http://dashboard.lan`) the server-minted `scenerySeed`
-    (appearance.ts:79-88) ships with `Secure`, the browser drops it, and it is re-minted on **every**
-    response — scenery re-arranges on every navigation and the document is permanently unshareable.
-    On HTTPS the inverse: the three browser-written cookies carry no `Secure`. Structurally invisible
-    in dev and CI, which both hit `http://localhost` — the one exempt host (playwright.config.ts
-    port 4173). Nothing to port: zenith omits `Secure` on both paths too, but it deploys to Vercel,
-    which is HTTPS-only, so it never reaches the failure.
-    _Files:_ src/lib/data/storage/cookie.ts:41,45-50,
-    src/lib/data/repository/appearance-repository.ts:69,72, README.md
+15. _(**State `secure` explicitly on all three appearance cookies** — landed, both directions.
+    `COOKIE_WRITE_OPTIONS` is now `cookieWriteOptions(secure)`; `writeCookie` derives the flag from
+    `location.protocol` **inside the function**, never at module scope, because `cookie.ts` sits on
+    the SSR import path and there is no `location` there; `$createScenerySeedCookie` takes `secure`
+    as a parameter; and `readOrMintScenerySeed(cookies, url)` makes the decision off the request URL
+    `+layout.server.ts` hands it (R1). `admin-session-repository.ts` keeps its own `secure: !dev`,
+    and only its comment changed, to name the new identifier. The item's line citations are dropped
+    with the constant they pointed at.
+    **Two things it did not foresee, both measured.** adapter-node's `get_origin` defaults the
+    protocol to `https` when `PROTOCOL_HEADER` is unset and never consults the socket, so
+    `event.url.protocol` reads `https:` on a plain-http server — the server half is only honest once
+    `ORIGIN` is set, a requirement that PREDATES this item, because `POST /admin/login` over plain
+    http without `ORIGIN` already answered 403. And the browser drop is **not universal**:
+    `http://localhost` and `http://127.0.0.1` are potentially-trustworthy origins and accept a
+    `Secure` cookie, so the failure belongs to LAN-address deployments alone
+    (`http://192.168.x.x:3000`) — the sharper version of this item's own "invisible in dev and CI".
+    AGENTS.md's appearance pipeline carries the measurements, the two-sources carve-out for
+    `secure`, and why no code change compensates for an unset `ORIGIN`; README.md carries the
+    operator half, beside the admin TLS note.)_
 
 16. _(**Stop a dead AdGuard box from gating first byte: cache the stats with a short TTL, then
     refresh them** — landed, and renamed by #33. `readStats` in
@@ -170,8 +186,9 @@ vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Alre
     window, a cached failure, the window expiring, and a dead host beside a live one, each keyed on
     its own href so the module-scope cache needs no test-only reset export — and in
     `page.server.spec.ts`, which asserts a cached failure still raises the flag while printing
-    nothing. Nothing was extracted out of `poll-services-state.ts` — see #18, which is where the
-    second caller would make that a real duplication. The five decisions it forced, the regressions
+    nothing. Nothing was extracted out of `poll-services-state.ts`, and #18 landing is what settled
+    that rather than making it a duplication — the reason is on that item. The five decisions it
+    forced, the regressions
     a periodic `invalidate` introduced and what gates each of them, and the one gap deliberately
     left open, are recorded in AGENTS.md under "Already done".)_
 
@@ -196,29 +213,27 @@ vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Alre
     Recorded in AGENTS.md under
     "Already done".)_
 
-18. **Re-poll service status on `visibilitychange` and `focus`** — `S`
-    `pollServicesState` is one `poll()`, one `setInterval(poll, 15min)` and a teardown that clears
-    it and aborts. Add a `visibilitychange` handler calling the existing `poll()` when
-    `document.visibilityState === 'visible'`, removed in the teardown the function already returns.
-    Zenith listens on **both** `visibilitychange` and `focus` — take the pair, with the guarded,
-    torn-down shape from its `session-store.svelte.ts` (its `today` store's listener is
-    unconditional; we want the `!document.hidden` guard).
-    _Prevents:_ timers do not fire while the OS is suspended and browsers freeze background tabs, and
-    `setInterval` does not catch up — a resumed start-page tab asserts, with a green dot, a
-    measurement that is hours old, and a recovered service stays red for up to 15 more minutes.
-    `#states` is keyed by href (service-store.svelte.ts:19), so the extra poll overwrites rather than
-    stacking.
-    _This is now the SECOND caller, so it is where the extraction happens._ #16 landed a
-    visibility-gated interval in [+page.svelte](src/routes/[...slug]/+page.svelte) — a `setInterval`
-    whose body is skipped unless `document.visibilityState === 'visible'`, torn down by its own
-    effect. It was deliberately NOT extracted then: one caller is not a duplication. Landing this
-    item makes two, which is the point AGENTS.md names for pulling the guarded interval into a
-    shared helper — note that #16's is only the gate, and this item still wants the `visibilitychange`
-    / `focus` LISTENERS zenith carries on top of it.
-    _Files:_ src/lib/business/store/poll-services-state.ts:34-40,
-    src/lib/business/store/poll-services-state.spec.ts (fake timers already installed at :39-45; the
-    new case needs a `*.svelte.spec.ts` home or a stubbed `document`, since the node project has
-    none)
+18. _(**Re-poll service status on `visibilitychange` and `focus`** — landed, with two guards the
+    item did not ask for and without the extraction it promised. Zenith's pair of listeners is
+    there, both removed in the teardown that already cleared the interval and aborted the signal.
+    What the review pass added on top: the `!document.hidden` guard moved INTO `poll()`, so the
+    15-minute interval and the eager first poll are gated by it too — a page loaded into a
+    background tab therefore skips its first poll, and the `visibilitychange` listener is what
+    covers it on the way back — and the wake path carries an ELAPSED guard, so a wake polls only
+    once `POLL_INTERVAL_MS` has passed since the last poll. Unguarded, the re-poll rate was
+    however often somebody changes windows, and a probe-failure toast the user had dismissed came
+    straight back, `ToastStore` deduping only against what is currently on screen.
+    **The extraction this item promised was deliberately REFUSED**, and being the second caller is
+    not what settled it: #16's gate exists to SUPPRESS a tick nobody is reading, while these
+    listeners exist to CREATE the tick the interval never delivered, so one helper serving both
+    would carry a flag telling the two apart.
+    Its spec moved to
+    [poll-services-state.svelte.spec.ts](src/lib/business/store/poll-services-state.svelte.spec.ts)
+    — so the item's old citation is dropped — 13 cases in real chromium, which is this item's own
+    "needs a `*.svelte.spec.ts` home" alternative taken: the module now touches `document` and
+    `window`, and the node project has neither. Every production half is mutation-audited to have
+    at least one failing case. Recorded in AGENTS.md under "Already done", and the suffix
+    convention it establishes is under "Conventions".)_
 
 19. _(**Widen `[[slug]]` to `[...slug]` and warn on `pages` keys without a leading slash** —
     landed. The route directory is renamed and `normalizeConfig` **drops** a key with no leading
@@ -352,7 +367,7 @@ vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Alre
     `useAsyncErrorAsValue` was made to compose, and the read-failure branch already cached against
     the stamp — what did not cache was the **stat**-failure branch, and neither retained its
     `AppError`. Both are fixed now. The rest moved into AGENTS.md's errors-as-values section.
-    _Unblocked:_ #12's two warnings now have a channel to write into. **`no-console` is enableable**
+    _Unblocked:_ #12 landed through this channel. **`no-console` is enableable**
     — nothing is in the way any more; see the console paragraph in AGENTS.md for the exemption list.
 
 ## Features
@@ -723,9 +738,9 @@ distributed guess, which no per-address counter addresses and which a long token
 
 ## Upstream drift (the `zenith` ports)
 
-Everything else portable from zenith maps onto an item above — see #10, #18, #21, #28. The
-app.html and reduced-motion ports (#3, #4) have landed, so has the scenery-seed one (#11), and so
-have both items this section held.
+Everything else portable from zenith maps onto an item above — see #10, #21, #28. The
+app.html and reduced-motion ports (#3, #4) have landed, so has the scenery-seed one (#11) and the
+wake-listener pair (#18), and so have both items this section held.
 
 _(#31 — "retire the self-referential `--color-x: var(--color-x)` idiom" — landed. All 15 `@theme`
 entries now alias the unprefixed upstream seed (`--color-danger: var(--danger)`), base.css declares
@@ -746,7 +761,8 @@ the repo's only automated a11y check.)_
 
 The order that matters, beyond the group ranking:
 
-- ~~**#23 before #12**~~ — landed. #12's two warnings now have the channel to write into, and
+- ~~**#23 before #12**~~ — both landed, in that order. #12's `defaults` warnings went in through
+  the channel #23 opened — its `span` half turning out to have been in the tree already — and
   `no-console` is enableable whenever someone wants it.
 - ~~**#34 before #35**~~ — landed. #35 now has the action, the `ConfigWrite` kinds and the
   rendered diagnostics under it, and a `<textarea>` to replace.

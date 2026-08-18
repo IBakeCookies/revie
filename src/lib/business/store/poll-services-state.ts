@@ -30,17 +30,54 @@ export function pollServicesState(servicesStore: ServicesStore, probeKey: string
 	// answer from the previous page out of the store — it would sit there for the next 15
 	// minutes — and stops a failure toasting a page the user has already left.
 	const controller = new AbortController();
+	let lastPolledAt = 0;
 
 	function poll(): void {
+		// A hidden tab is nobody reading, the same guard the stats refresh in
+		// `[...slug]/+page.svelte` carries. Background throttling is not the same as not
+		// firing: an 8-hour stint still delivers ~32 ticks, which for a dozen services is
+		// hundreds of round trips, each with a diagnostic and a toast waiting for a reader
+		// who is not there.
+		if (document.hidden) {
+			return;
+		}
+
+		lastPolledAt = Date.now();
 		hrefs.forEach((href) => servicesStore.refresh(href, controller.signal));
 	}
 
+	// Timers do not fire while the OS is suspended and browsers freeze background tabs, and
+	// `setInterval` does not catch up — so a resumed tab would keep asserting a measurement
+	// hours old until the next tick. Both signals are needed: on desktop, switching to
+	// another application leaves `visibilityState` at `visible`, so `focus` is the only one
+	// that fires there, while a tab switch within the browser raises `visibilitychange`.
+	//
+	// A wake is a user action, so the bound has to be "was a tick missed" rather than the
+	// wake itself: unguarded, the re-poll rate is however often somebody changes windows,
+	// and a dismissed probe failure comes straight back — `ToastStore` dedupes against what
+	// is currently on SCREEN. This is also what makes both events firing on one return a
+	// single poll instead of a duplicate round trip.
+	function onWake(): void {
+		if (Date.now() - lastPolledAt < POLL_INTERVAL_MS) {
+			return;
+		}
+
+		poll();
+	}
+
+	// A page loaded into a background tab skips this one, and the wake listeners below are
+	// what cover it on the way back.
 	poll();
 
 	const id = setInterval(poll, POLL_INTERVAL_MS);
 
+	document.addEventListener('visibilitychange', onWake);
+	window.addEventListener('focus', onWake);
+
 	return () => {
 		clearInterval(id);
 		controller.abort();
+		document.removeEventListener('visibilitychange', onWake);
+		window.removeEventListener('focus', onWake);
 	};
 }

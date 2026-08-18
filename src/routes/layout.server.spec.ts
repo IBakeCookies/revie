@@ -18,6 +18,8 @@ function event(): Parameters<typeof load>[0] {
 			get: () => undefined,
 			set: () => {},
 		},
+		// The mint reads the scheme off it, to decide whether the cookie is Secure.
+		url: new URL('http://dashboard.lan/'),
 	} as unknown as Parameters<typeof load>[0];
 }
 

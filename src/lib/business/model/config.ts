@@ -431,7 +431,18 @@ function withoutStructuralDefaults(
 	const cleaned: Record<string, unknown> = {};
 
 	for (const [name, props] of Object.entries(defaults)) {
+		// The merge only ever reads `defaults[raw.name]` for a name the schema knows, so a
+		// typo'd key is never looked up and the operator's defaults simply never apply — with
+		// nothing anywhere to say so.
+		if (!isContainerName(name)) {
+			warnings.push(`Ignoring the defaults for "${name}", no such container exists`);
+
+			continue;
+		}
+
 		if (!isRecord(props)) {
+			warnings.push(`Ignoring the defaults for "${name}", it is not a set of props`);
+
 			continue;
 		}
 

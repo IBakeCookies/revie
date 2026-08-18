@@ -17,7 +17,7 @@ import type { CookieSource } from '$lib/data/storage/cookie';
 const ADMIN_SESSION_COOKIE = 'adminSession';
 
 /**
- * Deliberately NOT `COOKIE_WRITE_OPTIONS`: the appearance cookies are read by
+ * Deliberately NOT `cookieWriteOptions`: the appearance cookies are read by
  * the browser and ride along on cross-site navigations, and this one must do
  * neither. No `maxAge` either — the session lasts the browser session, which is
  * the shortest lifetime that still works without a session store.

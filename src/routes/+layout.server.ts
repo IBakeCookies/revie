@@ -33,7 +33,7 @@ export const load: LayoutServerLoad = async (event) => {
 		sceneryPaused: appearance.sceneryPaused,
 		// one seed per user varies the animated theme scenery; minted once,
 		// then stable across visits (the reroll button rewrites the cookie)
-		scenerySeed: readOrMintScenerySeed(event.cookies),
+		scenerySeed: readOrMintScenerySeed(event.cookies, event.url),
 		// Whether the header shows a link to /admin at all. Unset token means the
 		// guard 404s every /admin path, and a switched-off feature must not
 		// advertise itself — so the link cannot be unconditional. No "is signed in"

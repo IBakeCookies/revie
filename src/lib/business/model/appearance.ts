@@ -68,13 +68,16 @@ export function updateSceneryMotion(paused: boolean): void {
  */
 export function readOrMintScenerySeed(
 	cookies: CookieSource & Parameters<typeof appearanceRepository.$createScenerySeedCookie>[0],
+	url: URL,
 ): number {
 	const stored = appearanceRepository.$readAppearance(cookies).scenerySeed;
 
 	if (stored !== undefined) return stored;
 
 	const seed = randomScenerySeed();
-	appearanceRepository.$createScenerySeedCookie(cookies, seed);
+	// Whether the cookie may carry `Secure` is a decision, so it is made here and the
+	// route only hands over the request URL — the model imports nothing to get it.
+	appearanceRepository.$createScenerySeedCookie(cookies, seed, url.protocol === 'https:');
 
 	return seed;
 }

@@ -91,14 +91,32 @@ describe('appearance writes', () => {
 				written.push(value);
 			},
 		});
+
+		vi.stubGlobal('location', {
+			protocol: 'http:',
+		});
 	});
 
 	afterEach(() => vi.unstubAllGlobals());
 
-	it('writes each cookie with the shared attributes', () => {
+	it('writes each cookie with the shared attributes, and Secure only on https', () => {
+		vi.stubGlobal('location', {
+			protocol: 'https:',
+		});
+
 		$updateTheme('abyss');
 
-		expect(written[0]).toBe('theme=abyss; path=/; max-age=31536000; SameSite=lax');
+		vi.stubGlobal('location', {
+			protocol: 'http:',
+		});
+
+		$updateTheme('abyss');
+
+		// Secure on a plain-http deployment has the browser drop the cookie outright.
+		expect(written).toEqual([
+			'theme=abyss; path=/; max-age=31536000; SameSite=lax; Secure',
+			'theme=abyss; path=/; max-age=31536000; SameSite=lax',
+		]);
 	});
 
 	it('serializes the seed and the motion flag to what the reader expects', () => {
@@ -116,13 +134,30 @@ describe('appearance writes', () => {
 			set: vi.fn(),
 		};
 
-		$createScenerySeedCookie(sink, 99);
+		$createScenerySeedCookie(sink, 99, false);
 
 		expect(sink.set).toHaveBeenCalledWith('scenerySeed', '99', {
 			path: '/',
 			maxAge: 31536000,
 			sameSite: 'lax',
 			httpOnly: false,
+			secure: false,
 		});
+	});
+
+	it('marks the minted cookie Secure when the caller asks for it', () => {
+		const sink = {
+			set: vi.fn(),
+		};
+
+		$createScenerySeedCookie(sink, 99, true);
+
+		expect(sink.set).toHaveBeenCalledWith(
+			'scenerySeed',
+			'99',
+			expect.objectContaining({
+				secure: true,
+			}),
+		);
 	});
 });

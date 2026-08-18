@@ -238,6 +238,33 @@ describe('normalizeConfig', () => {
 		expect(warnings).toEqual([expect.stringContaining('items')]);
 	});
 
+	// Nothing looks a defaults key up unless the schema names it, so a typo is not a merge
+	// that fails — it is a merge that never happens.
+	it('warns about a defaults entry that names no container, and one that is not props', () => {
+		const { warnings } = normalizeConfig({
+			defaults: {
+				BoxServices: {
+					span: 4,
+				},
+				BoxService: 'x',
+			},
+			pages: {
+				'/': {
+					containers: [
+						{
+							name: 'BoxDate',
+						},
+					],
+				},
+			},
+		});
+
+		expect(warnings).toEqual([
+			expect.stringContaining('"BoxServices"'),
+			expect.stringContaining('"BoxService"'),
+		]);
+	});
+
 	it('returns an empty config for anything that is not an object', () => {
 		expect(normalizeConfig('nope').config.pages).toEqual({});
 		expect(normalizeConfig(undefined).config.pages).toEqual({});

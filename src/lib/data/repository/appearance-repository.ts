@@ -9,7 +9,7 @@
  * seed should be minted, are model decisions — see `business/model/theme.ts`.
  */
 
-import { COOKIE_WRITE_OPTIONS, writeCookie, type CookieSource } from '$lib/data/storage/cookie';
+import { cookieWriteOptions, writeCookie, type CookieSource } from '$lib/data/storage/cookie';
 
 const THEME_COOKIE = 'theme';
 const SCENERY_SEED_COOKIE = 'scenerySeed';
@@ -56,10 +56,16 @@ export function $updateSceneryMotion(paused: boolean): void {
  * Server-side seed mint — the one appearance cookie the server writes, so a
  * first visit already renders its own scenery arrangement. `sink` is
  * SvelteKit's `event.cookies`, typed structurally like `CookieSource`.
+ *
+ * `secure` is decided by the caller: this layer parses and writes, it does not
+ * know what scheme the request arrived on.
  */
 export function $createScenerySeedCookie(
-	sink: { set(name: string, value: string, options: typeof COOKIE_WRITE_OPTIONS): void },
+	sink: {
+		set(name: string, value: string, options: ReturnType<typeof cookieWriteOptions>): void;
+	},
 	seed: number,
+	secure: boolean,
 ): void {
-	sink.set(SCENERY_SEED_COOKIE, String(seed), COOKIE_WRITE_OPTIONS);
+	sink.set(SCENERY_SEED_COOKIE, String(seed), cookieWriteOptions(secure));
 }

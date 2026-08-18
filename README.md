@@ -31,6 +31,9 @@ npm run build
 node build            # reads ./config.json relative to the working directory
 ```
 
+Serving on anything but `localhost` / `127.0.0.1` also needs `ORIGIN` set to the address you serve
+on — see [the admin area](#the-admin-area) for both things that depend on it.
+
 ## Configuration
 
 `config.json` maps URL paths to a list of containers. Every container names a
@@ -257,6 +260,16 @@ DASHBOARD_ADMIN_TOKEN=$(openssl rand -hex 32)
 - Signing in at `/admin/login` sets a session cookie that is `httpOnly`, `SameSite=Strict`
   and — outside `npm run dev` — `Secure`, so **serve production over TLS** or the browser
   drops it and the login never sticks.
+- **Set `ORIGIN` to the address you actually serve on**, e.g.
+  `ORIGIN=https://dashboard.example.com node build`. Without it, signing in answers
+  **403 Forbidden**: the login is a POST and the server compares its origin against a URL it
+  guessed. `ORIGIN` is also what tells the server whether the request was https, which is what
+  decides the `Secure` flag on the theme, scenery-seed and motion cookies — unset on a plain-http
+  deployment, the server marks them `Secure`, the browser drops the seed and the animated scenery
+  rearranges itself on every page load. `http://localhost` and `http://127.0.0.1` are exempt (they
+  keep `Secure` cookies), so this shows up on a LAN address like `http://192.168.1.10:3000` and
+  never in development. Behind a reverse proxy, `ORIGIN` is the public address, not the internal
+  one.
 - The cookie holds the token, so **rotating `DASHBOARD_ADMIN_TOKEN` signs everyone out**.
   That is the whole revocation mechanism; there is no session store to clear.
 - **`/admin` and everything under it are reserved** once the token is set. A `pages` key
@@ -272,11 +285,13 @@ DASHBOARD_ADMIN_TOKEN=$(openssl rand -hex 32)
 
 ## Services and status dots
 
-Each `BoxService` is probed through `POST /api/ping` every 15 minutes. The probe opens a
-TCP connection to the `href`'s own host **and port** — so a dead service on a live host
-reads as offline, and two boxes on one host can disagree. A scheme without a port to
-connect to is rejected. The endpoint only probes `host:port` pairs that appear in
-`config.json`; anything else is rejected too.
+Each `BoxService` is probed through `POST /api/ping` every 15 minutes, and again when the tab
+becomes visible or the window regains focus — but only if 15 minutes have passed since the last
+probe, so returning to the dashboard does not re-probe anything that was measured recently. A tab
+in the background is not probed at all. The probe opens a TCP connection to the `href`'s own host
+**and port** — so a dead service on a live host reads as offline, and two boxes on one host can
+disagree. A scheme without a port to connect to is rejected. The endpoint only probes `host:port`
+pairs that appear in `config.json`; anything else is rejected too.
 
 A dot only changes when a probe answers. A probe that **fails** — a network drop, a
 proxy erroring — says nothing about the service, so the dot keeps its last known state
