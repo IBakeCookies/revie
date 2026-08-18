@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import type { HTMLAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
 	import { cn } from '$lib/utils/style';
 
@@ -10,15 +9,15 @@
 		/** Extra panel classes — the theme list needs a scroll cap, the others don't. */
 		panelClass?: ClassValue;
 		class?: ClassValue;
-	} & HTMLAttributes<HTMLDivElement>;
+	};
 
-	let { trigger, children, panelClass, ...restProps }: Props = $props();
+	let { trigger, children, panelClass, class: className }: Props = $props();
 </script>
 
 <!-- The open one is raised: two dropdowns at the same z-index leave the later
      sibling painting over the earlier one's panel, which below `sm` is exactly the
      wide theme list under a half-width trigger. -->
-<div {...restProps} class={cn('group relative z-1 hover:z-20 focus-within:z-20', restProps.class)}>
+<div class={cn('group relative z-1 hover:z-20 focus-within:z-20', className)}>
 	<!-- Ghost until pointed at, and it rises into the same chip the nav marks its current
 	     page with: the trigger sits in a recessed track that already separates it from the
 	     bar, so a border and a fill of its own made the two menus the heaviest thing in a

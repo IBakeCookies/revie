@@ -8,7 +8,7 @@
 		     the dark default before first paint instead of a light flash; first
 		     visit (no sceneryMotion cookie) on a reduced-motion OS gets scenery
 		     paused before first paint instead of a flash of motion -->
-		<script>
+		<script nonce="%sveltekit.nonce%">
 			if (
 				!document.cookie.includes('theme=') &&
 				matchMedia('(prefers-color-scheme: dark)').matches

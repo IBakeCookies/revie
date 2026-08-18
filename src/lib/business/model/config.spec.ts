@@ -168,6 +168,26 @@ describe('normalizeConfig', () => {
 		expect(warnings).toEqual([expect.stringContaining('gridClass')]);
 	});
 
+	it('drops a prop the schema does not declare, which would reach a real DOM node', () => {
+		// The sentence is the operator's only account of it, so it is asserted whole:
+		// `title` is a global HTML attribute, and a misspelled optional prop (`spann`)
+		// used to render wrong with nothing said either way.
+		const { page, warnings } = pageWith({
+			name: 'BoxDate',
+			props: {
+				spann: 6,
+				title: 'a tooltip nobody asked for',
+			},
+		});
+
+		expect(page.containers[0].props).toEqual({});
+
+		expect(warnings).toEqual([
+			'Ignoring "spann" on container "BoxDate", no such prop exists',
+			'Ignoring "title" on container "BoxDate", no such prop exists',
+		]);
+	});
+
 	it('applies per-component defaults at any nesting depth', () => {
 		const nested = itemsOf(itemsOf(grid)[0]);
 

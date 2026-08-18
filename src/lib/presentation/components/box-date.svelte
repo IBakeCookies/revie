@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { HTMLAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
 	import { cn, spanStyle } from '$lib/utils/style';
 	import { getLocale } from '$lib/paraglide/runtime';
@@ -7,9 +6,9 @@
 	export type Props = {
 		span?: number;
 		class?: ClassValue;
-	} & HTMLAttributes<HTMLDivElement>;
+	};
 
-	let { span, ...restProps }: Props = $props();
+	let { span, class: className }: Props = $props();
 
 	// Instance scope, not module scope: the module body runs once per node
 	// process while the locale is per request, so a module-level formatter
@@ -43,11 +42,10 @@
 </script>
 
 <div
-	{...restProps}
 	style={spanStyle(span)}
 	class={cn(
 		'@container/box-date bg-(--box-surface,var(--surface-card)) border-line-soft col-span-12 flex flex-col justify-center rounded-2xl border p-box-lg backdrop-blur xl:col-span-(--span)',
-		restProps.class,
+		className,
 	)}
 >
 	<!-- Stacked while the box is narrow, one line once it is wide: a config that gives

@@ -1,0 +1,28 @@
+# Install to /etc/systemd/system/, adjust the paths, the user and the node binary, then
+# `systemctl daemon-reload && systemctl enable --now revie-dashboard`.
+
+[Unit]
+Description=Revie Dashboard
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=revie
+# Holds build/, node_modules/ and package.json: the build output is not standalone, it
+# imports svelte and @sveltejs/kit from node_modules at runtime.
+WorkingDirectory=/opt/revie-dashboard
+# This is the unit's env mechanism, so ExecStart stays the bare form — `node
+# --env-file=.env` would be a second one doing the same job.
+EnvironmentFile=/opt/revie-dashboard/.env
+# ABSOLUTE: the config path is resolved against the process working directory, and a
+# service manager's is not the repo. Set it here rather than in .env because it is a
+# deployment path, not a secret — but note EnvironmentFile wins if .env sets it too.
+Environment=DASHBOARD_CONFIG=/opt/revie-dashboard/config.json
+# The address browsers reach, not the internal one — see README's admin area for what
+# depends on it.
+Environment=ORIGIN=https://dashboard.example.com
+ExecStart=/usr/bin/node build
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

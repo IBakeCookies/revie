@@ -28,8 +28,22 @@ Production:
 
 ```sh
 npm run build
-node build            # reads ./config.json relative to the working directory
+node --env-file=.env build   # reads ./config.json relative to the working directory
 ```
+
+`--env-file` is not optional. Only `npm run dev` reads `.env`, through vite; nothing in the build
+output does, so a bare `node build` starts cleanly with every `DASHBOARD_SECRET_<NAME>`,
+`DASHBOARD_ADMIN_TOKEN` and `DASHBOARD_CONFIG` silently unset — a working-looking deploy with empty
+stats boxes and no admin area.
+
+That `./config.json` is resolved against the process working directory, so `DASHBOARD_CONFIG` (see
+[Configuration](#configuration)) has to be **absolute** as soon as something other than you starts
+the server: a service manager's working directory is not the repo.
+[`deploy/revie-dashboard.service`](deploy/revie-dashboard.service) is a unit that does both, using
+`EnvironmentFile=` rather than `--env-file` — one env mechanism per invocation, not two. There is
+no compose file to go with it: the build output is not standalone (it imports `svelte` and
+`@sveltejs/kit` from `node_modules` at runtime), so a container needs an image built from the repo
+and this project ships none.
 
 Serving on anything but `localhost` / `127.0.0.1` also needs `ORIGIN` set to the address you serve
 on — see [the admin area](#the-admin-area) for both things that depend on it.

@@ -28,6 +28,7 @@
 		"screenshot": "npm run build && node scripts/screenshot.js"
 	},
 	"devDependencies": {
+		"@axe-core/playwright": "^4.13.0",
 		"@chromatic-com/storybook": "^5.2.1",
 		"@eslint/js": "^10.0.1",
 		"@inlang/paraglide-js": "^2.23.1",

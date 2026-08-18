@@ -17,10 +17,10 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 8 items are open — 7 from the review passes, plus #33
-above, which came from asking what no review pass had proposed; **1, 2, 3, 4, 5,
-6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 23, 24, 25, 26, 30, 31, 32, 34, 35 and 36 are
-done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+**Numbers are stable, so gaps mean landed.** 3 items are open — #10 and #29 from the review
+passes, plus #33 above, which came from asking what no review pass had proposed; **1, 2, 3, 4, 5,
+6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 30, 31, 32, 34,
+35 and 36 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
 and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -245,116 +245,88 @@ vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Alre
     [can-see-service-status.e2e.ts](e2e/can-see-service-status.e2e.ts). `/media/*` and `/network/*`
     page grouping is unblocked. Recorded in AGENTS.md under "Config-driven rendering".)_
 
-20. **Add a response-header `Handle` (Referrer-Policy, X-Content-Type-Options, X-Robots-Tag,
-    Cache-Control), flip robots.txt, then enable CSP** — `M`
-    There is no header layer: the three handles in hooks.server.ts:1-36 only do
-    `transformPageChunk`, and `grep -rn setHeaders src e2e` returns nothing. One new `Handle` sets
-    `Referrer-Policy`, `X-Content-Type-Options`, `X-Robots-Tag: noindex` and
-    `Cache-Control: private, no-store`, and static/robots.txt (currently
-    `# allow crawling everything by default` / `Disallow:`) flips to noindex. Then
-    `kit.csp.directives` in svelte.config.js:9 — with two required accommodations:
-    `<script nonce="%sveltekit.nonce%">` on the hand-written pre-paint script (app.html:12-26), and
-    an explicit `'style-src-attr': ['unsafe-inline']`, because the app puts computed values in inline
-    `style` **attributes** (box-service.svelte:34 `style={spanStyle(span)}` — the `--span` invariant;
-    +layout.svelte:97 scenery; +layout.svelte:191,192 swatches) and SvelteKit's own nonced `<style>`
-    nullifies `'unsafe-inline'` in `style-src`. Nothing sets `prerender`, so `mode: 'nonce'` is
-    available.
-    _Prevents:_ the page's content is an internal network map (hostnames, ports, inventory) typically
-    published through a proxy, currently indexable, with the origin leaked to cdn.jsdelivr.net /
-    cdn.simpleicons.org / raw.githubusercontent.com on every load (config.json:28,39,55,104; the
-    `<a>` at box-service.svelte:33 carries `rel="noreferrer"`, the `<img>` at :43 carries no
-    `referrerpolicy`). The `Cache-Control` half is the one that matters most: `GET /` returns German
-    or English HTML purely on the `PARAGLIDE_LOCALE` cookie, plus a cookie-derived theme class and
-    scenery-paused class (hooks.server.ts:20,32) and a `Set-Cookie: scenerySeed` on first visit —
-    with no `Vary` and no cache directive. Client-side nav data is already safe (kit sets
-    `private, no-store` on `__data.json`), so only the document needs it.
-    _Nothing to port:_ zenith has no header `Handle`, no `kit.csp`, and no `Referrer-Policy` /
-    `X-Content-Type-Options` anywhere; its only `Cache-Control` is `public, max-age=3600` on
-    robots.txt and sitemap.xml, because it wants to be indexed — the opposite requirement.
-    _Files:_ src/hooks.server.ts, svelte.config.js:9, src/app.html:12-26, static/robots.txt,
-    src/routes/+layout.server.ts:21
+20. **Add a response-header `Handle`, flip robots.txt, then enable CSP — LANDED.**
+    `handleSecurityHeaders` is first in `sequence(...)` and sets `Referrer-Policy`,
+    `X-Content-Type-Options: nosniff` and `X-Robots-Tag: noindex` on every response that comes back
+    through `resolve`, plus `Cache-Control: private, no-store` on `text/html` alone. robots.txt is
+    `Disallow: /`, app.html's pre-paint script carries `nonce="%sveltekit.nonce%"`, and
+    `kit.csp.directives` is live in `mode: 'auto'`. The architecture is in AGENTS.md under "The
+    response headers and the CSP" and is deliberately not restated here.
+    **The one thing worth carrying forward is what this item got WRONG.** It specified
+    `Referrer-Policy`, and the value that reads strongest — `no-referrer` — silently 403s the whole
+    admin area: appending a request's `Origin` header is referrer-policy-dependent for a non-CORS
+    non-GET request, so under `no-referrer` a form POST sends `Origin: null`, kit compares that
+    against `url.origin` and answers `Cross-site POST form submissions are forbidden`. Measured with
+    curl (403 with `Origin: null`, 200 with the real origin) and caught by the four admin e2e cases
+    — which only ran against the real artifact because **#28 landed in the same change**. It is
+    `same-origin` now: identical cross-origin leakage, and the same-origin case left alone.
+    Two accommodations the item predicted were both required and both correct: the nonce on the
+    pre-paint script, and `'style-src-attr': ['unsafe-inline']` for the `--span`, scenery and swatch
+    style ATTRIBUTES. Two it did not predict: `img-src` and `form-action` have to allow `http:` and
+    `https:` wholesale, because icon hosts and the `BoxSearch` engine come out of a `config.json`
+    read from disk at runtime and no build-time list can enumerate them.
+    _Known gap, deliberate:_ `handleAdmin` throws its 404 and its 303 above this handle, so those
+    two responses carry none of the headers. Closing it means a second mechanism for one 404.
 
-21. **Fix the page's accessibility skeleton and land one axe e2e audit** — `M`
-    In +layout.svelte: move `<header>` (:118) out of `<main>` (:112, closing :238) so it maps to
-    `banner` instead of `generic` — the IntersectionObserver sentinel at :113 must move with it and
-    the header currently inherits `main`'s `p-page-sm md:p-page-md xl:p-page` ramp. Then add
-    `@axe-core/playwright` and one `e2e/is-accessible.e2e.ts` scanning `/`, `/services`, `/nope` in
-    both locales and with `colorScheme: 'dark'` (the `test.use` pattern exists at
-    e2e/can-change-theme.e2e.ts:32-33).
-    _All three component-level violations landed in the zenith parity pass_ (verified 2026-08-04),
-    once the storybook a11y gate went to `test: 'error'` and every component got a story to run axe
-    against: `heading-order` (grid.svelte's subTitle was h5 under an h3 — now h4 at
-    grid.svelte:41, under the h3 at :34), `link-name` (box-stats.svelte's anchor was empty
-    whenever `stats` was undefined, so its accessible name was `""`; it now carries an
-    unconditional `aria-label={m.stats_open({ provider, host })}`, which also replaces the
-    four-readings-run-together name in the populated case), and the status dot's `aria-label` on a
-    role-less `<span>`, which was ignored outright until the `role="img"` now at
-    box-service.svelte:73.
-    _The nav and `<title>` halves landed in the design pass_ (verified 2026-08-05): the page links
-    sit in a `<nav>` (+layout.svelte:140) with `aria-current="page"` (:144) off `page` from
-    `$app/state`, and `<svelte:head>` (:88-91) composes the title from the configured page name
-    plus `m.app_title()` (:89). That closes `document-title` **for the app but not for the gate** —
-    the title lives in the root layout, which no component story mounts, so axe in storybook still
-    cannot see it and only the e2e audit above can.
-    **What is left is what no component story can reach:** the `banner` landmark, the title (e2e
-    only, above), and the residual dot defect, which is WCAG 1.4.1 colour-only information rather
-    than a missing name: it wants a non-colour cue, not another ARIA change.
-    _Zenith's nav half is what was ported_ — its `<nav>` wrapper and its
-    `aria-current={isActive(link.href) ? 'page' : undefined}`, compared here against
-    `page.url.pathname`. Zenith has no `banner` landmark either — its `<nav>` also
-    sits inside `<main>` — and its `<title>` comes from an 89-line `seo-head.svelte` built on
-    canonical/hreflang/OG/JSON-LD and a `PUBLIC_SITE_URL`, which is the wrong shape for a noindex
-    private dashboard. Do adopt the one idea zenith's `scripts/` teaches — both its contrast tools
-    parse the theme catalogue rather than hardcoding a theme list, "because a hand-copied list
-    silently stops covering new themes" — but apply it narrowly: parameterize **`color-contrast`
-    only** over the 27-entry catalogue via the theme cookie and leave the other axe rules on one
-    theme. Unqualified, the loop is 27 × 3 paths × 2 locales = 162 axe runs against an item scoped
-    at 6. Don't create a `scripts/` directory for it: zenith's `ink-contrast.mjs` measures
-    `bg-<state> text-<state>-ink` over 9 fills and we have no `-ink` token, and its
-    `hover-contrast.mjs` drives a shadcn button story we have no equivalent of.
-    _Files:_ src/routes/+layout.svelte:112-118 (the `banner` move; its `<nav>` and `<title>` are
-    done), src/lib/presentation/components/box-service.svelte:72-80 (the non-colour cue),
-    e2e/is-accessible.e2e.ts (new), e2e/can-navigate-between-pages.e2e.ts.
-    grid.svelte, box-stats.svelte and grid.svelte.spec.ts are off this list — their half landed.
+21. **Fix the page's accessibility skeleton and land one axe e2e audit — LANDED.**
+    `<header>` is now a SIBLING of `<main>` and maps to `banner`: the old `<main>` became a plain
+    `page-shell` div that keeps the padding ramp, the `min-h-screen` and the tall sticky ancestor
+    the header needs, and the content-grid div it used to wrap became `<main>`. `@axe-core/playwright`
+    and `e2e/is-accessible.e2e.ts` ship: 3 paths × 2 locales, one dark run, one landmark assertion,
+    and `color-contrast` over all 27 catalogue entries by theme cookie. The status dot gained a
+    silhouette — filled disc / rotated square / hollow outline — so it is no longer colour alone.
+    **Three things this item's own plan would have shipped broken, all measured:**
+    1. **`.withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa'])` excludes the entire subject.**
+       Against the installed axe-core, `landmark-one-main`, `landmark-banner-is-top-level`,
+       `landmark-unique`, `region` and `heading-order` are tagged `cat.semantics,best-practice` and
+       nothing else — only `document-title`, `color-contrast` and `link-name` carry a wcag tag. The
+       audit is `best-practice` too now, or it cannot go red on the landmarks it was added for.
+    2. **Axe cannot fence the banner move at all**, even with those rules on: no rule requires a page
+       to HAVE a banner, and `<main>` wrapping everything satisfies `region`. Verified by putting the
+       header back inside main — the whole audit stayed green. Hence the explicit
+       `getByRole('banner')` test, which does fail on the old markup.
+    3. **The 27-theme contrast loop is vacuous on most of the catalogue.** Axe cannot compute a ratio
+       against a photograph, so every theme painting a `--background-image` returns 21 nodes
+       `incomplete`, 0 passes and 0 violations — measured; `solid-light` gets 19 real passes. The
+       loop keeps its assertion but now also requires real passes wherever the theme paints no
+       backdrop, so the quiet ones cannot read as checks they are not.
+       _And one silent regression the move caused:_ `themes.css` nested
+       `.glass-dark main { background-color: rgba(0,0,0,0.2) }` — a scrim that spanned the page only
+       because `<main>` did. It targets `.page-shell` now; left on `main` it painted a dark band behind
+       the content grid alone.
+       _Still open, and not this item's:_ the WCAG 1.4.1 dot defect is closed, but nothing fences the
+       CSP nonce, and `document-title` remains invisible to the storybook gate by construction.
 
 ## Architecture & extensibility
 
-22. **Close the config→DOM prop spread and make the seam actually fail on a mismatch** — `M`
-    AGENTS.md rests the "business owns the config format" decision on `{...container.props}`
-    (config-container.svelte:39-47) erroring when a component prop stops matching the schema.
-    Measured: it does not. Three parts: (a) drop `& HTMLAnchorAttributes` /
-    `& HTMLAttributes<HTMLDivElement>` and remove the `{...restProps}` pass-throughs from the **six**
-    components that carry them — box-service.svelte:18,30, box-stats.svelte,
-    box-date.svelte:22,37, grid.svelte:17,21, plus dropdown.svelte:15,18 and sub-grid.svelte:6,10;
-    `sub-grid` re-uses `grid`'s `Props`, so dropping grid's `& HTMLAttributes` ripples into it.
-    **`dropdown`'s pass-through is the one exception — it is LIVE, not dead** (corrected 2026-08-14;
-    the earlier note cited +layout.svelte:103/:153, lines that no longer exist): both call sites,
-    +layout.svelte:169 and :216, pass `class="flex-1 @2xl/header:flex-none"`, `class` is not
-    destructured at dropdown.svelte:15, and it is read at :21 via `restProps.class`. Deleting it drops
-    the header menus' flex sizing. Give it a declared `class` prop rather than removing the seam —
-    verify the rest with svelte-check at 0; (b) add an allowlist of schema-declared prop
-    keys next to `requiredProps` (a `Record<ContainerName, readonly string[]>`, same compile-time
-    completeness) and warn on unknown keys, reusing the `STYLE_KEYS` phrasing at config.ts:156; (c) add
-    the check the spread cannot give you — an
-    `Equals<ConfigContainer<'BoxService'>['props'], Omit<ComponentProps<typeof BoxService>, 'isOnline'>>`
-    assertion in a spec. While in config.ts, derive the two hand-written nesting lists:
-    `type NestingName = Extract<Container, { props: { items: Container[] } }>['name']`,
-    `CONTAINS_CHILDREN: Record<NestingName, true>` (config.ts:129 is a plain `ContainerName[]`), and
-    `isGrid` (config.ts:81-83) off that record.
-    _Payoff:_ measured — renaming BoxService's `title: string` to `heading?: string` with a default
-    keeps svelte-check at 0 errors and silently turns config's `title` into the `<a>` tooltip while
-    every service box renders an empty heading (a _required_-prop rename does error, so this is the
-    one escape). Independently, config.json currently injects arbitrary global HTML attributes
-    (`title`, `id`, `hidden`, `tabindex`, `data-*`) onto real DOM nodes because props stays
-    `Record<string, unknown>` (config.ts:149,186) and only `class`/`gridClass` are stripped — and a
-    misspelled _optional_ prop (`spann: 6`, `subTitel`) renders wrong with no diagnostic. Adding a
-    third nesting container today gets 2 of 4 compile prompts; `CONTAINS_CHILDREN` and `isGrid` are the
-    two silent ones, and missing them means children are never normalized (a BoxService without `img`
-    then 500s SSR) and `collectServiceProbes` skips the subtree. Verified: the derived
-    `Record<NestingName, true>` errors TS2741 where the array form compiles silently. Not an
-    injection vector — Svelte's SSR renderer skips `on*` attributes.
-    _Files:_ src/lib/presentation/components/{box-service,box-stats,box-date,grid}.svelte,
-    src/lib/business/model/config.ts:81-83,112-129,149-186, src/lib/business/model/config.spec.ts
+22. **Close the config→DOM prop spread and make the seam fail on a mismatch — LANDED.**
+    (a) The `& HTMLAnchorAttributes` / `& HTMLAttributes<HTMLDivElement>` intersections and their
+    `{...restProps}` pass-throughs are off `box-service`, `box-date`, `grid` and `dropdown`;
+    `sub-grid` needed no edit, because it re-uses grid's now-closed `Props` and its spread forwards
+    only declared props. `box-stats` already had neither. **The item's count of six was wrong in both
+    directions:** `dropdown`'s was live, as the item's own 2026-08-14 correction said, but it did not
+    need the seam — `Props` already declared `class`, so destructuring it was the whole fix.
+    (b) Unknown props are now dropped with a warning, and the allowlist is **derived** — the walk
+    reads `containerSchemas[name].entries`, the same structural view `containerFields` already uses,
+    rather than the hand-written `Record<ContainerName, readonly string[]>` the item asked for. A
+    table restating shapes the schema carries is the `requiredProps` duplicate that was deleted once
+    already. `items` needs no special case: it is IN `gridProps`, so it is declared for Grid and
+    SubGrid and unknown everywhere else.
+    (b2) `CONTAINS_CHILDREN` is `Record<NestingName, true>` off
+    `Extract<ConfigContainer, { props: { items: ConfigContainer[] } }>`, and `isGrid` reads it with
+    `Object.hasOwn`. An incomplete record is TS2741 where the array was just shorter.
+    (c) The `Equals<>` assertion lives in `src/lib/presentation/components/config-container.spec.ts`,
+    NOT in `config.spec.ts` as the item proposed: business importing `ComponentProps` is the upward
+    crossing eslint blocks, so presentation is the only side that may name both layers. It compares
+    against the WRAPPERS for BoxService and BoxStats, because those are what the seam actually
+    spreads into. Verified the way the item asked — performing the measured escape (`title: string`
+    → `heading?: string` with a default) fires it at :55.
+    _One consequence for operators:_ a `config.json` carrying a stray key now produces a warning, and
+    refuse-on-warnings means `/admin` declines the save and hands over the raw editor. That is the
+    designed repair path, but it is a live change for anyone whose file has one.
+    _Noticed, not fixed:_ `SubGrid` shares `gridProps`, so the schema declares `title`, the generated
+    form offers the field, and `sub-grid.svelte` then overrides it to `undefined` on purpose. That is
+    a pre-existing seam wart, not this change's.
 
 23. **Give config loading a return channel — LANDED.** `normalizeConfig` returns
     `{ config, warnings }`, `readConfig` returns `{ config, warnings, error, mtimeMs, isFresh }`,
@@ -622,61 +594,36 @@ distributed guess, which no per-address counter addresses and which a long token
 
 ## Ops & DX
 
-27. **Ship a production invocation that actually loads `.env`** — `S`
-    README's production path is a bare `node build` (README.md:30-31), but adapter-node reads only
-    `process.env` (build/env.js; `grep -c dotenv build/index.js` = 0) — so every
-    `DASHBOARD_SECRET_<NAME>` and `DASHBOARD_CONFIG` are silently absent in production while
-    working in dev. Document `node --env-file=.env build`, an **absolute** `DASHBOARD_CONFIG`
-    (src/lib/data/config.ts:16 resolves from the process CWD at module scope, which README.md:31
-    notes without connecting it to the variable), and a systemd unit (`EnvironmentFile=`,
-    `WorkingDirectory=`) or compose file with the config bind-mounted — neither `deploy/` nor a
-    compose file exists yet.
-    _The credential half of this item is DONE, and its old text is not:_ it asked for the two
-    AdGuard variables to be named in README. They no longer exist — #33 replaced them with the
-    per-instance `DASHBOARD_SECRET_<NAME>` scheme, and README now carries a whole "Stats
-    providers" section: the naming rule, the provider table, both degradations (a named variable
-    left unset is an absence — skipped, warned once in `[...slug]/+page.server.ts`'s `planReads`,
-    never toasted; unreachable or refused logs and toasts) and the 3s bound, which is now minted
-    in `business/model/stats.ts` rather than per repository. Do not re-add any of that here; what
-    is left is the invocation and the deploy files.
-    _The `engines` half landed_ (verified 2026-08-04): package.json:6-8 declares `"node": ">=22"`,
-    so `.npmrc`'s `engine-strict=true` is no longer inert, and README.md:11-12 documents that an
-    older node fails `npm install` outright rather than warning. That also retires this item's
-    "(Node ≥20.6)" qualifier on `--env-file` — the flag is guaranteed present at the version the
-    package now enforces, so the README does not have to caveat it.
-    _Prevents:_ measured before #33 renamed the variables — `node ./build` with a populated `.env`
-    logged the skip line and answered in 33ms, while `node --env-file=.env build` resolved the
-    credentials and took 2.98s attempting the fetch. The variable names have changed; the
-    invocation defect has not. `config.json`
-    is now gitignored rather than pointed at with `DASHBOARD_CONFIG`, so the variable matters most
-    for a bind-mounted deployment — which is exactly the invocation this item documents.
-    _Files:_ README.md:20-32, .env.example (replaced by hand — see #36),
-    deploy/revie-dashboard.service or compose.yaml (new). package.json is off this list — its
-    `engines` half landed.
+27. **Ship a production invocation that actually loads `.env` — LANDED.**
+    README's production path is `node --env-file=.env build`, with the reason stated in place: only
+    `npm run dev` reads `.env` — through vite — and nothing in the build output does, so a bare
+    `node build` starts cleanly with every `DASHBOARD_SECRET_<NAME>`, `DASHBOARD_ADMIN_TOKEN` and
+    `DASHBOARD_CONFIG` silently unset. `engines` is `>=22`, so the flag needs no version caveat.
+    `DASHBOARD_CONFIG` is documented as needing to be ABSOLUTE under a service manager, since
+    `./config.json` resolves against the process working directory.
+    **Only the systemd unit shipped, and that is a measured decision, not a shortcut.**
+    [deploy/revie-dashboard.service](deploy/revie-dashboard.service) uses `EnvironmentFile=` rather
+    than `--env-file` — one env mechanism per invocation, not two — plus `WorkingDirectory=`, an
+    absolute `DASHBOARD_CONFIG` and `ORIGIN`. There is no compose file because the adapter-node
+    output is **not standalone**: `build/server/chunks/*.js` import `svelte` and `@sveltejs/kit` as
+    bare specifiers and both are `devDependencies`, so `npm ci --omit=dev` breaks the artifact and a
+    container needs an image built from the repo. Verified against the on-disk build. A compose file
+    is therefore a Dockerfile item of its own, and it would have to ship `build/` plus the FULL
+    `node_modules`.
 
-28. **Point Playwright's `webServer` at the shipped artifact** — `S`
-    _The CI half of this item landed in the zenith parity pass_ —
-    [.github/workflows/ci.yml](.github/workflows/ci.yml) now runs `npm run check`, `npm run lint`
-    (which chains `lint:deps`), `npm run test:unit -- --run` and `npm run test:e2e`, with
-    `npx playwright install --with-deps chromium` and an `actions/cache@v4` on
-    `~/.cache/ms-playwright` keyed by the resolved Playwright version, plus
-    `permissions: contents: read` and a concurrency block with `cancel-in-progress` on non-main.
-    zenith's `depcheck` step and chromatic job were dropped as planned.
-    **What is left:** change playwright.config.ts:15 from `npm run build && npm run preview`
-    (i.e. `vite preview`) to `node build` with an explicit `PORT=4173` and the existing
-    `DASHBOARD_CONFIG: 'e2e/fixture-config.json'`.
-    _Payoff:_ everything under build/ — the artifact that ships — is exercised by nothing: the
-    Playwright command builds it and throws it away, then tests `vite preview` instead. That
-    runtime split (own CWD/env resolution at src/lib/data/config.ts:16, ORIGIN-derived CSRF check
-    that the `POST /api/ping` tests at e2e/can-see-service-status.e2e.ts:23-49 depend on,
-    sirv/compression instead of Vite) is structurally why the `.env` divergence in #27 went
-    unnoticed; assert the ping POST still behaves under it. It also means CI's only build is the
-    one the e2e webServer performs, so a broken `node build` is still nobody's failure.
-    Optional: fail on a `npm run depgraph` diff (needs graphviz `dot`) — the committed
-    dependency-graph.svg is **not** currently stale (68e35c9 is the last commit touching both it
-    and src/). Deliberately not done: graphviz output is not stable across `dot` versions, so a
-    runner upgrade would fail unrelated PRs.
-    _Files:_ playwright.config.ts:14-23
+28. **Point Playwright's `webServer` at the shipped artifact — LANDED.**
+    `webServer.command` is `npm run build && node build`, with `HOST` / `PORT` derived from the one
+    `previewUrl` literal so the IPv4 pinning stays in a single place, and `ORIGIN: previewUrl`.
+    **`ORIGIN` is the half the item did not mention and the suite does not start without it:**
+    adapter-node's `get_origin` defaults the protocol to `https` when `PROTOCOL_HEADER` is unset and
+    never consults the socket, so every POST form gets kit's 403. It is also what made this item pay
+    for itself immediately — pointing the suite at the real artifact is what exposed #20's
+    `Referrer-Policy: no-referrer` 403ing the admin area, a defect `vite preview` could not have
+    shown because it runs no such check. `DASHBOARD_CONFIG` stays relative on purpose: `node build`
+    runs from the repo root, and that resolution is now itself under test.
+    _Deliberately not done, as the item allowed:_ the `npm run depgraph` diff gate — graphviz output
+    is not stable across `dot` versions, so a runner upgrade would fail unrelated PRs.
+    _Left behind:_ `npm run preview` now has no caller in the repo.
 
 29. **Add two drift-fence node specs: the four hand-mirrored invariants, and doc links** — `M`
     One spec reading the real files with `node:fs` (the `server` project at vite.config.ts:35-43 is
@@ -789,7 +736,15 @@ The order that matters, beyond the group ranking:
   nothing — and one of them, "cookie beats the SSR seed", had to be rewritten as the
   payload-seeding case because #9 removed the path it was asserting. #30's remaining gap
   (no setter writes a cookie in any test) is recorded on the item.
-- **#21 still needs its own axe pass**, even though the storybook gate now runs. `addon-a11y` globs
-  every story (.storybook/main.ts:4) at `test: 'error'`, but landmarks, heading order across the
-  config recursion, `document-title` and the 27 theme palettes only exist on the composed,
-  server-rendered page — which only the axe e2e audit sees.
+- ~~**#21 still needs its own axe pass**~~ — landed, and the reasoning held exactly: the storybook
+  gate globs every story at `test: 'error'`, but landmarks, heading order across the config
+  recursion, `document-title` and the theme palettes only exist on the composed, server-rendered
+  page. What the bullet could not have known is that the e2e audit does not see all of them either
+  — axe cannot require a `banner` to exist, and it cannot measure contrast over a backdrop image.
+  #21 records both, and both are why that file carries assertions beside the audit.
+- ~~**#28 before #20**~~ — not planned, but that is the order that mattered, and it is why both
+  landed together. #28 points the suite at `node build`, which is the only runtime with kit's
+  origin-derived CSRF check; #20's `Referrer-Policy` decides whether a form POST carries an `Origin`
+  at all. Under `vite preview` the two never meet, so `no-referrer` would have shipped green and
+  broken every admin sign-in in production. A header change and the harness change are the same
+  review from now on.

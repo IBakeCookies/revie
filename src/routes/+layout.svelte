@@ -101,15 +101,22 @@
 	<div class="theme-helper-4"></div>
 </div>
 
-<!-- No backdrop-blur on <main> or on the content wrapper below: a blurred
+<!-- No backdrop-blur on this wrapper or on the <main> below: a blurred
      full-width rectangle averages the scenery inside it to a flat wash, and on
      the line-art themes (meridian, city-windows, orbit) that erases the art
      exactly where the page covers it. Each translucent surface blurs its own
      footprint instead, so the gaps between cards keep the scenery crisp. -->
+<!-- A plain div rather than <main>, so <header> is main's SIBLING and maps to `banner`
+     instead of `generic`. It also has to be this element that carries min-h-screen: a
+     sticky child can only travel inside its parent's box, so a wrapper the header's own
+     height would give it nowhere to stick to.
+     `page-shell` is a hook for themes.css, not a utility: it names the element that
+     spans the page, which is what a theme wanting to lay a scrim over its own backdrop
+     has to target. That used to be `<main>` and is not any more. -->
 <!-- The page padding runs the responsive ramp the --spacer-page-* tokens were added
      for and nothing used: one flat 24px spent 12% of a 390px phone's width before a
      card's own padding even started, and left a desktop tighter than its cards. -->
-<main class="flex min-h-screen flex-col p-page-sm md:p-page-md xl:p-page">
+<div class="page-shell flex min-h-screen flex-col p-page-sm md:p-page-md xl:p-page">
 	<div bind:this={sentinel}></div>
 
 	<!-- `@container/header`, and every reflow below queries it rather than the viewport:
@@ -252,11 +259,11 @@
 		</div>
 	</header>
 
-	<div class="mx-auto mt-grid-lg grid w-full max-w-screen-2xl grid-cols-12 gap-grid-lg">
+	<main class="mx-auto mt-grid-lg grid w-full max-w-screen-2xl grid-cols-12 gap-grid-lg">
 		{@render children()}
-	</div>
-</main>
+	</main>
+</div>
 
-<!-- Outside <main>: the region is fixed to the viewport, so main's padding ramp and
-     its 12-column grid have nothing to say about it. -->
+<!-- Outside the page wrapper: the region is fixed to the viewport, so the padding ramp
+     and main's 12-column grid have nothing to say about it. -->
 <Toasts messages={toasts.messages} ondismiss={(message) => toasts.dismiss(message)} />

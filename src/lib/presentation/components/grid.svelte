@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { HTMLAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
 	import type { ConfigContainer } from '$lib/business/model/config';
 	import ConfigContainerView from '$lib/presentation/components/config-container.svelte';
@@ -22,17 +21,24 @@
 		span?: number;
 		gridClass?: ClassValue;
 		class?: ClassValue;
-	} & HTMLAttributes<HTMLDivElement>;
+	};
 
-	let { title, subTitle, items, headingLevel = 2, span, gridClass, ...restProps }: Props = $props();
+	let {
+		title,
+		subTitle,
+		items,
+		headingLevel = 2,
+		span,
+		gridClass,
+		class: className,
+	}: Props = $props();
 </script>
 
 <div
-	{...restProps}
 	style={spanStyle(span)}
 	class={cn(
 		'@container/grid bg-(--box-surface,var(--surface-card)) border-line-strong shadow-card col-span-12 rounded-2xl border p-box-xl backdrop-blur xl:col-span-(--span)',
-		restProps.class,
+		className,
 	)}
 >
 	<!-- The gap below the headings belongs to the headings, not to the items grid: a

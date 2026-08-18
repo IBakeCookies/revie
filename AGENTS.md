@@ -115,7 +115,16 @@ prop on a component silently changed the file format with no error anywhere. Now
 presentation has to satisfy the schema, and the mismatch surfaces at the
 `{...container.props}` spread in
 [config-container.svelte](src/lib/presentation/components/config-container.svelte) —
-the one place the two layers meet. Its `{:else}` branch is a `never` assertion, so
+the one place the two layers meet — but only since #22 took the `& HTMLAnchorAttributes` /
+`& HTMLAttributes` intersections off the components, which had been swallowing every mismatch.
+The spread still cannot catch one escape, because TypeScript does not excess-property-check a
+spread of a typed VALUE: renaming a REQUIRED prop errors, renaming it to an OPTIONAL one with a
+default does not. That is what
+[config-container.spec.ts](src/lib/presentation/components/config-container.spec.ts) fences, with
+an `Equals<>` per container against the WRAPPERS the seam actually spreads into. It lives in
+presentation because business importing `ComponentProps` is the upward crossing eslint blocks, and
+it is a plain `*.spec.ts` — no DOM, the component imports are types and are erased — so it does not
+join the two `*.svelte.spec.ts` files the convention below counts. Its `{:else}` branch is a `never` assertion, so
 adding a container to the schema without a renderer fails to compile.
 
 **Config is the carve-out: it stays props, not a store.** `containers` isn't ambient
@@ -686,7 +695,7 @@ through `writeConfig` — see "Config-driven rendering" for both halves.
 ```
 DASHBOARD_ADMIN_TOKEN ─→ business/model/admin-auth.ts    every decision, owns no cookie name
                       ─→ data/repository/admin-session-repository.ts   the cookie name + attributes
-                      ─→ hooks.server.ts   handleAdmin, second in the sequence
+                      ─→ hooks.server.ts   handleAdmin, third in the sequence
 ```
 
 The same repository/business split the appearance pipeline uses, for the same reason. Five
@@ -770,6 +779,53 @@ anyway, because kit answers 403 `Cross-site POST form submissions are forbidden`
 request origin against a `url.origin` adapter-node guessed as `https`. `ORIGIN` closes that 403
 and nothing else: the successful response still carries `Secure` on `adminSession`.
 
+### The response headers and the CSP
+
+One `Handle` sets four headers, `svelte.config.js` declares the policy, and `app.html` carries a
+nonce. It is small; three things about it are decisions, and one is a trap that looks like
+hardening.
+
+```
+handleSecurityHeaders ─→ FIRST in sequence(), so it wraps the other four handles
+                      ─→ Referrer-Policy, X-Content-Type-Options, X-Robots-Tag on everything
+                      ─→ Cache-Control: private, no-store on text/html ALONE
+kit.csp.directives    ─→ mode 'auto' — nothing prerenders, so it resolves to nonces
+src/app.html          ─→ <script nonce="%sveltekit.nonce%"> on the pre-paint script
+```
+
+- **`Referrer-Policy` is `same-origin`, and `no-referrer` is the version that breaks the admin
+  area.** This is the one to read before "strengthening" it. Appending a request's `Origin` header
+  is referrer-policy-dependent for a non-CORS request that is not a `GET` (fetch spec, "append a
+  request `Origin` header"): under `no-referrer` the origin is serialized as `null`
+  **unconditionally**, under `same-origin` only when the request really is cross-origin. A form
+  POST is a navigation, so `no-referrer` sends `Origin: null`, kit compares it against `url.origin`
+  and answers 403 `Cross-site POST form submissions are forbidden` — every sign-in and every config
+  save. Measured with curl: 403 with `Origin: null`, 200 with the real origin. Cross-origin leakage
+  is identical under both values, which is the whole reason the weaker-sounding one is correct:
+  the icon CDNs get no `Referer` either way. The fence is the four admin cases in
+  [can-sign-in-as-admin.e2e.ts](e2e/can-sign-in-as-admin.e2e.ts) and
+  [can-edit-the-config.e2e.ts](e2e/can-edit-the-config.e2e.ts) — **and they only fence it because
+  the suite runs against `node build`**, which is the only runtime carrying kit's origin check.
+  Under `vite preview` this shipped green. A header change and the e2e harness are one review.
+- **`Cache-Control` is gated on `text/html`, and the gate is the point.** `GET /` returns German or
+  English purely on the `PARAGLIDE_LOCALE` cookie, plus a cookie-derived theme class and
+  scenery-paused class, with no `Vary` on it — so a shared cache is the failure. Unconditional, the
+  same header would throw away the year-long `max-age` on the hashed assets under
+  `/_app/immutable/`, and kit already sets `private, no-store` on `__data.json` itself.
+- **Three directives are deliberately wide, and no build-time list can narrow them.** `img-src` and
+  `form-action` allow `http:` and `https:` wholesale because icon hosts and the `BoxSearch` engine
+  come out of `config.json`, which is **read from disk at runtime** — the same fact the Tailwind
+  invariant rests on. `style-src-attr: 'unsafe-inline'` is required because computed values ride in
+  style ATTRIBUTES (`--span`, the scenery vars, the generated theme swatches) and kit's own nonced
+  `<style>` nullifies `'unsafe-inline'` in `style-src`. `script-src` is spelled out rather than left
+  to `default-src` so kit has an explicit directive to hang the nonce on.
+- **The handle is first, so `handleAdmin`'s thrown 404 and its 303 carry none of these headers** —
+  they are produced above it. Known, accepted, and not worth a second mechanism for one 404.
+- **Nothing fences the nonce.** Remove it from `app.html` and CSP blocks the pre-paint script, so a
+  first visit on a dark-preferring OS gets a light flash — invisible to every test in the repo.
+  `npm run dev` is not a check either: kit nonces vite's injected scripts too, so dev is green
+  whatever `app.html` says.
+
 ## Invariants
 
 Things that break **silently** — no error, just wrong output.
@@ -779,7 +835,9 @@ Things that break **silently** — no error, just wrong output.
   nothing at all. Column width goes through `span` (1–12) → a `--span` custom property →
   the static `xl:col-span-(--span)` utility. Anything new that must be configurable follows
   the same shape: a named token in config, mapped to literal classes in the component.
-  `normalizeConfig` strips `class` / `gridClass` from config and warns.
+  `normalizeConfig` strips `class` / `gridClass` from config and warns — and since #22 it
+  strips and warns about EVERY key the container's schema does not declare, so a stray
+  `title` or `data-*` can no longer ride the spread onto a real DOM node.
 - `spanStyle()` must always emit `--span`. An unset custom property makes `grid-column`
   invalid at computed-value time, which drops the whole declaration.
 - **A `@container/name` element is a query container for its DESCENDANTS, never for itself.**
@@ -896,6 +954,20 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   `oklch(0.91 …)` against a `0.995` card — a drop so deep it fell **past the page** (`0.96`) and
   read as a hole; it is `0.955` now, a step of `0.04` that matches what a `0 0 0 / 0.05` veil
   does on the light glass themes.
+- **`<main>` is the CONTENT GRID, not the page — the page is `.page-shell`, and a theme that wants
+  to paint the page has to say so.** `<header>` has to be a sibling of `<main>` to map to `banner`
+  rather than `generic`, so the page-spanning element is a plain wrapper div carrying the padding
+  ramp, `min-h-screen` and — load-bearing — the tall ancestor the sticky header needs, since a
+  sticky element can only travel inside its parent's box. `.page-shell` is a hook for
+  [themes.css](src/lib/presentation/style/themes.css), not a utility, and it is the one element
+  selector in the whole style directory. It exists because `glass-dark` nests
+  `main { background-color: rgba(0,0,0,0.2) }` — a scrim that "tames the texture", and that spanned
+  the page only for as long as `<main>` did. Measured at 1280×720 while it still said `main`: the
+  scrim computed over a 1216×494 box instead of the full 1280×720, so the sticky header, the page
+  margins and everything below the last card lost their 20% black and the header's `backdrop-blur`
+  sampled the undarkened photograph. Nothing failed; it just looked wrong on one theme in 27. A new
+  theme wanting a page-wide wash targets `.page-shell`, and a paste from zenith that says `main`
+  has to be changed on the way in, the way `fallow` gets dropped.
 - **A heading level is depth, so the container declares it — the same shape as `--box-surface`.**
   `headingLevel?: 2 | 3` on `box-service` and `grid`, threaded through `config-container`; `grid`
   hands its items `3` when it drew a heading of its own and `2` when it did not, on the same
@@ -905,6 +977,8 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   correctly sat under that card's `h2`. Same for a top-level `SubGrid`'s label, which is its only
   heading. Size stays a class, so nothing moves visually. The storybook a11y gate cannot catch this
   class of defect at all: no story mounts the layout, so axe never sees the `h1` being skipped from.
+  [is-accessible.e2e.ts](e2e/is-accessible.e2e.ts) is what does — but only because its tag list
+  carries `best-practice`, since `heading-order` is tagged that and nothing else.
 - **A theme lives in three hand-edited places**, plus optionally a fourth:
   1. the `ThemeName` union **and** the `themes` catalogue in
      [theme.ts](src/lib/business/model/theme.ts) — 27 entries. Union → catalogue is the one
@@ -1021,13 +1095,29 @@ measured baseline rather than invented.
 `presentation/components/` has a `*.stories.svelte` beside it whose `play` functions assert
 real behaviour — they run in chromium as part of `npm run test:unit`, so a broken component
 fails the suite, not just the storybook UI. **The a11y addon is at `test: 'error'`, so axe runs
-against every story and a violation fails `npm run test:unit`.** Keep it there — it is the only
-automated a11y gate in the repo, and it earned its place immediately: turning it on surfaced a
+against every story and a violation fails `npm run test:unit`.** Keep it there — it is one of the
+repo's two automated a11y gates ([is-accessible.e2e.ts](e2e/is-accessible.e2e.ts) is the other,
+and the two see disjoint things), and it earned its place immediately: turning it on surfaced a
 `link-name` violation no one had reported (box-stats' anchor is empty whenever `stats` is
 undefined, so it sat in the tab order announcing nothing). Note axe only ever sees a story's
 **rest** state, so the states worth an a11y check have to exist as their own stories rather than
-being reached inside a `play` function. The one violation it cannot catch is `document-title`
-([roadmap.md](roadmap.md) #21) — the `<title>` lives in the root layout, which no story mounts.
+being reached inside a `play` function. The one violation it cannot catch is `document-title` —
+the `<title>` lives in the root layout, which no story mounts, so only the e2e audit sees it.
+
+**The e2e axe audit has two limits of its own, both measured, and both are why that file carries
+plain assertions beside the audit.** First, **axe cannot require a landmark to EXIST**:
+`landmark-banner-is-top-level` only checks a banner that is already there, and `region` is
+satisfied by any landmark at all — so the pre-#21 markup, with `<header>` nested inside `<main>`
+where it maps to `generic`, passes every axe rule there is. Verified by putting the header back:
+the whole audit stayed green. Hence the explicit `getByRole('banner')` test, which does fail on it.
+Second, **`color-contrast` is inert on 25 of the 27 themes**: axe's `_getBackgroundColor` bails as
+soon as the background stack holds an image or a gradient, so it returns ~23 nodes `incomplete` and
+evaluates exactly one — the toast paragraph, the only opaque surface on the page. It is not simply
+"themes with a `--background-image`"; `abyss` declares none and is still unreadable, because its
+`.theme-helper-3` scenery layer carries a radial-gradient. `solid-light` and `solid-dark` are the
+only two axe reads end to end, which is why one named theme is asserted by evaluated-node COUNT.
+Neither limit is fixable — contrast through a translucent surface over a photograph genuinely
+depends on the pixels — so what the file owes is honesty about which of its 36 tests can go red.
 
 **A `play` function's pointer rests at the canvas origin, so a story can pass without the
 interaction it names.** The storybook project drives a real pointer and it starts at (0, 0);
@@ -1061,9 +1151,11 @@ the value is arbitrary apart from the colon AdGuard's provider checks for, and t
 points at is closed either way.
 
 The host that resolves is the preview server itself, which is why
-[playwright.config.ts](playwright.config.ts) pins **IPv4 on both sides** — `--host 127.0.0.1`,
-`webServer.url`, and `use.baseURL` all spell the same literal as the fixture's `href`. Left
-unpinned, `vite preview` binds the hostname `localhost`, which resolves to `::1` wherever
+[playwright.config.ts](playwright.config.ts) pins **IPv4 on both sides** — `HOST`, `PORT`,
+`webServer.url` and `use.baseURL` all come off the one `previewUrl` literal, which is the
+fixture's `href`. (It was `--host 127.0.0.1` until #28 moved the server from `vite preview` to
+`node build`; adapter-node takes its binding from the environment and has no such flag.) Left
+unpinned, a server binds the hostname `localhost`, which resolves to `::1` wherever
 /etc/hosts maps it (GitHub's runners do) — the browser follows and the page loads, while
 `/api/ping` TCP-connects to the literal `127.0.0.1` the config names and gets ECONNREFUSED,
 so `marks a reachable service as online` failed on CI and only on CI. Measured: bind preview
@@ -1080,7 +1172,9 @@ declares `@container/<its-name>` and queries that: `box-service` (the status wor
 (stacked vs. one line), `box-stats` (2 → 3 → 4 readings), `grid` (title size), and `header`
 (when the menus stop taking a row of their own). The viewport variants left in the tree are the
 ones that genuinely mean the viewport: `xl:col-span-(--span)`, which is where the 12-column page
-grid starts honouring config's span at all, and `md:p-page-md` on `<main>`, which is the page.
+grid starts honouring config's span at all, and `md:p-page-md` on the `page-shell` wrapper,
+which is the page — it was on `<main>` until the banner landmark move took the padding ramp
+one element out.
 Read the invariant above before writing the first one — the classes go on a child.
 
 **Code.** Named exports only; a default export is for a Svelte component, or for a root
@@ -1130,9 +1224,11 @@ to justify it — if you can't name the inputs and the wrong outcome, the branch
 "defensive" is not a reason. Comments earn their length: a paragraph defending a decision
 usually means the decision is too clever. When you notice something unrelated, say it rather
 than fix it — a finding reported costs a sentence, a finding fixed costs a review and a bigger
-diff for the thing you were actually asked to do. The standing example is live: six components
-spread `{...restProps}` onto real DOM nodes for callers that don't exist
-([roadmap.md](roadmap.md) #22). Deleting code to satisfy this is progress, not lost work.
+diff for the thing you were actually asked to do. The standing example USED to be live and is now
+the proof: five components spread `{...restProps}` onto real DOM nodes for callers that did not
+exist, and #22 deleted every one of them. The count in the item was wrong in both directions —
+`dropdown`'s caller was real, and `sub-grid`'s spread targets a component rather than a DOM node,
+so it stayed. Deleting code to satisfy this is progress, not lost work.
 
 **Style.** Tabs, single quotes, trailing commas where multiline, 100 cols, and **tabWidth left
 at prettier's default 2** — [prettier.config.js](prettier.config.js) owns it. `tabWidth` is not

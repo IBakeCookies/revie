@@ -10,8 +10,8 @@
 
 	/**
 	 * Every prop this box takes, and nothing else — deliberately WITHOUT
-	 * `& HTMLAnchorAttributes` and without a `{...restProps}` pass-through, unlike the
-	 * boxes beside it (roadmap #22 is the rest of them).
+	 * `& HTMLAnchorAttributes` and without a `{...restProps}` pass-through. It was the
+	 * first box with neither; roadmap #22 took them off the rest.
 	 *
 	 * That absence is the whole guard: `config-container.svelte` spreads config's own props
 	 * in here, `secret` among them, and a rest spread would put the NAME of an environment

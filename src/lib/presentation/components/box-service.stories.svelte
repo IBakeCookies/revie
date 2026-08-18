@@ -40,7 +40,13 @@
 			}),
 		).toHaveTextContent(args.title);
 
-		await expect(canvas.getByLabelText(m.service_status_unknown())).toHaveClass('bg-ty-ghost');
+		// Hollow, not filled: the silhouette is what carries the state to a reader who
+		// cannot separate `success` from `danger`, and it is the only cue left below
+		// `@xs`, where the word is hidden.
+		await expect(canvas.getByLabelText(m.service_status_unknown())).toHaveClass(
+			'border-2',
+			'border-ty-ghost',
+		);
 
 		// Which machine a tile points at is the second thing an operator wants after
 		// the name, and it is the only way two boxes on one host tell each other apart.
@@ -90,15 +96,20 @@
 	}}
 />
 
-<!-- Reachable. The dot is the only thing that differs between the three states,
-     so it names its state in text as well as in colour. -->
+<!-- Reachable. The dot is the only thing that differs between the three states, so it
+     names its state in text, in colour AND in shape. -->
 <Story
 	name="Online"
 	args={{
 		isOnline: true,
 	}}
 	play={async ({ canvas }) => {
-		await expect(canvas.getByLabelText(m.service_status_online())).toHaveClass('bg-success');
+		// Filled disc — the third state's outline and the second's diamond are the halves
+		// of this that survive a reader who cannot tell the two colours apart.
+		await expect(canvas.getByLabelText(m.service_status_online())).toHaveClass(
+			'bg-success',
+			'rounded-full',
+		);
 
 		// The other two states must not linger — the dot is one element, not three
 		await expect(canvas.queryByLabelText(m.service_status_offline())).not.toBeInTheDocument();
@@ -114,7 +125,12 @@
 		isOnline: false,
 	}}
 	play={async ({ args, canvas }) => {
-		await expect(canvas.getByLabelText(m.service_status_offline())).toHaveClass('bg-danger');
+		// A diamond, so the one state an operator has to act on is the one silhouette
+		// nothing else on the row shares.
+		await expect(canvas.getByLabelText(m.service_status_offline())).toHaveClass(
+			'bg-danger',
+			'rotate-45',
+		);
 
 		const link = canvas.getByRole('link');
 

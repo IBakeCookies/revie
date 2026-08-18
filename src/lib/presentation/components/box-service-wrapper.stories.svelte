@@ -99,7 +99,8 @@
 		const dot = canvasElement.querySelector('[aria-label]');
 
 		await expect(dot).toHaveAttribute('aria-label', m.service_status_unknown());
-		await expect(dot).toHaveClass('bg-ty-ghost');
+		// Hollow, not filled: unknown is the one state that draws no fill at all.
+		await expect(dot).toHaveClass('border-2', 'border-ty-ghost');
 	}}
 />
 

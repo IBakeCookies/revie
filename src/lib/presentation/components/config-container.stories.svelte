@@ -196,9 +196,11 @@
 
 		// Nothing has been probed yet, so `isAlive` is null — neither up nor down. A
 		// green dot here would claim a service is reachable on no evidence.
-		const dot = canvasElement.querySelector('span.rounded-full');
+		// By role, not by a radius class: each state draws its own silhouette, so a
+		// shape-based selector only ever finds the state it was written for.
+		const dot = canvasElement.querySelector('span[role="img"]');
 
-		await expect(dot).toHaveClass('bg-ty-ghost');
+		await expect(dot).toHaveClass('border-2', 'border-ty-ghost');
 		await expect(dot).not.toHaveClass('bg-success');
 	}}
 />

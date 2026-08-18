@@ -24,7 +24,12 @@
 	/* 50% black overlay tames the texture */
 	--background-image:
 		linear-gradient(oklch(0 0 0 / 0.5), oklch(0 0 0 / 0.5)), url('/themes/glass-dark.jpg');
-	main {
+	/* `.page-shell` and NOT `main`: this is a scrim over the whole page, and `<main>`
+	   stopped being the page-spanning element when the header moved out of it to become
+	   a `banner` landmark. Left on `main` it paints a dark band behind the content grid
+	   alone — not the header, not the padding ramp — which reads as a rendering fault
+	   rather than as the texture being tamed. */
+	.page-shell {
 		background-color: rgba(0, 0, 0, 0.2);
 	}
 

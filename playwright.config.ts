@@ -11,16 +11,18 @@ const testTimeout = 60 * 1000;
 const outputDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'test-result/e2e');
 // IPv4, spelled out, and it has to match `href` on the fixture's Loopback service: that
 // service IS this server, and `/api/ping` TCP-connects to the literal address the config
-// names. `vite preview` otherwise binds the *hostname* `localhost`, which resolves to ::1
-// on a machine whose /etc/hosts maps it — GitHub's runners do — and then the browser
-// follows that resolution and loads the page while the probe gets ECONNREFUSED, so the
-// online dot goes red on CI only. `url` rather than `port` because `port` implies
-// localhost; it does not set `baseURL` the way `port` does, hence `use.baseURL` below.
+// names. Left to bind the *hostname* `localhost`, a server answers on ::1 wherever
+// /etc/hosts maps it — GitHub's runners do — and then the browser follows that resolution
+// and loads the page while the probe gets ECONNREFUSED, so the online dot goes red on CI
+// only. adapter-node has no `--host` flag, so this one literal is split into `HOST` /
+// `PORT` below. `url` rather than `port` because `port` implies localhost; it does not set
+// `baseURL` the way `port` does, hence `use.baseURL` below.
 const previewUrl = 'http://127.0.0.1:4173';
+const { hostname, port } = new URL(previewUrl);
 
 export default defineConfig({
 	webServer: {
-		command: `npm run build && npm run preview -- --host ${new URL(previewUrl).hostname}`,
+		command: 'npm run build && node build',
 		url: previewUrl,
 		timeout: serverTimeout,
 		// The dashboard renders whatever config it is pointed at, so the tests bring
@@ -38,6 +40,15 @@ export default defineConfig({
 			// closed, so the fetch fails whatever the value is; it only has to exist and
 			// to carry the colon AdGuard's provider checks for.
 			DASHBOARD_SECRET_E2E_ADGUARD: 'e2e-adguard-user:e2e-adguard-password',
+			// adapter-node takes its binding from the environment, not from a flag.
+			HOST: hostname,
+			PORT: port,
+			// Not optional: `get_origin` defaults the protocol to `https` when
+			// `PROTOCOL_HEADER` is unset and never consults the socket, so kit compares a
+			// request origin against the wrong one and answers 403 `Cross-site POST form
+			// submissions are forbidden` to every POST form — `POST /admin/login` here.
+			// Measured: 403 without it, 200 with. `vite preview` ran no such check.
+			ORIGIN: previewUrl,
 		},
 	},
 	timeout: testTimeout,

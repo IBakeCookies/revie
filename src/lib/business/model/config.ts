@@ -317,8 +317,22 @@ export function isBoxService(item: ConfigContainer): item is ConfigContainer<'Bo
 	return item.name === 'BoxService';
 }
 
-export function isGrid(item: ConfigContainer): item is ConfigContainer<'Grid' | 'SubGrid'> {
-	return item.name === 'Grid' || item.name === 'SubGrid';
+/**
+ * Which containers nest, taken from the schema's own output type rather than listed
+ * beside it. A hand-written list accepts an incomplete one: a third nesting container
+ * would compile with its children never normalized, so `collectServiceProbes` would skip
+ * the whole subtree and a BoxService with no `img` would reach SSR. The record form is
+ * what errors instead — a missing member is TS2741, where an array is just shorter.
+ */
+type NestingName = Extract<ConfigContainer, { props: { items: ConfigContainer[] } }>['name'];
+
+const CONTAINS_CHILDREN: Record<NestingName, true> = {
+	Grid: true,
+	SubGrid: true,
+};
+
+export function isGrid(item: ConfigContainer): item is ConfigContainer<NestingName> {
+	return Object.hasOwn(CONTAINS_CHILDREN, item.name);
 }
 
 export function isBoxStats(item: ConfigContainer): item is ConfigContainer<'BoxStats'> {
@@ -342,8 +356,6 @@ const STRUCTURAL_KEYS = ['items'] as const;
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-
-const CONTAINS_CHILDREN: ContainerName[] = ['Grid', 'SubGrid'];
 
 function normalizeContainer(
 	raw: unknown,
@@ -377,6 +389,23 @@ function normalizeContainer(
 		}
 	}
 
+	// Read off the schema rather than listed beside it, the same walk `containerFields`
+	// does: `props` is what this returns — `v.object` strips what it does not name, but
+	// the parse output is not what reaches the renderer — so an undeclared key is spread
+	// straight onto a real DOM node by `config-container.svelte`. That is how a config
+	// could set `title` or `data-*` on a box, and how a misspelled OPTIONAL prop (`spann`,
+	// `subTitel`) rendered wrong with nothing anywhere to say so. Dropped as well as
+	// warned about: a warning that leaves the value in place still spreads it.
+	const declared = schemaNodes[raw.name].entries ?? {};
+
+	for (const key of Object.keys(props)) {
+		if (!Object.hasOwn(declared, key)) {
+			warnings.push(`Ignoring "${key}" on container "${raw.name}", no such prop exists`);
+
+			delete props[key];
+		}
+	}
+
 	if (props.span !== undefined) {
 		const span = normalizeSpan(props.span);
 
@@ -393,7 +422,7 @@ function normalizeContainer(
 	// Set unconditionally, not just when present: every traversal (collectStatsTargets,
 	// collectServiceProbes) iterates `items`, so a grid whose children have not been
 	// written yet would throw on the first page load rather than render as empty.
-	if (CONTAINS_CHILDREN.includes(raw.name)) {
+	if (Object.hasOwn(CONTAINS_CHILDREN, raw.name)) {
 		props.items = (Array.isArray(props.items) ? props.items : [])
 			.map((child) => normalizeContainer(child, defaults, warnings))
 			.filter((item): item is ConfigContainer => item !== undefined);

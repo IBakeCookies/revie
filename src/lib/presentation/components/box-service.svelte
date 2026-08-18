@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { HTMLAnchorAttributes } from 'svelte/elements';
 	import type { ClassValue } from 'clsx';
 	import type { ProbeMode } from '$lib/business/model/config';
 	import { cn, spanStyle } from '$lib/utils/style';
@@ -30,7 +29,7 @@
 		headingLevel?: 2 | 3;
 		span?: number;
 		class?: ClassValue;
-	} & HTMLAnchorAttributes;
+	};
 
 	let {
 		isOnline = null,
@@ -40,7 +39,7 @@
 		img,
 		headingLevel = 2,
 		span,
-		...restProps
+		class: className,
 	}: Props = $props();
 
 	const statusLabel = $derived(
@@ -87,14 +86,13 @@
 </script>
 
 <a
-	{...restProps}
 	{href}
 	target="_blank"
 	rel="noreferrer"
 	style={spanStyle(span)}
 	class={cn(
 		'@container/box-service bg-(--box-surface,var(--surface-card)) border-line-soft hover:border-line-strong hover:bg-surface-hover hover:shadow-card focus-visible:ring-ring col-span-12 flex cursor-pointer items-center gap-text-sm rounded-xl border p-box-sm backdrop-blur transition focus-visible:ring-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5 xl:col-span-(--span)',
-		restProps.class,
+		className,
 	)}
 >
 	<!-- No border of its own: a bordered plate inside a bordered tile, thirteen times
@@ -160,16 +158,23 @@
 		     exists to show. `ring` draws as a shadow, so the halo costs no layout — and it
 		     is why the transition is `transition` and not `transition-colors`, which does
 		     not cover box-shadow. Every dot starts unknown and flips once its probe
-		     answers, so without it a page settling in reads as a rank of things blinking. -->
+		     answers, so without it a page settling in reads as a rank of things blinking.
+
+		     The three states differ by SILHOUETTE as well as hue — filled disc, rotated
+		     square, hollow outline — because colour alone is the whole of WCAG 1.4.1 and
+		     `success` against `danger` is the pair a red-green reader cannot separate. It
+		     has to be the dot that carries it: below `@xs` the word above is hidden, and
+		     that narrow tile is exactly the case the defect is about. The radius therefore
+		     moves into the branches — `rotate-45` on a `rounded-full` mark turns nothing. -->
 		<span
 			role="img"
 			class={[
-				'ml-auto size-2.5 shrink-0 rounded-full ring-4 transition @xs/box-service:ml-text-2xs',
+				'ml-auto size-2.5 shrink-0 ring-4 transition @xs/box-service:ml-text-2xs',
 				isOnline === true
-					? 'bg-success ring-success/20'
+					? 'bg-success ring-success/20 rounded-full'
 					: isOnline === false
-						? 'bg-danger ring-danger/20'
-						: 'bg-ty-ghost ring-ty-ghost/20',
+						? 'bg-danger ring-danger/20 rotate-45 rounded-xs'
+						: 'border-ty-ghost ring-ty-ghost/20 rounded-full border-2',
 			]}
 			aria-label={statusLabel}
 		>
