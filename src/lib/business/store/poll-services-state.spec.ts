@@ -1,7 +1,7 @@
 import type { ConfigContainer } from '$lib/business/model/config';
 import type { ServicesStore } from '$lib/business/store/service-store.svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pollServicesState } from '$lib/business/store/poll-services-state';
+import { pollServicesState, serviceProbeKey } from '$lib/business/store/poll-services-state';
 
 const POLL_INTERVAL_MS = 1000 * 60 * 15;
 
@@ -44,11 +44,19 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
+describe('serviceProbeKey', () => {
+	// The regression the key exists to stop: a re-run load hands the page a rebuilt array,
+	// and an effect tracking that array restarted the 15-minute poll on the 60s refresh.
+	it('is unchanged by a containers array that was rebuilt rather than edited', () => {
+		expect(serviceProbeKey(structuredClone(containers))).toBe(serviceProbeKey(containers));
+	});
+});
+
 describe('pollServicesState', () => {
 	it('refreshes every service href immediately', () => {
 		const store = fakeStore();
 
-		pollServicesState(store, containers);
+		pollServicesState(store, serviceProbeKey(containers));
 
 		expect(store.refresh).toHaveBeenCalledExactlyOnceWith(
 			'https://proxmox.local',
@@ -61,7 +69,7 @@ describe('pollServicesState', () => {
 
 		// Two probes of one endpoint per tick is two round trips for one answer. The
 		// dedupe lives in `collectServiceProbes`; this holds it at the seam that needs it.
-		pollServicesState(store, [...containers, ...containers]);
+		pollServicesState(store, serviceProbeKey([...containers, ...containers]));
 
 		expect(store.refresh).toHaveBeenCalledTimes(1);
 	});
@@ -69,26 +77,29 @@ describe('pollServicesState', () => {
 	it('never polls a probe:none box, which has no state to measure', () => {
 		const store = fakeStore();
 
-		pollServicesState(store, [
-			{
-				name: 'BoxService',
-				props: {
-					title: 'Bookmark',
-					href: 'https://bookmark.local',
-					img: {
-						src: '',
+		pollServicesState(
+			store,
+			serviceProbeKey([
+				{
+					name: 'BoxService',
+					props: {
+						title: 'Bookmark',
+						href: 'https://bookmark.local',
+						img: {
+							src: '',
+						},
+						probe: 'none',
 					},
-					probe: 'none',
 				},
-			},
-		]);
+			]),
+		);
 
 		expect(store.refresh).not.toHaveBeenCalled();
 	});
 
 	it('aborts the probes it started once the returned teardown runs', () => {
 		const store = fakeStore();
-		const stop = pollServicesState(store, containers);
+		const stop = pollServicesState(store, serviceProbeKey(containers));
 		const [, signal] = vi.mocked(store.refresh).mock.calls[0];
 
 		expect(signal?.aborted).toBe(false);
@@ -103,7 +114,7 @@ describe('pollServicesState', () => {
 	it('keeps refreshing on the interval', () => {
 		const store = fakeStore();
 
-		pollServicesState(store, containers);
+		pollServicesState(store, serviceProbeKey(containers));
 		vi.advanceTimersByTime(POLL_INTERVAL_MS * 2);
 
 		expect(store.refresh).toHaveBeenCalledTimes(3);
@@ -112,7 +123,7 @@ describe('pollServicesState', () => {
 	it('stops polling once the returned teardown runs', () => {
 		const store = fakeStore();
 
-		pollServicesState(store, containers)();
+		pollServicesState(store, serviceProbeKey(containers))();
 		vi.advanceTimersByTime(POLL_INTERVAL_MS * 2);
 
 		expect(store.refresh).toHaveBeenCalledTimes(1);

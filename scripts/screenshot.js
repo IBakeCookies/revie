@@ -75,10 +75,10 @@ async function startAdguardStub() {
 	};
 }
 
-/** Every BoxAdguard on every page, wherever config nests it. */
-function repointAdguard(node, origin) {
+/** Every AdGuard BoxStats on every page, wherever config nests it. */
+function repointStats(node, origin) {
 	if (Array.isArray(node)) {
-		node.forEach((item) => repointAdguard(item, origin));
+		node.forEach((item) => repointStats(item, origin));
 
 		return;
 	}
@@ -87,11 +87,11 @@ function repointAdguard(node, origin) {
 		return;
 	}
 
-	if (node.name === 'BoxAdguard' && node.props) {
+	if (node.name === 'BoxStats' && node.props?.provider === 'adguard') {
 		node.props.href = origin;
 	}
 
-	Object.values(node).forEach((value) => repointAdguard(value, origin));
+	Object.values(node).forEach((value) => repointStats(value, origin));
 }
 
 /** Polls the app until it answers, so the screenshot never races the server's startup. */
@@ -113,7 +113,7 @@ const adguard = await startAdguardStub();
 const workDir = await mkdtemp(join(tmpdir(), 'revie-screenshot-'));
 const configPath = join(workDir, 'config.json');
 const config = JSON.parse(await readFile(SOURCE_CONFIG, 'utf8'));
-repointAdguard(config, adguard.origin);
+repointStats(config, adguard.origin);
 await writeFile(configPath, JSON.stringify(config));
 
 const server = spawn('node', ['build'], {
@@ -122,8 +122,8 @@ const server = spawn('node', ['build'], {
 		PORT: String(PORT),
 		ORIGIN,
 		DASHBOARD_CONFIG: configPath,
-		ADGUARD_USERNAME: 'screenshot',
-		ADGUARD_PASSWORD: 'screenshot',
+		// The name after the prefix is `config.example.json`'s own `"secret"`.
+		DASHBOARD_SECRET_ADGUARD_MAIN: 'screenshot:screenshot',
 	},
 	stdio: 'inherit',
 });

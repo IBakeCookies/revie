@@ -9,8 +9,12 @@
 				{ "name": "BoxDate" },
 
 				{
-					"name": "BoxAdguard",
-					"props": { "href": "http://127.0.0.1:9999" }
+					"name": "BoxStats",
+					"props": {
+						"provider": "adguard",
+						"href": "http://127.0.0.1:9999",
+						"secret": "E2E_ADGUARD"
+					}
 				},
 				{
 					"name": "Grid",

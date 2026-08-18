@@ -17,10 +17,9 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 19 items are open — 18 from the review passes, plus
-item 36, which came from building the admin guard rather than from a review and is now down to a
-single line in `.env.example`, a file this environment will not let an agent write; **1, 2, 3, 4, 5,
-6, 7, 8, 11, 14, 19, 23, 25, 31, 32, 34 and 35 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+**Numbers are stable, so gaps mean landed.** 16 items are open — 15 from the review passes, plus #33
+above, which came from asking what no review pass had proposed; **1, 2, 3, 4, 5,
+6, 7, 8, 11, 14, 16, 17, 19, 23, 25, 31, 32, 34, 35 and 36 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
 the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -68,7 +67,8 @@ vitest project. See AGENTS.md's "Already done".)_
    wrong and was NOT followed.** `AppError.message` is minted in `data`, which has no locale, so
    that shipped an English toast on a German page. `ErrorReporter` is gone: `ServicesStore` takes
    `NotifyProbeFailed = (href: string) => void` and logs the message itself, the load returns
-   `adguardFailed: boolean`, and `[...slug]/+page.svelte` picks the paraglide message. Ported from
+   a failure flag (a keyed list since #33), and `[...slug]/+page.svelte` picks the paraglide
+   message. Ported from
    zenith, which has no language problem for exactly this reason — its seams are `() => void` and
    its variants are kinds. Five shape decisions plus the `untrack` trap are in AGENTS.md's
    "Already done"; the no-copy-crosses-a-layer rule is under "Errors are values". What this did
@@ -142,50 +142,46 @@ vitest project. See AGENTS.md's "Already done".)_
     _Files:_ src/lib/data/storage/cookie.ts:41,45-50,
     src/lib/data/repository/appearance-repository.ts:69,72, README.md
 
-16. **Stop a dead AdGuard box from gating first byte: cache the stats with a short TTL, then refresh
-    them** — `M`
-    `+page.server.ts:59` awaits `loadAdguardStats(page)` inline and nothing caches the result.
-    Mirror config-source.ts:18's cache shape with a short TTL so at most one request per window pays
-    the 3s bound (keep the bound), then add `depends('dashboard:adguard')` in the load and a
-    visibility-gated `invalidate('dashboard:adguard')` interval in **src/routes/[...slug]/+page.svelte**
-    (reuse the setInterval + teardown shape at poll-services-state.ts:19-23). Note `invalidate`
-    re-runs the whole load, so `readConfig` (mtime-cached) runs again too.
-    _Prevents:_ measured with a blackhole href — `ttfb=2.996s` then `2.954s` on the second request,
-    while a 404 on the same server answers in 0.005s; repository/adguard.ts:16-22's own comment says
-    "it does not get to hold the other boxes hostage". Also unfreezes the only real-data widget,
-    currently loaded once per navigation while the date box ticks at 1s and dots re-poll at 15min.
-    _Files:_ src/routes/[...slug]/+page.server.ts:51-67, src/lib/business/model/adguard.ts,
-    src/routes/[...slug]/+page.svelte
+16. _(**Stop a dead AdGuard box from gating first byte: cache the stats with a short TTL, then
+    refresh them** — landed, and renamed by #33. `readStats` in
+    [stats.ts](src/lib/business/model/stats.ts) now holds a `Map<key, { readAt, result }>` at
+    module scope behind a 30s TTL and returns `{ result, isFresh }`, the same seam `ConfigRead`
+    uses; the client half is `depends('dashboard:stats')` in the load plus a 60s
+    `invalidate('dashboard:stats')` interval in
+    [+page.svelte](src/routes/[...slug]/+page.svelte).
+    Fenced in [stats.spec.ts](src/lib/business/model/stats.spec.ts) — a second read inside the
+    window, a cached failure, the window expiring, and a dead host beside a live one, each keyed on
+    its own href so the module-scope cache needs no test-only reset export — and in
+    `page.server.spec.ts`, which asserts a cached failure still raises the flag while printing
+    nothing. Nothing was extracted out of `poll-services-state.ts` — see #18, which is where the
+    second caller would make that a real duplication. The five decisions it forced, the regressions
+    a periodic `invalidate` introduced and what gates each of them, and the one gap deliberately
+    left open, are recorded in AGENTS.md under "Already done".)_
 
-17. **Key AdGuard stats by href, and validate the wire shape before transforming** — `M`
-    `loadAdguardStats` resolves `findContainer(page, 'BoxAdguard')` — first match at any depth — and
-    `AdguardStore` holds one value that box-adguard-wrapper.svelte:11 hands to every instance without
-    reading `props.href`. Add `collectAdguardHrefs` beside `collectServiceProbes` (renamed from
-    `collectServiceHrefs` when #25 landed),
-    `Promise.all` the fetches so the 3s bound stays 3s total, return `Record<href, AdguardStats>`, and
-    make the store `stats(href)` (the wrapper edit is one line — `props.href` is already typed in).
-    Separately, add a numeric check right after `raw.json()` in `getAdguardStats`, matching the
-    existing `if (!raw.ok) throw …` pattern so `useAsyncErrorAsValue` turns it into the existing
-    `AppError`.
-    _Prevents:_ reproduced live — two BoxAdguard containers (`:4753` stubbed, `:4999` dead) both
-    render `DNS queries: 1111 / Blocked: 222 / Delay: 11ms / first.example`, and `:4999` is never
-    contacted or reported. And a 200 with the wrong body (`{"message":"unauthorized"}`) renders
-    `DNS queries: undefined`, `Delay: NaNms` with nothing logged, while the same function already
-    defends `top_blocked_domains?.at(0) ?? {}`.
-    _Sequencing:_ the load's return type changes to a record, rippling into page.svelte:10-21 — land
-    this before #16's refresh. Decide explicitly whether `findContainer` (config.ts:258-269) gets
-    deleted; `+page.server.ts:17` is its only production caller. Cheap fallback if multi-instance is
-    not wanted: warn on a second BoxAdguard via #23's channel (credentials are global —
-    `+page.server.ts:23` reads one `ADGUARD_USERNAME`/`ADGUARD_PASSWORD` pair — so keying only
-    supports instances sharing a login).
-    _Files:_ src/routes/[...slug]/+page.server.ts:17, src/lib/business/model/config.ts:272-286,
-    src/lib/business/store/adguard-store.svelte.ts:12-20,
-    src/lib/presentation/components/box-adguard-wrapper.svelte:11,
-    src/lib/data/repository/adguard.ts:43-47, src/lib/presentation/components/page.svelte:28
+17. _(**Key AdGuard stats by href, and validate the wire shape before transforming** — landed, in
+    two halves. The wire-shape check went in first, as a predicate right after `raw.json()`
+    in [adguard.ts](src/lib/data/repository/adguard.ts) — a valibot schema since #33 — inside the
+    error-as-value boundary, so a
+    200 carrying `{"message":"unauthorized"}` becomes an `AppError` instead of rendering
+    `DNS queries: undefined` / `Delay: NaNms`. The keying is the rest: a collector beside
+    `collectServiceProbes`, `Promise.all` in the load, a keyed record out of it, and a keyed
+    lookup in the store. #33 renamed all four and widened the key to provider + href.
+    **`findContainer` and `scanContainer` were DELETED**, which is the decision the item asked for:
+    the load was their only production caller, and what was left was a `config.spec.ts` describe
+    block testing `findContainer` and nothing else — a helper whose one reader is a test of itself
+    is what `no-orphans` is for.
+    Reproduced before the fix and fenced after it in three places: `config.spec.ts` for the
+    collector, `page.server.spec.ts` for two instances asking two hosts and keeping the one that
+    answered, and a box-stats-wrapper story mounting two wrappers against one store, because e2e
+    cannot render a populated box (the fixture's provider port is closed on purpose).
+    **What was deliberately NOT done:** the failure stayed one boolean and credentials stayed one
+    global pair, both of which were #33's scope, not this item's — and both landed there.
+    Recorded in AGENTS.md under
+    "Already done".)_
 
 18. **Re-poll service status on `visibilitychange` and `focus`** — `S`
-    `pollServicesState` is 24 lines: one `poll()`, one `setInterval(poll, 15min)`, a teardown that
-    only clears it. Add a `visibilitychange` handler calling the existing `poll()` when
+    `pollServicesState` is one `poll()`, one `setInterval(poll, 15min)` and a teardown that clears
+    it and aborts. Add a `visibilitychange` handler calling the existing `poll()` when
     `document.visibilityState === 'visible'`, removed in the teardown the function already returns.
     Zenith listens on **both** `visibilitychange` and `focus` — take the pair, with the guarded,
     torn-down shape from its `session-store.svelte.ts` (its `today` store's listener is
@@ -194,9 +190,16 @@ vitest project. See AGENTS.md's "Already done".)_
     `setInterval` does not catch up — a resumed start-page tab asserts, with a green dot, a
     measurement that is hours old, and a recovered service stays red for up to 15 more minutes.
     `#states` is keyed by href (service-store.svelte.ts:19), so the extra poll overwrites rather than
-    stacking. Grep confirms zero `visibilitychange` / `focus` / `online` listeners anywhere in src.
-    _Files:_ src/lib/business/store/poll-services-state.ts:19-23,
-    src/lib/business/store/poll-services-state.spec.ts (fake timers already installed at :27-60; the
+    stacking.
+    _This is now the SECOND caller, so it is where the extraction happens._ #16 landed a
+    visibility-gated interval in [+page.svelte](src/routes/[...slug]/+page.svelte) — a `setInterval`
+    whose body is skipped unless `document.visibilityState === 'visible'`, torn down by its own
+    effect. It was deliberately NOT extracted then: one caller is not a duplication. Landing this
+    item makes two, which is the point AGENTS.md names for pulling the guarded interval into a
+    shared helper — note that #16's is only the gate, and this item still wants the `visibilitychange`
+    / `focus` LISTENERS zenith carries on top of it.
+    _Files:_ src/lib/business/store/poll-services-state.ts:34-40,
+    src/lib/business/store/poll-services-state.spec.ts (fake timers already installed at :39-45; the
     new case needs a `*.svelte.spec.ts` home or a stubbed `document`, since the node project has
     none)
 
@@ -249,9 +252,9 @@ vitest project. See AGENTS.md's "Already done".)_
     _All three component-level violations landed in the zenith parity pass_ (verified 2026-08-04),
     once the storybook a11y gate went to `test: 'error'` and every component got a story to run axe
     against: `heading-order` (grid.svelte's subTitle was h5 under an h3 — now h4 at
-    grid.svelte:41, under the h3 at :34), `link-name` (box-adguard.svelte's anchor was empty
+    grid.svelte:41, under the h3 at :34), `link-name` (box-stats.svelte's anchor was empty
     whenever `stats` was undefined, so its accessible name was `""`; it now carries an
-    unconditional `aria-label={m.adguard_open()}` at box-adguard.svelte:79, which also replaces the
+    unconditional `aria-label={m.stats_open({ provider, host })}`, which also replaces the
     four-readings-run-together name in the populated case), and the status dot's `aria-label` on a
     role-less `<span>`, which was ignored outright until the `role="img"` now at
     box-service.svelte:73.
@@ -280,7 +283,7 @@ vitest project. See AGENTS.md's "Already done".)_
     _Files:_ src/routes/+layout.svelte:112-118 (the `banner` move; its `<nav>` and `<title>` are
     done), src/lib/presentation/components/box-service.svelte:72-80 (the non-colour cue),
     e2e/is-accessible.e2e.ts (new), e2e/can-navigate-between-pages.e2e.ts.
-    grid.svelte, box-adguard.svelte and grid.svelte.spec.ts are off this list — their half landed.
+    grid.svelte, box-stats.svelte and grid.svelte.spec.ts are off this list — their half landed.
 
 ## Architecture & extensibility
 
@@ -289,7 +292,7 @@ vitest project. See AGENTS.md's "Already done".)_
     (config-container.svelte:39-47) erroring when a component prop stops matching the schema.
     Measured: it does not. Three parts: (a) drop `& HTMLAnchorAttributes` /
     `& HTMLAttributes<HTMLDivElement>` and remove the `{...restProps}` pass-throughs from the **six**
-    components that carry them — box-service.svelte:18,30, box-adguard.svelte:16,42,
+    components that carry them — box-service.svelte:18,30, box-stats.svelte,
     box-date.svelte:22,37, grid.svelte:17,21, plus dropdown.svelte:15,18 and sub-grid.svelte:6,10;
     `sub-grid` re-uses `grid`'s `Props`, so dropping grid's `& HTMLAttributes` ripples into it.
     **`dropdown`'s pass-through is the one exception — it is LIVE, not dead** (corrected 2026-08-14;
@@ -318,7 +321,7 @@ vitest project. See AGENTS.md's "Already done".)_
     then 500s SSR) and `collectServiceProbes` skips the subtree. Verified: the derived
     `Record<NestingName, true>` errors TS2741 where the array form compiles silently. Not an
     injection vector — Svelte's SSR renderer skips `on*` attributes.
-    _Files:_ src/lib/presentation/components/{box-service,box-adguard,box-date,grid}.svelte,
+    _Files:_ src/lib/presentation/components/{box-service,box-stats,box-date,grid}.svelte,
     src/lib/business/model/config.ts:81-83,112-129,149-186, src/lib/business/model/config.spec.ts
 
 23. **Give config loading a return channel — LANDED.** `normalizeConfig` returns
@@ -378,26 +381,27 @@ missing or not valid` because a rejected enum value can still be a string.
     were left alone — that file is the operator's and gitignored, so only the entry under
     discussion was touched.
 
-26. **Add `preferredLanguage` to the Paraglide strategy, then localize the AdGuard counters** — `M`
+26. **Add `preferredLanguage` to the Paraglide strategy** — `S`
     `paraglide/runtime.js:35-39` is `strategy = ["cookie", "globalVariable", "baseLocale"]` and
     vite.config.ts:11-14 passes only `project`/`outdir`, so a `de-DE` browser gets English on the
     first SSR response and only reaches German by clicking the dropdown — and there is no way to link
     a locale. Adding `preferredLanguage` also makes `test.use({ locale: 'de-DE' })` a usable e2e
-    lever. Then run the two counters through `Intl.NumberFormat(getLocale())` at **instance** scope
-    (the same per-request reason box-date.svelte's formatter sits there): box-adguard.svelte:24,26
-    pass raw numbers and the compiled
-    message is `` `DNS-Anfragen: ${i?.count}` ``.
-    _Payoff:_ closes the first-render locale gap in a deliberately bilingual app, and `43871` becomes
-    `43.871` in German. Nothing tests the READINGS in German: box-date.svelte.spec.ts:20 matches
-    `/\d{1,2}:\d{2}:\d{2}/` (true in every locale), box-adguard.svelte.spec.ts:31-45 compares
-    against `m.*()` so it auto-follows any format change, and e2e cannot render a populated AdGuard
-    box (fixture-config.json:12 points at closed port 9999). Assert it in
-    box-adguard.svelte.spec.ts against a literal string — the compiled message accepts
+    lever.
+    _The counters half landed._ Every reading goes through `Intl.NumberFormat(getLocale())` at
+    **instance** scope in
+    [box-stats.svelte](src/lib/presentation/components/box-stats.svelte) — the same per-request
+    reason box-date.svelte's formatter sits there — and the messages are labels rather than
+    sentences with a number baked in, so `43871` is already `43.871` on a German page.
+    _Payoff:_ closes the first-render locale gap in a deliberately bilingual app. Nothing tests
+    the READINGS in German: box-date.svelte.spec.ts:20 matches `/\d{1,2}:\d{2}:\d{2}/` (true in
+    every locale), the box-stats stories compare against `m.*()` so they auto-follow any format
+    change, and e2e cannot render a populated stats box (fixture-config.json points at closed port
+    9999). Assert it in a story against a literal string — the compiled message accepts
     `{ locale: 'de' }`, which is the lever
-    [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts)'s German toast case
+    [can-see-provider-stats.e2e.ts](e2e/can-see-provider-stats.e2e.ts)'s German toast case
     demonstrates for the one path that IS asserted in German since #8 landed.
-    _Files:_ vite.config.ts:11-14, src/lib/presentation/components/box-adguard.svelte:24-34,
-    src/lib/presentation/components/box-adguard.svelte.spec.ts
+    _Files:_ vite.config.ts:11-14,
+    src/lib/presentation/components/box-stats.stories.svelte
 
 ## Service integrations
 
@@ -406,51 +410,59 @@ list to run sequentially from its first item: put 33 under Features and `prettie
 it to 27, colliding with Ops. A heading breaks the list, which is what keeps the number stable —
 the same applies to a future 34.
 
-33. **Generalize the AdGuard path into a keyed stats provider, then add Pi-hole, Proxmox and the
-    rest** — `L`
-    Stats are hardcoded to one vendor at every layer: the literal `'BoxAdguard'` in
-    `CONTAINER_NAMES` (config.ts:15), one `findContainer(page, 'BoxAdguard')` in the load
-    (+page.server.ts:17), one global credential pair (+page.server.ts:23), and one `AdguardStats`
-    in the store (adguard-store.svelte.ts:12). A second integration is therefore not an addition,
-    it is a fourth copy of the three defects #16 and #17 already name. **Land those two first** —
-    they are what turns "AdGuard, singular" into "a provider, keyed by href, `Promise.all`'d inside
-    one 3s bound, TTL-cached".
-    _One container, not one per service._ Add `'BoxStats'` with a `provider` token
-    (`"provider": "pihole"`) rather than a dozen container names. A dozen names means a dozen
-    `requiredProps` entries (config.ts:114-131), a dozen branches before config-container.svelte's
-    `never` assert (:38-52), and a dozen components; a token keeps presentation at one component
-    and moves compile-time completeness to a `Record<ProviderName, Provider>` in
-    `data/repository/` — same guarantee, in the layer that owns the wire shapes. Decide one
-    wrinkle up front: `AdguardStats` is four named fields (business/type/adguard-stats.ts) rendered
-    through four paraglide messages, and business cannot pick a message per provider — it names no
-    component, and paraglide is presentation's. So business returns `{ key, value }[]` and
-    presentation holds a `Record<StatKey, (value) => string>` message map, complete the same way
-    `requiredProps` is.
-    _Credentials need a scheme, and that is the real work._ One pair cannot serve two Pi-holes.
-    Have the config entry name its variable instead of carrying the secret
-    (`"secret": "PIHOLE_MAIN"` → `DASHBOARD_SECRET_PIHOLE_MAIN` through `$env/dynamic/private`):
-    `config.example.json` is tracked, so a secret in the file format is a secret in someone's
-    repo. Keep the fetch server-only — the load hands the page derived numbers and nothing else,
-    and a provider written as a client store would ship the key — and keep the href config-only,
-    never a query param, which is the difference between a dashboard and an SSRF proxy
-    (`/api/ping`'s allowlist at api/ping/+server.ts:45 is the precedent).
-    _Self-signed TLS is what actually blocks Proxmox._ Proxmox on :8006, TrueNAS, Unifi and
-    Portainer all ship self-signed certs and Node's `fetch` rejects them with no per-request
-    escape hatch. Verified: both `fetch(` sites in src (service.ts:13, adguard.ts:33) pass no
-    dispatcher, and `undici` / `rejectUnauthorized` / `NODE_TLS_REJECT_UNAUTHORIZED` appear nowhere
-    in src or package.json. Either an `undici` `Agent` with `connect: { rejectUnauthorized: false }`
-    passed as a per-request `dispatcher` — which adds `undici` as a direct dependency, since Node
-    ships it internally but exports no module — or document that the operator installs a real cert.
-    Not `NODE_TLS_REJECT_UNAUTHORIZED=0`: it is process-global and silently unverifies every other
-    fetch. Either way it is a per-provider opt-in, so settle it before Proxmox rather than during.
-    _Order the providers by auth cost, not popularity._ Cheap first — one GET, one header, counters
-    that fit the box that already exists:
-    - **Uptime Kuma** — `/api/status-page/<slug>` plus `/api/status-page/heartbeat/<slug>`, no auth
-      on a public status page. Write this one first: it exercises the whole keyed refactor with no
-      credential scheme at all.
-    - **Pi-hole** — the direct AdGuard sibling, and most people run one or the other. Mind the v6
-      break: v5 is a single `GET /admin/api.php?summaryRaw&auth=<hash>`, v6 needs a session
-      (`POST /api/auth` → `X-FTL-SID`, then `/api/stats/summary`). Both are deployed in the wild.
+33. ~~**Generalize the AdGuard path into a keyed stats provider**~~ — **the CORE AND FOUR
+    PROVIDERS LANDED; what is left is the rest of the list.** Kept as a numbered item because
+    the notes below cross-reference it, and because the list at the bottom is still work.
+    `BoxAdguard` is **gone** and `BoxStats` with a `provider` token replaced it: one container,
+    one component, one `Record<ProviderName, ReadProvider>` registry, `{ key, value }[]`
+    readings through a presentation-side message map, and per-instance credentials through
+    `"secret": "ADGUARD_MAIN"` → `DASHBOARD_SECRET_ADGUARD_MAIN`. **The architecture is in
+    [AGENTS.md](AGENTS.md) under "The stats providers", and is deliberately not restated here** —
+    the count of decisions, the unit rule, the one-signal handshake, the v6 session cache and the
+    redirect split all live there, and a copy in this file is the drift AGENTS.md's own opening
+    forbids. What belongs here is only what this item's own instructions got wrong. Three of them
+    were NOT followed, each for a reason recorded there:
+    - **The registry is in `business/model/stats.ts`, not `data/repository/`.** `Stat`/`StatKey`
+      keys a message map, so it is presentation-facing vocabulary and `data → leaf only` forbids
+      a repository importing it. `Record<ProviderName, …>` is the same guarantee either way.
+    - **`adguardFailed` became `failedStats: { key, provider, href }[]`, not
+      `failedProviders: ProviderName[]`.** #17 keyed readings per INSTANCE, so a provider is not
+      an identity: with two Pi-holes and one down, "Pi-hole is unavailable" is true, useless and
+      indistinguishable from both being down.
+    - **`Record<ProviderName, () => string>` is a plain `Record<ProviderName, string>` of
+      PRODUCT names** in `presentation/util/provider-name.ts`, not paraglide messages. A product
+      name is identical in every locale; the SENTENCE around it is the message, and it takes the
+      name as a parameter — the `service_probe_failed({ href })` seam.
+      _Self-signed TLS is settled: DOCUMENTED, not worked around._ Node's `fetch` rejects a
+      self-signed certificate with no per-request escape hatch, so README tells the operator to
+      install a real certificate or terminate TLS at a proxy. `undici` is **not** a dependency, no
+      `dispatcher` is passed, and `NODE_TLS_REJECT_UNAUTHORIZED` appears nowhere — it is
+      process-global and silently unverifies every other fetch. That decision is what keeps
+      **Proxmox VE, TrueNAS, Unifi and Portainer** off the list below rather than on it.
+      _Three providers landed on top of the core and the seam held_ — nothing in the route, the
+      store, the cache, the schema-generated form or the container branch. `uptime-kuma`,
+      `pihole-v5` and `pihole-v6` are in
+      [src/lib/data/repository/](src/lib/data/repository/), one file per provider, each with a
+      valibot wire schema and a projection in `stats.ts`; what they settled is in AGENTS.md with
+      the rest. Two things about them are this item's own, and neither is written down there:
+    - **A rejected v5 token is a 200 carrying `[]`, not a 401**, which is #17's wire schema
+      paying for itself on the first provider added after it: without it that is an empty box
+      and silence.
+    - **Their behaviour is transcribed from vendor docs, not measured**, which is this item's own
+      instruction and the reason two of the three shipped with defects a review had to find — a
+      Pi-hole 6 with no password set could never be read, and a 401 that was not session expiry
+      minted a session every 30s until FTL's 16 seats were gone. Both are fixed and fenced in
+      `pihole-v6.spec.ts`; treat every endpoint below the same way.
+
+      _What is left is the rest of the list, and the seam is the whole of the work._ Adding one
+      is **six** edit points: a repository file, one entry in `providers`, one token in
+      `providerNames`, one product name in `providerNameLabel`, and — per reading nothing else
+      emits — a `StatKey` with its `stat_*` message in BOTH catalogues plus an entry in
+      `box-stats.svelte`'s `chrome` (and `formats`, if the reading is a number). Those last two
+      are `Record<StatKey, …>` / `Record<NumericStatKey, …>`, so a missed one is a compile error
+      in a file this list used to omit. Ordered by auth cost — cheap first, counters that fit the
+      box that already exists:
+
     - **Sonarr / Radarr / Prowlarr** — `/api/v3/queue`, `X-Api-Key` header, for a queue count.
     - **Immich** (`/api/server/statistics`, `x-api-key`), **Paperless-ngx** (`/api/statistics/`,
       `Authorization: Token`), **Gitea / Forgejo** (`/api/v1/…`, `Authorization: token`).
@@ -458,44 +470,37 @@ the same applies to a future 34.
     - **Glances** — `/api/4/cpu` and `/api/4/mem`, no auth by default: the generic "how is this
       host doing" box, and the one that earns its place on a single-node setup.
 
-    Then the ones needing a handshake, an aggregation or the TLS decision: **Proxmox VE**
-    (`/api2/json/cluster/resources` with `Authorization: PVEAPIToken=…` — a token, no login
-    round-trip, but self-signed TLS and a flat resource list to aggregate), **Portainer**
+    Then the ones needing a handshake or an aggregation: **Portainer**
     (`/api/endpoints/<id>/docker/containers/json`, `X-API-Key`), **qBittorrent**
     (`POST /api/v2/auth/login` for a cookie), **Transmission** (the 409 +
-    `X-Transmission-Session-Id` dance), **Unifi** (cookie login and self-signed),
-    **Nextcloud** (`/ocs/v2.php/apps/serverinfo/api/v1/info?format=json`, basic auth plus
+    `X-Transmission-Session-Id` dance), **Nextcloud**
+    (`/ocs/v2.php/apps/serverinfo/api/v1/info?format=json`, basic auth plus
     `OCS-APIRequest: true`, XML otherwise), **Plex** (`/status/sessions`, token in the query and
-    XML unless `Accept: application/json`), **TrueNAS**, **Home Assistant** (bearer, but one entity
-    per number, so its config shape differs from every other provider here).
-    _Payoff:_ the demand is already in the config as dead click-throughs — README.md:50-53 links
-    Proxmox at `https://192.168.178.180:8006` as a plain `BoxService` whose only feedback is a
-    status dot, the same shape as the Whoogle entry #24 cites. Stats are the one thing a start page
-    shows that a browser bookmark cannot.
-    _Unverified on purpose:_ every endpoint and header above comes from the vendors' docs, not from
-    a live instance behind this code — unlike every other item here, so re-check each before
-    implementing it. Homepage's widget list is the working popularity ranking if this needs
-    extending.
-    _The failure channel is in — #8 landed._ An unreachable AdGuard box returns a flag and the
-    route toasts a paraglide message. What a provider ADDS is that the toast has to name WHICH one
-    failed — one line is enough for one widget and useless for eight — and the way it does that is
-    **not** by returning a sentence: no copy crosses a layer (AGENTS.md, "Errors are values"). So
-    `adguardFailed: boolean` becomes `failedProviders: ProviderName[]`, and presentation holds a
-    `Record<ProviderName, () => string>` message map, complete the same way `requiredProps` is —
-    the same shape this item already proposes for `StatKey`, for the same reason. A provider name
-    is data; the sentence around it is presentation's.
-    _Files:_ src/lib/business/model/config.ts:15,114-131, src/lib/business/model/stats.ts (new),
-    src/lib/data/repository/ (one file per provider),
-    src/lib/business/store/adguard-store.svelte.ts,
-    src/lib/presentation/components/box-stats.svelte (new),
-    src/lib/presentation/components/config-container.svelte:38-52,
-    src/routes/[...slug]/+page.server.ts:16-48, messages/en.json, messages/de.json,
-    README.md:65-74, .env.example
+    XML unless `Accept: application/json`), **Home Assistant** (bearer, but one entity per
+    number, so its config shape differs from every other provider here).
+    _Unverified on purpose:_ every endpoint and header above comes from the vendors' docs, not
+    from a live instance behind this code — unlike every other item here, so re-check each
+    before implementing it. **That applies to the three that shipped as much as to the ones that
+    have not**: their specs mock `fetch`, their repository comments say where the shape was
+    transcribed from, and so does README. Homepage's widget list is the working popularity
+    ranking if this needs extending.
+    _Deliberately NOT built, and each would be a regression:_ a `requiresSecret` capability
+    table on the registry (a 401 already says it, and the table is a second declaration of each
+    provider's auth that nothing forces to agree with the code); Pi-hole version auto-detection
+    (a round trip per cache miss inside the 3s budget, against a host that may be down, for a
+    version the operator must know anyway); a client-side fetch or an `/api/stats` endpoint (one
+    ships the credential, the other is an SSRF surface — `/api/ping`'s allowlist is the
+    precedent); a cap or an aggregate on the failure toasts; a `unit` field on `Stat` (the key
+    carries the unit, and a second field is a copy nothing keeps in step).
+    _Files:_ src/lib/data/repository/ (one file per provider, new),
+    src/lib/business/model/stats.ts, src/lib/business/model/config.ts (`providerNames`),
+    src/lib/business/type/stats.ts (a key per new reading),
+    src/lib/presentation/util/provider-name.ts, messages/en.json, messages/de.json, README.md
 
 ## The admin area and the config editor
 
-The guard, the write path, the editor and #36's login backoff have all landed; what is left of #36
-is one line in `.env.example`, and all three items are kept as numbered entries because the notes
+The guard, the write path, the editor and #36's login backoff have all landed, and #36's
+`.env.example` half closed by hand; all three items are kept as numbered entries because the notes
 below still cross-reference them. The
 threat model is the reason for the ordering: `config.json` is the internal network map _and_ the
 source of `/api/ping`'s allowlist, so a write path without the guard in front of it would let
@@ -551,51 +556,53 @@ distributed guess, which no per-address counter addresses and which a long token
       disambiguates within a list, not between lists that share a parent type.
       _Files:_ src/routes/admin/, src/lib/business/model/config.ts,
       src/lib/business/model/config-source.ts
-36. **Close the two known gaps in the admin area** — **the rate limit LANDED; the
-    `.env.example` line is the operator's own paste**
-    Kept as a numbered item because the notes above and below cross-reference it. **The login
-    backoff is in:** five failures per client address, then `min(5s × 2^(n − 6), 60s)`, refusing
-    even a correct token while the wait runs, cleared by a success and pruned on write — which is
-    also the decay, so the sustained ceiling is five guesses a minute per address rather than five
-    ever. It went where this item said it belonged, in `business/model/admin-auth.ts` and not the
-    hook, and it returns `{ status: 'locked'; retryAfterSeconds }` so the login page picks the
-    words. The decisions are in AGENTS.md, including why there is deliberately **no e2e** for it
-    and what replaces one. **The `.env.example` line is still open and cannot be closed from
-    here:** the file is on this environment's permission deny list, so the agents doing this work
-    were never able to touch it — the text to paste was handed over in the conversation instead.
-    _Files:_ .env.example (open), src/lib/business/model/admin-auth.ts, README.md
+36. ~~**Close the two known gaps in the admin area**~~ — **LANDED.** Kept as a numbered item
+    because the notes above and below cross-reference it. **The login backoff:** five failures per
+    client address, then `min(5s × 2^(n − 6), 60s)`, refusing even a correct token while the wait
+    runs, cleared by a success and pruned on write — which is also the decay, so the sustained
+    ceiling is five guesses a minute per address rather than five ever. It went where this item
+    said it belonged, in `business/model/admin-auth.ts` and not the hook, and it returns
+    `{ status: 'locked'; retryAfterSeconds }` so the login page picks the words. The decisions are
+    in [AGENTS.md](AGENTS.md), including why there is deliberately **no e2e** for it and what
+    replaces one. **`.env.example` closed by hand, and that is the part worth knowing:** the file
+    is on this environment's permission deny list, so no agent that has worked on this repo could
+    read or write it — each one handed its text over instead, and the operator pasted it. It now
+    names `DASHBOARD_SECRET_<NAME>` and no longer ships the two AdGuard variables #33 retired.
+    Nothing here can verify that, and nothing ever will while the deny list stands: it is the one
+    tracked file in the repo that no check, lint or test can see.
+    _Files:_ .env.example, src/lib/business/model/admin-auth.ts, README.md
 
 ## Ops & DX
 
-27. **Ship a production invocation that actually loads `.env`, and document the AdGuard contract** —
-    `S`
-    README's production path is a bare `node build` (README.md:24-25), but adapter-node reads only
-    `process.env` (build/env.js; `grep -c dotenv build/index.js` = 0) — so `ADGUARD_USERNAME`,
-    `ADGUARD_PASSWORD` and `DASHBOARD_CONFIG` are all silently absent in production while working in
-    dev. Document `node --env-file=.env build`, an **absolute** `DASHBOARD_CONFIG`
-    (src/lib/data/config.ts:16 resolves from the process CWD at module scope, which README.md:25
+27. **Ship a production invocation that actually loads `.env`** — `S`
+    README's production path is a bare `node build` (README.md:30-31), but adapter-node reads only
+    `process.env` (build/env.js; `grep -c dotenv build/index.js` = 0) — so every
+    `DASHBOARD_SECRET_<NAME>` and `DASHBOARD_CONFIG` are silently absent in production while
+    working in dev. Document `node --env-file=.env build`, an **absolute** `DASHBOARD_CONFIG`
+    (src/lib/data/config.ts:16 resolves from the process CWD at module scope, which README.md:31
     notes without connecting it to the variable), and a systemd unit (`EnvironmentFile=`,
     `WorkingDirectory=`) or compose file with the config bind-mounted — neither `deploy/` nor a
-    compose file exists yet. In the same README pass, name the two AdGuard variables (they appear
-    **nowhere** in README.md or AGENTS.md — README.md:17 says only "AdGuard credentials, optional",
-    and the names live in `.env.example` and `+page.server.ts:23`), state that they are runtime
-    `$env/dynamic/private`, and describe the two degradations, which are no longer the same one
-    now that #8 has landed: credentials absent is a silent empty box plus a `console.warn`
-    (+page.server.ts:23-28 — deliberately not toasted, an unconfigured box being an absence rather
-    than a failure, so this is the case the README has to explain instead), while
-    unreachable/401 both logs and toasts the reason (:30-48). Mention the 3s `AbortSignal.timeout`
-    (repository/adguard.ts:38) as what the reader will see in that toast on a dead host.
+    compose file exists yet.
+    _The credential half of this item is DONE, and its old text is not:_ it asked for the two
+    AdGuard variables to be named in README. They no longer exist — #33 replaced them with the
+    per-instance `DASHBOARD_SECRET_<NAME>` scheme, and README now carries a whole "Stats
+    providers" section: the naming rule, the provider table, both degradations (a named variable
+    left unset is an absence — skipped, warned once in `[...slug]/+page.server.ts`'s `planReads`,
+    never toasted; unreachable or refused logs and toasts) and the 3s bound, which is now minted
+    in `business/model/stats.ts` rather than per repository. Do not re-add any of that here; what
+    is left is the invocation and the deploy files.
     _The `engines` half landed_ (verified 2026-08-04): package.json:6-8 declares `"node": ">=22"`,
     so `.npmrc`'s `engine-strict=true` is no longer inert, and README.md:11-12 documents that an
     older node fails `npm install` outright rather than warning. That also retires this item's
     "(Node ≥20.6)" qualifier on `--env-file` — the flag is guaranteed present at the version the
     package now enforces, so the README does not have to caveat it.
-    _Prevents:_ measured — `node ./build` with a populated `.env` logs
-    `ADGUARD_USERNAME / ADGUARD_PASSWORD are not set, skipping AdGuard stats` and answers in 33ms;
-    `node --env-file=.env build` resolves them and takes 2.98s attempting the fetch. `config.json`
+    _Prevents:_ measured before #33 renamed the variables — `node ./build` with a populated `.env`
+    logged the skip line and answered in 33ms, while `node --env-file=.env build` resolved the
+    credentials and took 2.98s attempting the fetch. The variable names have changed; the
+    invocation defect has not. `config.json`
     is now gitignored rather than pointed at with `DASHBOARD_CONFIG`, so the variable matters most
     for a bind-mounted deployment — which is exactly the invocation this item documents.
-    _Files:_ README.md:21-26,65-74, .env.example,
+    _Files:_ README.md:20-32, .env.example (replaced by hand — see #36),
     deploy/revie-dashboard.service or compose.yaml (new). package.json is off this list — its
     `engines` half landed.
 
@@ -675,7 +682,7 @@ distributed guess, which no per-address counter addresses and which a long token
     _Payoff:_ AGENTS.md calls ThemeStore the subtlest machinery in the app and #9 asks someone to
     delete lines 88-96 of it — with zero tests that edit is unverifiable, and a regression renders the
     app unstyled or shifts the SSR'd scenery on hydration. The harness is reusable for any future
-    rune-constructor store (adguard-store.svelte.ts, scenery-seed.ts, scenery-time.ts,
+    rune-constructor store (stats-store.svelte.ts, scenery-seed.ts, scenery-time.ts,
     hooks.server.ts, data/config.ts and data/storage/cookie.ts also have no siblings).
     _Files:_ src/lib/business/model/appearance.spec.ts (new),
     src/lib/test/theme-store-harness.svelte +
@@ -719,12 +726,11 @@ The order that matters, beyond the group ranking:
   connects an hour now ask the question they were pretending to answer; `probe: "none"` is the
   bookmark, and it is the value that keeps an entry out of the allowlist. The item records why
   its own argument against a flag did not survive checking.
-- **#17 before #16** — #17 changes the load's return type to a record, rippling into
-  page.svelte:10-21 and, since #8 landed, into `[...slug]/+page.svelte`, which now spreads the
-  load's `adguard` / `adguardError` into the component by hand.
-- **#16 and #17 before #33** — a second stats provider inherits AdGuard's single-value store, its
-  uncached serial await and its one global credential pair unless those two land first. #33 is the
-  generalization they set up, not a parallel track.
+- ~~**#17 before #16**~~ — landed. The load returns a keyed record of readings and
+  page.svelte's prop moved with it, so #16's refresh has the keyed shape under it already.
+- ~~**#16 before #33**~~ — both landed. The TTL cache and the refresh interval went in first, so
+  #33 inherited only the vendor in the names and the one global credential pair, which was its
+  own work; it was the generalization #16 and #17 set up, not a parallel track.
 - **#30 before #9** — the `ThemeStore` edit is unverifiable without a rune harness.
 - **#21 still needs its own axe pass**, even though the storybook gate now runs. `addon-a11y` globs
   every story (.storybook/main.ts:4) at `test: 'error'`, but landmarks, heading order across the

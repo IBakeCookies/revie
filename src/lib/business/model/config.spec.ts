@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
 	collectServiceProbes,
+	collectStatsTargets,
 	containerFields,
 	containerNames,
-	findContainer,
-	isBoxAdguard,
 	isGrid,
 	normalizeConfig,
+	providerNames,
+	statsKey,
 } from '$lib/business/model/config';
 
 const rawConfig = {
@@ -33,9 +34,11 @@ const rawConfig = {
 								props: {
 									items: [
 										{
-											name: 'BoxAdguard',
+											name: 'BoxStats',
 											props: {
+												provider: 'adguard',
 												href: 'http://adguard.local',
+												secret: 'ADGUARD_MAIN',
 											},
 										},
 										{
@@ -168,7 +171,7 @@ describe('normalizeConfig', () => {
 	it('applies per-component defaults at any nesting depth', () => {
 		const nested = itemsOf(itemsOf(grid)[0]);
 
-		expect(nested.map((item) => item.name)).toEqual(['BoxAdguard', 'BoxService']);
+		expect(nested.map((item) => item.name)).toEqual(['BoxStats', 'BoxService']);
 		expect(nested[1].props.span).toBe(6);
 	});
 
@@ -295,7 +298,7 @@ describe('containers that would throw while rendering', () => {
 			},
 		});
 
-		expect(() => findContainer(page, 'BoxAdguard')).not.toThrow();
+		expect(() => collectStatsTargets(page.containers)).not.toThrow();
 		expect(() => collectServiceProbes(page.containers)).not.toThrow();
 	});
 
@@ -341,13 +344,64 @@ describe('containers that would throw while rendering', () => {
 		expect(page.containers).toEqual([]);
 	});
 
-	it('drops a BoxAdguard with no href', () => {
+	it('drops a BoxStats with no href', () => {
 		const { page, warnings } = pageWith({
-			name: 'BoxAdguard',
+			name: 'BoxStats',
+			props: {
+				provider: 'adguard',
+			},
 		});
 
 		expect(page.containers).toEqual([]);
 		expect(warnings).toEqual([expect.stringContaining('href')]);
+	});
+
+	it('drops a BoxStats naming a provider that does not exist', () => {
+		const { page, warnings } = pageWith({
+			name: 'BoxStats',
+			props: {
+				provider: 'pi-hole',
+				href: 'http://pihole.local',
+			},
+		});
+
+		expect(page.containers).toEqual([]);
+		expect(warnings).toEqual(['Skipping container "BoxStats", "provider" is missing or not valid']);
+	});
+
+	/**
+	 * A shell cannot export `DASHBOARD_SECRET_ADGUARD-MAIN`, so a name with punctuation in
+	 * it points at a variable that can never be set — the box would be skipped forever with
+	 * only a log line. Refused at the schema instead, where the editor says which prop.
+	 */
+	it('drops a BoxStats whose secret is not a variable name a shell can export', () => {
+		const { page, warnings } = pageWith({
+			name: 'BoxStats',
+			props: {
+				provider: 'adguard',
+				href: 'http://adguard.local',
+				secret: 'ADGUARD-MAIN',
+			},
+		});
+
+		expect(page.containers).toEqual([]);
+		expect(warnings).toEqual([expect.stringContaining('secret')]);
+	});
+
+	// A public Uptime Kuma status page takes no credential at all, so `secret` has to be
+	// optional. A provider that DOES need one and names no variable is not blessed by this:
+	// it is read anonymously and answers 401, which is an ordinary failure that toasts.
+	it('keeps a BoxStats with no secret, which is a provider that needs none', () => {
+		const { page, warnings } = pageWith({
+			name: 'BoxStats',
+			props: {
+				provider: 'uptime-kuma',
+				href: 'https://kuma.local/status/home',
+			},
+		});
+
+		expect(warnings).toEqual([]);
+		expect(page.containers.map((item) => item.name)).toEqual(['BoxStats']);
 	});
 
 	it('keeps a BoxDate, which requires nothing', () => {
@@ -380,15 +434,84 @@ describe('containers that would throw while rendering', () => {
 	});
 });
 
-describe('findContainer', () => {
-	it('finds a nested container instead of its ancestor', () => {
-		const found = findContainer(home, 'BoxAdguard');
+describe('collectStatsTargets', () => {
+	function statsAt(href: string, secret?: string) {
+		return {
+			name: 'BoxStats',
+			props: {
+				provider: 'adguard',
+				href,
+				...(secret === undefined
+					? undefined
+					: {
+							secret,
+						}),
+			},
+		};
+	}
 
-		expect(found && isBoxAdguard(found) && found.props.href).toBe('http://adguard.local');
+	it('collects instances at any nesting depth, carrying what the config named', () => {
+		expect(collectStatsTargets(home.containers)).toEqual([
+			{
+				key: statsKey('adguard', 'http://adguard.local'),
+				provider: 'adguard',
+				href: 'http://adguard.local',
+				secret: 'ADGUARD_MAIN',
+			},
+		]);
 	});
 
-	it('returns undefined when nothing matches', () => {
-		expect(findContainer(home, 'BoxDate')).toBeUndefined();
+	/** The defect #17 closed: the load read the first match and every box rendered it. */
+	it('collects every instance on the page, in the order the file names them', () => {
+		const { page } = pageWith(statsAt('http://first.local'), {
+			name: 'Grid',
+			props: {
+				items: [statsAt('http://second.local')],
+			},
+		});
+
+		expect(collectStatsTargets(page.containers).map((target) => target.href)).toEqual([
+			'http://first.local',
+			'http://second.local',
+		]);
+	});
+
+	/**
+	 * First occurrence wins, as `collectServiceProbes` does: two boxes naming one target
+	 * with two secrets is a config to fix, not a case worth arbitrating.
+	 */
+	it('returns one entry however many boxes on the page name the same target', () => {
+		const { page } = pageWith(
+			statsAt('http://one.local', 'FIRST'),
+			statsAt('http://one.local', 'SECOND'),
+		);
+
+		expect(collectStatsTargets(page.containers)).toEqual([
+			{
+				key: statsKey('adguard', 'http://one.local'),
+				provider: 'adguard',
+				href: 'http://one.local',
+				secret: 'FIRST',
+			},
+		]);
+	});
+
+	it('returns nothing for a page with no stats box', () => {
+		const { page } = pageWith({
+			name: 'BoxDate',
+			props: {},
+		});
+
+		expect(collectStatsTargets(page.containers)).toEqual([]);
+	});
+
+	// The key is what the cache, the page record and the store all address a reading by, so
+	// an href alone would let two providers at one host serve each other's numbers.
+	it('keys on the provider as well as the href', () => {
+		const key = statsKey('adguard', 'http://one.local');
+
+		expect(key).toContain('adguard');
+		expect(key).toContain('http://one.local');
 	});
 });
 
@@ -585,6 +708,33 @@ describe('containerFields', () => {
 			kind: 'enum',
 			isRequired: false,
 			options: ['tcp', 'http', 'none'],
+		});
+	});
+
+	/**
+	 * `provider` is the first REQUIRED picklist, and it has to reach the form with its
+	 * values: without them the editor renders a text box whose every near-miss is a refused
+	 * save, for a prop the form itself invited. Asserted against `providerNames` rather than
+	 * a literal list, so a provider added to the schema is covered the moment it is declared.
+	 */
+	it('offers every provider a config may name, as a required choice', () => {
+		expect(containerFields.BoxStats).toContainEqual({
+			path: 'provider',
+			kind: 'enum',
+			isRequired: true,
+			options: providerNames,
+		});
+	});
+
+	/**
+	 * `secret` names a variable, so an operator has to be able to leave it out — a provider
+	 * needing none would otherwise be unfillable. A `pipe`d string still describes as text.
+	 */
+	it('describes a piped optional string as an omittable text field', () => {
+		expect(containerFields.BoxStats).toContainEqual({
+			path: 'secret',
+			kind: 'string',
+			isRequired: false,
 		});
 	});
 

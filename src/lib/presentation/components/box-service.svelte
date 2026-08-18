@@ -103,7 +103,7 @@
 	     top-level the tile IS card, so the plate was the tile's own fill and vanished.
 	     `surface-inset` is the ladder's deepest step, so it is one below a top-level
 	     tile and, under a nested tile that is already inset, composites a step lighter
-	     over itself the way box-adguard's readings do. Named rather than read from
+	     over itself the way box-stats' readings do. Named rather than read from
 	     `--box-surface`: that property carries the TILE's fill, so reading it would
 	     hand the plate the surface it is meant to sit on. -->
 	<span

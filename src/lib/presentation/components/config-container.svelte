@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { ConfigContainer } from '$lib/business/model/config';
-	import BoxAdguardWrapper from '$lib/presentation/components/box-adguard-wrapper.svelte';
 	import BoxDate from '$lib/presentation/components/box-date.svelte';
 	import BoxServiceWrapper from '$lib/presentation/components/box-service-wrapper.svelte';
+	import BoxStatsWrapper from '$lib/presentation/components/box-stats-wrapper.svelte';
 	import Grid from '$lib/presentation/components/grid.svelte';
 	import SubGrid from '$lib/presentation/components/sub-grid.svelte';
 
@@ -47,8 +47,8 @@
 	<SubGrid {...container.props} {headingLevel} />
 {:else if container.name === 'BoxService'}
 	<BoxServiceWrapper {...container.props} {headingLevel} />
-{:else if container.name === 'BoxAdguard'}
-	<BoxAdguardWrapper {...container.props} />
+{:else if container.name === 'BoxStats'}
+	<BoxStatsWrapper {...container.props} />
 {:else if container.name === 'BoxDate'}
 	<BoxDate {...container.props} />
 {:else}

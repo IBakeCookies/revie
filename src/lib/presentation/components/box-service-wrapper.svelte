@@ -8,7 +8,7 @@
 	let props: Props = $props();
 	const servicesStore = getServicesStore();
 
-	// `?.`, like box-adguard-wrapper: `getServicesStore` returns `T | undefined` because
+	// `?.`, like box-stats-wrapper: `getServicesStore` returns `T | undefined` because
 	// `getContext` answers `undefined` wherever no page component set the store — which a
 	// story mounting this wrapper alone is.
 	const isOnline = $derived(servicesStore?.isAlive(props.href));

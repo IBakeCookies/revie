@@ -59,7 +59,7 @@ has no config file for it, so a strategy would have to be spelled in both places
 
 ```
 data → business/model → business/store → UI    client reads (ping, theme)
-data → business/model → load → store   → UI    SSR reads (adguard, config)
+data → business/model → load → store   → UI    SSR reads (stats, config)
 ```
 
 The UI never knows where its data comes from. It reads from a store or from props —
@@ -91,12 +91,12 @@ so no `setContext` and no runes, and the server must have the data before any HT
 exists. So the load function is the composition root — it's how server data gets
 _into_ a store. The component-facing contract is identical either way, which is what
 [page.svelte](src/lib/presentation/components/page.svelte) buys with
-`setAdguardStore(() => adguard ?? undefined)`: that thunk keeps the SSR path obeying
+`setStatsStore(() => stats)`: that thunk keeps the SSR path obeying
 the same rule as the client path.
 
 Note the exemption is narrow. A route **server** file may call `business/model`, but
 it may NOT reach `src/lib/data` — a load function is the composition root, not a
-licence to call a repository. That is why `readAdguardStats` and `readConfig` are
+licence to call a repository. That is why `readStats` and `readConfig` are
 business functions rather than repository calls inlined into
 [+page.server.ts](src/routes/[...slug]/+page.server.ts).
 
@@ -224,10 +224,10 @@ mtimeMs, isFresh }`. Neither prints. `isFresh` is true only on the call that act
   never will, so rendering one puts an English line on a German page with nothing short of this
   rule to fix it. What crosses a layer is **data or a kind**, never a sentence:
 
-  | Producer         | Hands over                                   | Words chosen by                                              |
-  | ---------------- | -------------------------------------------- | ------------------------------------------------------------ |
-  | `ServicesStore`  | `NotifyProbeFailed = (href: string) => void` | `[...slug]/+page.svelte`: `m.service_probe_failed({ href })` |
-  | the AdGuard load | `adguardFailed: boolean`                     | the same route: `m.adguard_load_failed()`                    |
+  | Producer        | Hands over                                   | Words chosen by                                              |
+  | --------------- | -------------------------------------------- | ------------------------------------------------------------ |
+  | `ServicesStore` | `NotifyProbeFailed = (href: string) => void` | `[...slug]/+page.svelte`: `m.service_probe_failed({ href })` |
+  | the stats load  | `failedStats: { key, provider, href }[]`     | the same route: `m.stats_load_failed({ provider, href })`    |
 
   So `ServicesStore` keeps its own `console.error(err.message, …)` **unconditionally** — that
   is a diagnostic, and a diagnostic has a fixed sink — while the injected half carries the href
@@ -238,7 +238,7 @@ mtimeMs, isFresh }`. Neither prints. `isFresh` is true only on the call that act
   [ToastStore](src/lib/business/store/toast-store.svelte.ts) therefore takes a **finished
   string** and is translation-blind, which is what lets it live in business at all.
   The fence is the German case in
-  [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts) — verified to fail, and to be
+  [can-see-provider-stats.e2e.ts](e2e/can-see-provider-stats.e2e.ts) — verified to fail, and to be
   the only thing that fails, when that call site is given a literal instead of a message.
   `message`'s own doc comment in
   [useAsyncErrorAsValue.ts](src/lib/utils/useAsyncErrorAsValue.ts) now says the same thing. It used
@@ -250,11 +250,16 @@ mtimeMs, isFresh }`. Neither prints. `isFresh` is true only on the call that act
   plumbing did not.
 
 - **`ToastStore.show` untracks its own body, and that is load-bearing:** the route calls it
-  from inside an `$effect` (the AdGuard flag the load returned), and both the dedupe check and
+  from inside an `$effect` (the failure list the load returned), and both the dedupe check and
   the `push` READ the message array — so the effect subscribed to it and dismissing a toast put
-  it straight back. Reproduced end to end; the fence is the dismiss case in
-  [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts), because `untrack` outside
-  an effect is a pass-through and no node spec can register one.
+  it straight back. Reproduced end to end. **It is no longer fenced, and that is worth knowing
+  before you delete it**: the dismiss case in
+  [can-see-provider-stats.e2e.ts](e2e/can-see-provider-stats.e2e.ts) was the fence, and #16's
+  `reportedFailures` now `continue`s in that effect _before_ `show`, so the e2e passes with
+  the `untrack` removed. Nothing detects its removal — `untrack` outside an effect is a
+  pass-through, so neither remaining caller (the probe notify fires after an `await`, outside
+  any tracking scope) can register one, and no node spec can either. It stays because the next
+  in-effect caller will not arrive with an episode flag of its own.
 
 ### Config-driven rendering
 
@@ -338,7 +343,7 @@ config.json ─(disk read, no caching)→ data/config.ts
 
 - **The admin diagnostics are the one sanctioned crossing of the no-copy rule.**
   `ConfigWrite.rejection` is a KIND (`'invalid-json' | 'not-an-object' | 'warnings' |
-'write-failed' | null`) and the route picks the words, exactly like `adguardFailed` — but
+'write-failed' | null`) and the route picks the words, exactly like `failedStats` — but
   `warnings` rides along as `normalizeConfig`'s own English sentences and `/admin` renders
   them verbatim. The carve-out: the admin area's only audience is the operator who set
   `DASHBOARD_ADMIN_TOKEN` and reads the server log, and these are the same sentences in the
@@ -406,6 +411,123 @@ missing or not valid` rather than `not a string`: `probe` is the first prop wher
   **drops** a key without a leading slash rather than warning about it, because the nav links
   straight to the key: `noslash` visited from `/services` emits a relative href that resolves
   under it, and a link that navigates somewhere else is worse than no link.
+
+### The stats providers
+
+One container reads live numbers off a service — `BoxStats`, with a `provider` token —
+rather than one container per vendor. A dozen names would be a dozen schema entries, a
+dozen branches before `config-container.svelte`'s `never` assert and a dozen components;
+a token keeps presentation at ONE component and moves completeness one layer down.
+
+```
+config.json ─(provider + href + secret)→ business/model/config.ts   collectStatsTargets
+            ─(DASHBOARD_SECRET_<NAME>)→ [...slug]/+page.server.ts   the credential, resolved
+            ─(TTL cache + one AbortSignal)→ business/model/stats.ts  readStats
+            ─(fetch + wire schema)→ data/repository/<vendor>.ts
+            ─(project)→ Stat[] ─→ StatsStore ─→ box-stats.svelte
+```
+
+Four ship: `adguard`, `pihole-v5`, `pihole-v6`, `uptime-kuma`. Adding a fifth is **six** edit
+points, not the five this list used to name: a repository file, one entry in `providers`, one
+token in `providerNames`, one product name in `providerNameLabel`, and — per reading it adds
+that nothing else emits — a `StatKey` with its `stat_*` message in BOTH catalogues, **plus an
+entry in [box-stats.svelte](src/lib/presentation/components/box-stats.svelte)'s `chrome`** (and
+one in its `formats`, if the reading is a number). Those two records are `Record<StatKey, …>`
+and `Record<NumericStatKey, …>`, so a new key is a compile error in a file the list omitted —
+discovered, but discovered late. Eleven things about the shape are decisions:
+
+- **The registry lives in `business/model/stats.ts`, NOT in `data/repository/` where
+  [roadmap.md](roadmap.md) #33 put it.** `Stat`/`StatKey` is a presentation-facing
+  vocabulary — its keys index a message map — and `data → leaf only` means a repository
+  may not import `business/type/stats.ts`. A registry down there would either move the
+  projection out of business or hand `data` a type it cannot name. `Record<ProviderName,
+ReadProvider>` gives the identical compile-time completeness either way, so the layer
+  rule decides it. `providerNames` itself stays in
+  [config.ts](src/lib/business/model/config.ts), because that file is in the CLIENT bundle
+  (`poll-services-state.ts` value-imports `collectServiceProbes`) while `stats.ts`
+  value-imports every repository; `stats.ts` type-imports the token and never the reverse.
+- **A repository declares its wire shape as a valibot schema, and the projection reads
+  `v.InferOutput` of it.** `readStats` is `fetch → project`, in that order, with the
+  projection only ever running on the `[null, data]` branch — so it cannot read a field
+  nothing validated. That is #17's bug made structural: a 200 carrying a shape nobody
+  checked is `[AppError, null]` before a projection is reachable, instead of a TypeError
+  that 500s the whole page and loses the instances that DID answer.
+- **The 3s bound is minted by business and handed DOWN as a signal.** It is a page-latency
+  policy — the same thing the 30s TTL beside it is — not a wire fact, and a provider that
+  needs two round trips would otherwise spend a per-fetch bound twice, quietly doubling the
+  worst case the whole design rests on. `stats.spec.ts` asserts the value; the repository
+  spec asserts only that the signal it was handed is the one used.
+- **A config entry names the VARIABLE holding its credential, never the credential.**
+  `"secret": "ADGUARD_MAIN"` is read from `DASHBOARD_SECRET_ADGUARD_MAIN` through
+  `$env/dynamic/private`, in the ROUTE, and passed to the model as a parameter (R1 — the
+  model imports nothing to get it). The value is appended **verbatim**: folding case or
+  punctuation would invent collisions whose failure mode is the wrong credential, silently,
+  while verbatim lets the diagnostic name the literal key it looked up. Punctuation is the
+  one case that cannot work at all — a shell cannot export `DASHBOARD_SECRET_A-B` — so the
+  schema is `v.regex(/^[A-Za-z0-9_]+$/)` and the editor refuses the save instead.
+  One string per instance, opaque; what it MEANS is the provider's own business (AdGuard
+  splits it at the first colon). There is deliberately **no `requiresSecret` flag** on the
+  registry: a 401 already says it, and a table would be a second declaration of each
+  provider's auth that nothing forces to agree with the code that authenticates.
+- **A named variable that is unset is an ABSENCE — skipped, logged once, never toasted.**
+  Same rule the global credential pair had: an operator's own setup decision must not be put
+  in front of every visitor on every page load. A box naming NO variable is read anonymously,
+  which is right for a provider that needs none; one that does answers 401, and that is an
+  ordinary failure that toasts.
+- **The key is `provider` AND `href`, through `statsKey`.** The TTL cache, the page's record
+  and the store all address a reading by that one string, so they cannot disagree. An href
+  alone is not an identity: two boxes at one href with different providers is a real config
+  — a Pi-hole migrated from v5 to v6 answers both — and an href-keyed cache would serve one
+  provider's readings to the other. Not a collision: wrong numbers.
+- **The failure seam is a LIST of instances, not a flag and not a provider list.** #17 keyed
+  readings by instance, so a provider is not an identity either: with two Pi-holes and one
+  down, "Pi-hole is unavailable" is true, useless, and indistinguishable from both being
+  down. `StatsFailure` carries `{ key, provider, href }` and the route picks every word —
+  `providerNameLabel` in [presentation/util/](src/lib/presentation/util/provider-name.ts)
+  turns the token into a product name, which is **not** a paraglide message because a product
+  name is identical in every locale and offering a translator four strings they must not
+  touch is worse than a map. N failing instances raise N toasts, uncapped and deliberately: a
+  summary line is the same "useless for eight" failure one level up.
+- **A `StatKey` carries its unit, and the two share-shaped ones are FRACTIONS.**
+  `blocked-share` and `uptime-24h` are 0..1, because `Intl`'s percent style is what formats
+  them and multiplies by 100 itself. Both Pi-hole wires report 0–100, so both projections
+  divide — the same rule `avg-latency` follows when AdGuard reports seconds. A wire value
+  passed through unchanged is the silent version of this bug: `4.5` renders as `450%`.
+- **Pi-hole is TWO provider tokens, not one with a version prop.** v5 (`/admin/api.php`,
+  token in the query) and v6 (a session against FTL) share no path, no auth and no field
+  name, so one token would be a branch wrapping two unrelated bodies — and the operator has
+  to know which they run anyway, because the two take different secrets. Auto-detection was
+  refused: a round trip per cache miss against a host that may be down, for a fact the
+  operator already has. `statsKey` carrying the provider is what lets one href answer both
+  during a migration.
+- **v6 caches its session id at module scope in the repository, and BOTH round trips spend
+  one signal.** FTL caps `webserver.api.max_sessions` at 16 and answers 429 once they are
+  gone, so a login per read would take the operator's own admin UI down with the dashboard.
+  What invalidates an entry is named rather than hoped for — a 401 from the summary call,
+  which is what the 30-minute timeout produces — and the re-auth happens **once per read and
+  only for a session that had already served a summary**. That `proven` flag is not caution:
+  a 401 is evidence of expiry only for a session that worked, while a proxy stripping
+  `X-FTL-SID`, TOTP on the instance or an app password without the scope refuses a session
+  minted seconds earlier and never stops — so re-authing on every 401 spent a seat per read
+  and burned all 16 in eight minutes at the 30s stats window, which is the exact 429 the
+  cache exists to prevent. The trade is honest: while such a 401 persists the cached session
+  is reused and the read keeps failing, so an instance whose session FTL has since dropped
+  needs a restart to log in again. **A box naming no secret never logs in at all** — an
+  instance with no password set answers the summary unauthenticated, and its `/api/auth`
+  returns a 200 whose `sid` is null, which is byte-identical to a refusal. The handshake is
+  also why the 3s bound is minted in `stats.ts` and handed down: a per-fetch bound here
+  would have been spent twice, quietly doubling the worst case the page rests on.
+- **`redirect: 'manual'` on both Pi-hole fetches, and the reason is not symmetry.** v5's
+  token is in the query string and v6's session id is a custom header, and a redirect strips
+  neither — so a followed one hands the credential to a host the operator never configured.
+  AdGuard's credential is `Authorization`, which the Fetch spec deletes across origins by
+  itself (measured on node 22.14: a cross-origin redirect target received `{"seenAuth":null}`
+  where a same-origin one got the header), so it has nothing left to leak and follows; Uptime
+  Kuma reads a public status page and has nothing to leak either. **An earlier version of this
+  bullet said following redirects is "what keeps an instance behind an `http:`→`https:` hop
+  working". It is not** — `http:`→`https:` is cross-origin, so the credential is dropped and
+  AdGuard answers 401. An href has to name the address the instance actually answers on, and
+  README.md says so where an operator will read it.
 
 ### The appearance pipeline
 
@@ -531,7 +653,7 @@ things about it are decisions:
      lockout of the real operator.
 
   It returns a **kind plus a number** — `{ status: 'locked'; retryAfterSeconds }` — and the login
-  page picks every word, the same seam as `adguardFailed`. **There is deliberately no e2e for
+  page picks every word, the same seam as `failedStats`. **There is deliberately no e2e for
   it:** one preview server process serves the whole playwright run and every admin spec signs in
   from `127.0.0.1`, so a lockout test would poison whichever admin spec ran next. The node spec
   keys each case on its own fake address instead, which is also why no test-only reset export
@@ -614,16 +736,16 @@ Things that break **silently** — no error, just wrong output.
   `--box-surface`.** Config decides depth, so no component can know its own: the same
   `BoxService` is a tile inside a `Grid` card on one page and sits straight on the page on
   another, and one hardcoded fill is wrong in whichever case it wasn't written for. It was
-  wrong: every box named `bg-surface-inset`, so a top-level `BoxDate` / `BoxAdguard` rendered
+  wrong: every box named `bg-surface-inset`, so a top-level `BoxDate` / `BoxStats` rendered
   a step **below** the `Grid` card beside it, which is elevation upside down for two siblings.
   Measured on `solid-light` — inset `0.955` on a `0.96` page, so the clock box dissolved into
   the background while the card next to it was white with a shadow. The shape now:
 
-  | Who                                                                                                                         | Does what                                         |
-  | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-  | `box-date`, `box-adguard`, `box-service`, `grid`, `config-container`'s `{:else}`, [+error.svelte](src/routes/+error.svelte) | READ it: `bg-(--box-surface,var(--surface-card))` |
-  | `grid`'s items `<div>`, `box-adguard`'s `<dl>`                                                                              | DECLARE `[--box-surface:var(--surface-inset)]`    |
-  | `sub-grid`'s items `<div>`                                                                                                  | PASS THROUGH: `[--box-surface:inherit]`           |
+  | Who                                                                                                                       | Does what                                         |
+  | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+  | `box-date`, `box-stats`, `box-service`, `grid`, `config-container`'s `{:else}`, [+error.svelte](src/routes/+error.svelte) | READ it: `bg-(--box-surface,var(--surface-card))` |
+  | `grid`'s items `<div>`, `box-stats`'s `<dl>`                                                                              | DECLARE `[--box-surface:var(--surface-inset)]`    |
+  | `sub-grid`'s items `<div>`                                                                                                | PASS THROUGH: `[--box-surface:inherit]`           |
 
   Four things about it are load-bearing:
   1. **The declaration is on the items wrapper, never on the card that reads it.** Unlike a
@@ -647,7 +769,7 @@ inline` inlines its values at build time and emits no `--color-*` custom propert
      tile's fill whenever the tile is top-level — so the plate vanished into it.
 
   Two steps is all there is, because there are only two tokens: page → card → inset. The third
-  level — a reading inside a nested `BoxAdguard` — lands on inset-over-inset and reads only
+  level — a reading inside a nested `BoxStats` — lands on inset-over-inset and reads only
   because the veil composites (next bullet).
 
 - **On the dark glass themes, nesting gets LIGHTER — `--surface-inset` is a white veil.** All
@@ -715,15 +837,20 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  39 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
-  **Three take parameters** — `service_probe_failed({ href })`, so the toast names the service it
+  44 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  **Six take parameters** — `service_probe_failed({ href })`, so the toast names the service it
   could not reach, `admin_container_add_at({ target, position })`, so each of a list's N+1
-  insertion buttons has an accessible name that says which list and where, and
+  insertion buttons has an accessible name that says which list and where,
   `admin_sign_in_locked({ seconds })`, so a locked-out operator knows whether to wait or to go
-  looking for the token. They are the only things the compiler's parameter typecheck has ever had
-  to check. The four AdGuard keys are
-  labels, with `Intl.NumberFormat` formatting the
-  readings themselves ([box-adguard.svelte](src/lib/presentation/components/box-adguard.svelte)).
+  looking for the token, and the three `stats_*` keys, which all take `{ provider }` — a
+  PRODUCT name out of [provider-name.ts](src/lib/presentation/util/provider-name.ts), never
+  the config token — plus `{ host }` on `stats_open`, so two `BoxStats` instances on one page
+  do not offer a screen reader two links with the same name, and `{ href }` on
+  `stats_load_failed`, so a page of several says which one is empty. They are the only things
+  the compiler's parameter typecheck has ever had to check. The nine `stat_*` keys are
+  labels — one per `StatKey`, so a reading a provider emits and nobody has words for is a
+  compile error — with `Intl.NumberFormat` formatting the
+  readings themselves ([box-stats.svelte](src/lib/presentation/components/box-stats.svelte)).
   A parameter is how DATA reaches a message; it is never how copy leaves a lower layer — see the
   no-copy-crosses-a-layer rule above.
 
@@ -762,7 +889,7 @@ real behaviour — they run in chromium as part of `npm run test:unit`, so a bro
 fails the suite, not just the storybook UI. **The a11y addon is at `test: 'error'`, so axe runs
 against every story and a violation fails `npm run test:unit`.** Keep it there — it is the only
 automated a11y gate in the repo, and it earned its place immediately: turning it on surfaced a
-`link-name` violation no one had reported (box-adguard's anchor is empty whenever `stats` is
+`link-name` violation no one had reported (box-stats' anchor is empty whenever `stats` is
 undefined, so it sat in the tab order announcing nothing). Note axe only ever sees a story's
 **rest** state, so the states worth an a11y check have to exist as their own stories rather than
 being reached inside a `play` function. The one violation it cannot catch is `document-title`
@@ -780,7 +907,7 @@ body, whose centre can land back inside the component.
 
 **A wrapper's story is its only test.** A wrapper reads a store and forwards props
 ([box-service-wrapper.svelte](src/lib/presentation/components/box-service-wrapper.svelte),
-[box-adguard-wrapper.svelte](src/lib/presentation/components/box-adguard-wrapper.svelte)) —
+[box-stats-wrapper.svelte](src/lib/presentation/components/box-stats-wrapper.svelte)) —
 and providing the store context is the only thing that proves the store→prop forwarding, which
 nothing else covers.
 
@@ -788,14 +915,16 @@ nothing else covers.
 that `testMatch` separates them from the vitest specs). Playwright
 points the preview server at [e2e/fixture-config.json](e2e/fixture-config.json) via
 `DASHBOARD_CONFIG`, so the suite never depends on the services of the machine it runs on:
-one host that resolves, one that never does, an AdGuard instance on a closed port.
+one host that resolves, one that never does, a stats provider on a closed port.
 
-**The fixture's env is part of the fixture.** `webServer.env` spells `ADGUARD_USERNAME` /
-`ADGUARD_PASSWORD` alongside `DASHBOARD_ADMIN_TOKEN` for the same reason the config is
-pinned: unset, `loadAdguardStats` returns `[null, null]` — an absence, no toast — so the
-two toast cases in [can-see-adguard-stats.e2e.ts](e2e/can-see-adguard-stats.e2e.ts) find an
+**The fixture's env is part of the fixture.** `webServer.env` spells
+`DASHBOARD_SECRET_E2E_ADGUARD` alongside `DASHBOARD_ADMIN_TOKEN` for the same reason the
+config is pinned: unset, the load treats the box as an ABSENCE — skipped, no toast — and the
+two toast cases in [can-see-provider-stats.e2e.ts](e2e/can-see-provider-stats.e2e.ts) find an
 empty live region. That was green on a developer machine off a gitignored `.env` and red on
-CI, which has none. The values are arbitrary; the port they point at is closed either way.
+CI, which has none. The name after the prefix is the fixture's own `"secret": "E2E_ADGUARD"`;
+the value is arbitrary apart from the colon AdGuard's provider checks for, and the port it
+points at is closed either way.
 
 The host that resolves is the preview server itself, which is why
 [playwright.config.ts](playwright.config.ts) pins **IPv4 on both sides** — `--host 127.0.0.1`,
@@ -814,7 +943,7 @@ to invalid URL".
 the same `Grid` is the whole page or a quarter of it — so a `sm:` breakpoint answers a question
 about the window when the question is about the box. Every component that changes shape
 declares `@container/<its-name>` and queries that: `box-service` (the status word), `box-date`
-(stacked vs. one line), `box-adguard` (2 → 3 → 4 readings), `grid` (title size), and `header`
+(stacked vs. one line), `box-stats` (2 → 3 → 4 readings), `grid` (title size), and `header`
 (when the menus stop taking a row of their own). The viewport variants left in the tree are the
 ones that genuinely mean the viewport: `xl:col-span-(--span)`, which is where the 12-column page
 grid starts honouring config's span at all, and `md:p-page-md` on `<main>`, which is the page.
@@ -837,7 +966,7 @@ green test that proves nothing, which is worse than no test.
 **`console` has exactly three homes, all of them routes or stores, and no lint rule guards
 them yet.** `business/store/service-store.svelte.ts` (1 — the probe diagnostic),
 `+layout.server.ts` (2 — config diagnostics) and `[...slug]/+page.server.ts` (4 — config
-diagnostics plus the AdGuard operator channel). Measured: a global `no-console` reports 9, the
+diagnostics plus the stats operator channel). Measured: a global `no-console` reports 9, the
 other two being outside `src` and neither a home — `dps.js`, which [roadmap.md](roadmap.md) #10
 deletes, and `scripts/screenshot.js`, a CLI whose whole job is to tell a terminal where it wrote
 a file. **#23 has landed, and this is what it bought:** `business/model/config.ts` and
@@ -894,10 +1023,10 @@ Comments explain _why_, not _what_; the existing ones are the house style, match
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 21 open items, all but #33 and #36 from three
-review passes and adversarially verified against the code, ordered by what breaks soonest. Those
-two are the second stats provider and the admin area's two known gaps, the latter from building
-the guard rather than from a review. Several are straight ports from
+The open work lives in [roadmap.md](roadmap.md) — 16 open items, all but #33 from three
+review passes and adversarially verified against the code, ordered by what breaks soonest. #33 is
+the exception: its core landed, so what is left of it is the remaining vendor files that plug into
+the seam. Several are straight ports from
 `zenith`, which has already solved them; those items name the upstream files. It is its own file
 because it churns as items land, while this one is the architecture and should not. **Nothing in it
 is fixed** — the section below is what is.
@@ -927,14 +1056,15 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
      above it, and `page.stories.svelte` mounts exactly that — while setting the store from a
      stories file gives every story on the autodocs page one shared context. Left out, the
      failure is still logged by the store; only the toast is missing.
-  3. **`loadAdguardStats` returns `Result<AdguardStats | null>`, and the load passes
-     `adguardFailed: boolean`.** A flag, not a message — see the no-copy rule above.
-     `[null, null]` is reserved for an _absence_ — no box configured, or no credentials —
-     because toasting an operator's own setup decision would put it in front of every visitor on
-     every page load. One flag rather than an `'unauthorized' | 'unreachable'` kind because the
-     only distinction worth drawing is already in the server's log line, which names the host and
-     the status, and a user reads the same sentence either way. Add the kind if that stops being
-     true; the shape is ready for it.
+  3. **The stats load returns `{ stats, failed }`, and the load passes `failedStats`.** Data,
+     not a message — see the no-copy rule above. An empty `failed` is reserved for an _absence_
+     — no box configured, or a `secret` naming a variable nobody set — because toasting an
+     operator's own setup decision would put it in front of every visitor on every page load.
+     `{ key, provider, href }` rather than an `'unauthorized' | 'unreachable'` kind, because the
+     distinction worth drawing is WHICH BOX, not why: the why is already in the server's log
+     line, which names the host and the status, and a user reads the same sentence either way.
+     It was one boolean until #33; see "The stats providers" for why an instance list replaced
+     it and why a provider list would not have.
   4. **`toasts.show()` takes a finished string.** It is the one thing in `business/store/` that
      could plausibly have wanted a message key, and it must not: keys there would make the store
      name a locale and a catalogue. Callers resolve first.
@@ -964,7 +1094,7 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
 - **Stores live in `business/store/`**, not presentation. The reactive holder is only
   half of what a store does; the other half is orchestration, and that is business. The
   split that makes it safe is `model/` staying framework-free for the SSR path.
-- **`readAdguardStats` and `readConfig` are business functions.** Route server files
+- **`readStats` and `readConfig` are business functions.** Route server files
   may not reach `src/lib/data` — see the layer rule.
 - **`normalizeContainer` guards required props, and `requiredProps` is gone.** It was a
   `Record<ContainerName, …>` table restating shapes the types already carried, with nothing
@@ -972,7 +1102,7 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   exactly two, and the only one that could be collapsed. The valibot schema is now the single
   declaration and the types are inferred from it. Don't reintroduce the table. What did not
   change: `items` is set unconditionally for `Grid`/`SubGrid` — a grid written before its
-  children renders empty instead of throwing in `findContainer` on the next page load — and a
+  children renders empty instead of throwing in the collectors on the next page load — and a
   container missing a required prop is dropped with a warning while its siblings and its parent
   grid survive.
 - **A page whose value is not a record is dropped, and `v.object` will not do it for you.**
@@ -986,9 +1116,92 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   (merged into props), so nothing downstream ever sees them. The file format has no type at
   all — it arrives as `unknown`. Adding `defaults` there would describe a shape that never
   exists.
-- **The AdGuard fetch is bounded** at 3s via `AbortSignal.timeout`. Without it, the page load
-  awaited undici's defaults: 10s for a box that is switched off, 300s for one that answers the
-  SYN then goes quiet.
+- **A stats fetch is bounded** at 3s via `AbortSignal.timeout`, minted in
+  [business/model/stats.ts](src/lib/business/model/stats.ts) and handed to the provider — see
+  "The stats providers" for why it is not the repository's. Without it, the page load awaited
+  undici's defaults: 10s for a box that is switched off, 300s for one that answers the SYN
+  then goes quiet.
+- **Stats are keyed per instance, and every configured one is read.** `collectStatsTargets`
+  (beside `collectServiceProbes`, same traversal) hands the load one target per instance, the
+  reads go out under `Promise.all` so the 3s bound above is the cost of the whole page rather
+  than of each box in turn, and `StatsStore` answers `stats(provider, href)`. It was one
+  `findContainer(page, 'BoxAdguard')` — the FIRST match at any depth — and one value in the store
+  that the wrapper handed to every box without reading `props.href`: two instances rendered
+  identical numbers and the second host was never contacted. **`findContainer` and its
+  `scanContainer` helper are gone**, deleted with the `config.spec.ts` block that was their only
+  remaining reader — a helper whose one caller is a test of itself is what `no-orphans` is for.
+  `isBoxStats` survives because the collector narrows with it. The key became `provider` + `href`
+  and the credential became per-instance when #33 landed; both are under "The stats providers".
+- **The stats sit behind a 30s TTL cache, and the page refreshes itself every 60s.**
+  `readStats` holds a `Map<key, { readAt, result }>` at module scope in
+  [business/model/stats.ts](src/lib/business/model/stats.ts) and returns `{ result, isFresh }`.
+  Process state in `business/model` on the same precedent as `config-source.ts`'s stamp cache and
+  `admin-auth.ts`'s backoff — a store is unreachable from the SSR path, and a `data/` module would
+  be a second file for one caller with no external name to own. The honest consequences, and they
+  are in README.md: it is per process, a restart drops it, and two instances behind a load balancer
+  can be serving readings a window apart. Five decisions:
+  1. **The FAILURE is cached too, and that is the whole item.** A host that is switched off is the
+     one paying the repository's 3s bound, so a success-only cache would have left the measured
+     `ttfb=2.996s` / `2.954s` exactly where it was. Same reasoning as `config-source.ts` caching a
+     read failure against its stamp; here the window expiring is what retries.
+  2. **`isFresh` gates the route's `console.error`, not the report.** The entry still reaches
+     `failedStats` on a cached failure — the box is empty either way — while the operator log
+     prints once per window. Unconditional, a refreshing tab would put back the per-request spam
+     #23 removed.
+  3. **Keyed per instance, not one blob**, so two pages naming different hosts do not evict each other
+     and a dead instance does not cost a live sibling its freshness.
+  4. **Not pruned, deliberately.** `admin-auth.ts` prunes because a stranger picks its keys; these
+     come out of `config.json`, so the set is bounded by a file one operator writes.
+  5. **The refresh interval is 60s and must stay `>=` the TTL.** Shorter, and a tick only re-reads
+     the cache and the box never moves. It is `depends('dashboard:stats')` in the load plus a
+     `setInterval` in [+page.svelte](src/routes/[...slug]/+page.svelte) gated on
+     `document.visibilityState === 'visible'` and cleared by its effect's teardown. Nothing was
+     extracted out of `poll-services-state.ts`: one guarded interval is not a duplication, and
+     [roadmap.md](roadmap.md) #18 is where the second one makes it so.
+  6. **`invalidate` re-runs the WHOLE load, and everything that re-runs with it needs a gate.**
+     Four of them, each a named failure rather than caution:
+     - `readConfig` runs again per tick — accepted, it is mtime-cached, so a tick that changes
+       nothing costs one `stat`.
+     - The load also rebuilds `containers`, a fresh array every tick, so
+       [page.svelte](src/lib/presentation/components/page.svelte)'s `$effect` restarted the
+       15-minute service poll every minute — re-probing every configured service and, because
+       `ToastStore` only dedupes what is on screen, re-toasting a probe that keeps failing.
+       That effect depends on `serviceProbeKey(containers)`, a joined href list, so it re-runs
+       when the SET changes and not when the array carrying it does.
+     - The interval itself is gated on the page having something to refresh (a reading that
+       arrived, or a read that failed). `[...slug]` matches every config page, so ungated it
+       costs an install with no `BoxStats` a load round trip a minute, forever, for a record
+       that is always empty.
+     - The unset-secret `console.warn` is the one branch no cache gates — it skips the target
+       before `readStats` — so it warns once per VARIABLE per process behind a module-scope
+       `Set`. `$env/dynamic/private` cannot change without a restart, so each name has exactly
+       one thing to say.
+
+     One gap is left and is a trade, not an oversight: a tick whose load hits `error(503)`
+     (config caught mid-write by a non-atomic editor) or `error(404)` (a page key renamed under
+     an open tab) swaps the dashboard for the error page, and the unmounted page takes its
+     interval with it, so the tab stays there until a manual reload. Closing it means keeping
+     the interval above the page — in the layout, which survives the swap — and the layout
+     cannot know whether the page it is showing has a `BoxStats`, so that trades a rare
+     operator-caused park for the certain, continuous waste the gate above removes. Take the
+     gate. Closing it properly means the refresh not re-running the config half at all — a
+     dedicated endpoint the store polls, the shape `/api/ping` already has — which is a
+     different item, not a patch to this one.
+- **A stats toast is raised once per failure EPISODE, through a plain `let` in the route.**
+  `ToastStore` dedupes against what is currently on screen, so it cannot cover a periodic
+  `invalidate`: a re-run load hands `[...slug]/+page.svelte` a new `data` object every minute, the
+  `$effect` re-runs, and a toast the user dismissed — or that timed itself out after `TOAST_MS` —
+  came straight back, unattended, forever. `reportedFailures` is a `string[]` keyed the same way
+  the readings are, and an entry is dropped as its instance recovers, so a box that fails again is
+  reported again — the boolean's behaviour, one per instance. It is a list and **not a `Set`**
+  because `svelte/prefer-svelte-reactivity` rejects a mutable built-in `Set` in a component, and a
+  reactive one is the opposite of what this needs; it holds one entry per stats box, so `includes`
+  is right. Three things it is also **not**:
+  not `$state` (nothing renders it, and the effect must not depend on it), not a "seen" set in
+  `ToastStore` (that store is shared with the probe toast, and its dedupe-by-message is a recorded
+  decision), and not a message key crossing into business. `ToastStore.show`'s `untrack` is
+  untouched — it closes the self-retrigger loop and was never about an external one — but this
+  flag is what took its e2e fence away, which the "Errors are values" section spells out.
 - **The docs were corrected against the code**, so don't restore the old wording from memory or
   from an older checkout. What changed: the seven module paths the `refactor(layers)` commit
   stranded (three were 404 links); the render-pipeline diagram, which named a `server/config.ts`
@@ -1107,7 +1320,7 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
     arrives with the old `0.1` — halve it on the way in, the way `fallow` gets dropped.
 - **`src/lib/test/` is under no layer constraint.** No eslint layer block and no cruiser layer
   rule matches it, so the two harnesses that live there —
-  [adguard-store-harness.svelte](src/lib/test/adguard-store-harness.svelte) and
+  [stats-store-harness.svelte](src/lib/test/stats-store-harness.svelte) and
   [theme-store-harness.svelte](src/lib/test/theme-store-harness.svelte) — may import from any
   layer with nothing to stop them. That is fine for test support and is why they live there
   rather than under `presentation/` — but it means an import _from_ this directory into app code

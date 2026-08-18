@@ -203,16 +203,22 @@
 	}}
 />
 
-<!-- BoxAdguard's stats come from the SSR payload via a store, which no story mounts:
-     the box has to render its shell on `undefined` rather than throw, because the
-     page load hands back an error as a value whenever AdGuard is unreachable. -->
+<!-- BoxStats' readings come from the SSR payload via a store, which no story mounts: the
+     box has to render its shell on `undefined` rather than throw, because the page load
+     hands back an error as a value whenever the service is unreachable.
+
+     `secret` rides along in the container's props because a real config carries it, and the
+     box declares no such prop: the spread has to survive a key nothing downstream names.
+     Whether it reaches the DOM is the e2e's assertion, not this one. -->
 <Story
-	name="Box adguard without stats"
+	name="Box stats without stats"
 	args={{
 		container: {
-			name: 'BoxAdguard',
+			name: 'BoxStats',
 			props: {
+				provider: 'adguard',
 				href: 'http://adguard.local',
+				secret: 'ADGUARD_MAIN',
 				span: 8,
 			},
 		},
@@ -227,7 +233,7 @@
 			'--span': '8',
 		});
 
-		// No stats, so one line saying so instead of the four readings.
+		// No stats, so one line saying so instead of the readings.
 		await expect(link?.querySelectorAll('p')).toHaveLength(1);
 	}}
 />
