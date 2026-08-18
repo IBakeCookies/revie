@@ -49,7 +49,7 @@ export class ToastStore {
 		// Untracked, and not defensively: `show` is called FROM an `$effect` (a route
 		// forwarding a failure its load returned), and both the dedupe check and `push`
 		// READ this array — so the effect subscribed to it and dismissing a toast put it
-		// straight back. Reproduced end to end; the e2e in can-see-adguard-stats holds
+		// straight back. Reproduced end to end; the e2e in can-see-provider-stats holds
 		// it, since `untrack` outside an effect is a pass-through and a node spec cannot
 		// register one.
 		untrack(() => {

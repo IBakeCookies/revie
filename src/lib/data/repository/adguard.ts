@@ -1,60 +1,65 @@
+import * as v from 'valibot';
 import { type Result, useAsyncErrorAsValue } from '$lib/utils/useAsyncErrorAsValue';
 
-interface GetAdguardStatsInput {
-	username: string;
-	password: string;
+/**
+ * A 200 does not mean stats. AdGuard answers `null` on some proxy setups and an error
+ * object (`{"message":"unauthorized"}`) on others, and a cast let both through: the
+ * first threw a TypeError out of the projection, the second rendered "NaN". The
+ * repository owns the wire shape, so the check lives here — inside the error-as-value
+ * boundary, where a bad body becomes `[AppError, null]` like any other failure.
+ *
+ * A schema rather than a hand-rolled predicate, so the type the projection sees is
+ * inferred from the thing that validated it and cannot describe a field nothing checked.
+ */
+const adguardStatsSchema = v.object({
+	num_dns_queries: v.number(),
+	num_blocked_filtering: v.number(),
+	avg_processing_time: v.number(),
+	// AdGuard omits this on a fresh install, and Go's `encoding/json` writes a nil slice as
+	// `null` — the same "no data yet" instance, one wire value apart. `nullish` and not
+	// `optional`: the latter substitutes its default for `undefined` ALONE, so an explicit
+	// null ran the array schema and failed the whole read on an instance answering
+	// correctly. Defaulted rather than left absent so the projection's `.at(0)` has nothing
+	// to optional-chain — the exact call that threw.
+	top_blocked_domains: v.nullish(v.array(v.record(v.string(), v.number())), []),
+});
+
+export type AdguardWire = v.InferOutput<typeof adguardStatsSchema>;
+
+export type GetAdguardStatsInput = {
 	href: string;
-}
+	/**
+	 * `username:password`, as one opaque string. Every provider gets exactly one, and
+	 * what it means is the provider's own business.
+	 */
+	credential?: string;
+	/**
+	 * The whole read's budget, minted by business. Not a bound of the repository's own:
+	 * a provider that needs two round trips would otherwise spend the bound twice.
+	 */
+	signal: AbortSignal;
+};
 
-export interface GetAdguardStatsOutput {
-	num_dns_queries: number;
-	num_blocked_filtering: number;
-	avg_processing_time: number;
-	/** AdGuard omits this on a fresh install, so the projection has to cope with it missing. */
-	top_blocked_domains?: Record<string, number>[];
-}
-
-/**
- * A 200 does not mean stats. AdGuard answers `null` on some proxy setups and an
- * error object (`{"message":"unauthorized"}`) on others, and a cast let both
- * through: the first threw a TypeError out of the projection, the second rendered
- * "NaN". The repository owns the wire shape, so the check lives here — inside the
- * error-as-value boundary, where a bad body becomes `[AppError, null]` like any
- * other failure. Only the three fields the box renders are checked.
- */
-function isAdguardStats(body: unknown): body is GetAdguardStatsOutput {
-	const stats = body as GetAdguardStatsOutput | null;
-
-	return (
-		typeof stats?.num_dns_queries === 'number' &&
-		typeof stats.num_blocked_filtering === 'number' &&
-		typeof stats.avg_processing_time === 'number'
-	);
-}
-
-/**
- * The page load awaits this, so without a bound of our own an unreachable AdGuard
- * host stalls the whole render on undici's defaults: 10s to fail a connection to a
- * box that is switched off, and 300s if something answers the SYN and then goes
- * quiet (a repurposed IP, a firewall that DROPs after the handshake). It is one
- * box on the page; it does not get to hold the other boxes hostage.
- */
-const REQUEST_TIMEOUT_MS = 3000;
-
-export async function $getAdguardStats({
-	username,
-	password,
+export function $getAdguardStats({
 	href,
-}: GetAdguardStatsInput): Promise<Result<GetAdguardStatsOutput>> {
-	const base64 = Buffer.from(`${username}:${password}`).toString('base64');
-
+	credential,
+	signal,
+}: GetAdguardStatsInput): Promise<Result<AdguardWire>> {
 	return useAsyncErrorAsValue(async () => {
+		// Basic auth is the whole `username:password` string, so nothing is split here —
+		// only checked. Missing or half-pasted fails HERE rather than at AdGuard, because
+		// a 401 does not tell an operator that they pasted only half of it. Everything
+		// after the first colon is the password, so a password may contain colons.
+		if (!credential?.includes(':')) {
+			throw new Error('credentials must be "username:password"');
+		}
+
 		const raw = await fetch(`${href}/control/stats`, {
 			headers: {
-				Authorization: `Basic ${base64}`,
+				Authorization: `Basic ${Buffer.from(credential).toString('base64')}`,
 				'Content-type': 'application/json',
 			},
-			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+			signal,
 		});
 
 		// fetch only rejects on network errors, so an auth failure would otherwise
@@ -63,12 +68,12 @@ export async function $getAdguardStats({
 			throw new Error(`AdGuard responded with ${raw.status} ${raw.statusText}`);
 		}
 
-		const body = await raw.json();
+		const parsed = v.safeParse(adguardStatsSchema, await raw.json());
 
-		if (!isAdguardStats(body)) {
+		if (!parsed.success) {
 			throw new Error('answered 200 with a body that is not stats');
 		}
 
-		return body;
+		return parsed.output;
 	}, `Could not read AdGuard stats from ${href}`);
 }

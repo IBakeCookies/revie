@@ -22,7 +22,7 @@
 		},
 	];
 
-	// Two clocks rather than one service box: `BoxService` / `BoxAdguard` render
+	// Two clocks rather than one service box: `BoxService` / `BoxStats` render
 	// through a wrapper that reads a store, and a story mounts no page to set one.
 	const boxes: ConfigContainer[] = [
 		{

@@ -2,9 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { $getAdguardStats } from '$lib/data/repository/adguard';
 
 const input = {
-	username: 'admin',
-	password: 'secret',
 	href: 'http://adguard.local',
+	credential: 'admin:secret',
+	// The read's budget is minted by business and handed down, so the repository's own
+	// cases only need a signal that exists. Short enough that a leaked real fetch dies.
+	signal: AbortSignal.timeout(50),
 };
 
 const stats = {
@@ -28,7 +30,7 @@ afterEach(() => {
 });
 
 describe('$getAdguardStats', () => {
-	it('asks the stats endpoint with basic auth', async () => {
+	it('asks the stats endpoint with basic auth built from the one credential', async () => {
 		const fetchMock = stubFetch({
 			ok: true,
 			json: async () => stats,
@@ -49,12 +51,9 @@ describe('$getAdguardStats', () => {
 		);
 	});
 
-	it('bounds the request at 3s, so an unreachable host cannot stall the page load', async () => {
-		// Asserting the timeout VALUE, not just that a signal exists: AbortSignal.timeout
-		// runs on an internal timer no fake clock reaches, so an "is it aborted yet"
-		// assertion passes at any bound, including none worth having.
-		const timeout = vi.spyOn(AbortSignal, 'timeout');
-
+	// The bound is the caller's, not this layer's — `stats.spec.ts` asserts the 3s value.
+	// What this file has to keep true is that the signal handed in is the one used.
+	it('uses the signal it was given rather than minting one', async () => {
 		const fetchMock = stubFetch({
 			ok: true,
 			json: async () => stats,
@@ -62,8 +61,58 @@ describe('$getAdguardStats', () => {
 
 		await $getAdguardStats(input);
 
-		expect(timeout).toHaveBeenCalledWith(3000);
-		expect(fetchMock.mock.calls[0][1].signal).toBe(timeout.mock.results[0].value);
+		expect(fetchMock.mock.calls[0][1].signal).toBe(input.signal);
+	});
+
+	// A 401 does not tell an operator that they pasted only half of it, so a credential
+	// with no colon fails here instead — before a request goes out at all.
+	it('refuses a credential that is not "username:password" without asking AdGuard', async () => {
+		const fetchMock = stubFetch({
+			ok: true,
+			json: async () => stats,
+		});
+
+		const [err, res] = await $getAdguardStats({
+			...input,
+			credential: 'just-a-password',
+		});
+
+		expect(res).toBeNull();
+		expect(err?.message).toContain('credentials must be "username:password"');
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	// The provider contract makes the credential optional, because a provider may need
+	// none. AdGuard does, and says so as a failure rather than throwing a TypeError.
+	it('reports a missing credential as a failure, not a crash', async () => {
+		stubFetch({
+			ok: true,
+			json: async () => stats,
+		});
+
+		const [err] = await $getAdguardStats({
+			...input,
+			credential: undefined,
+		});
+
+		expect(err?.message).toContain('credentials must be "username:password"');
+	});
+
+	// Everything after the FIRST colon is the password, so a password may contain colons.
+	it('keeps a password that contains colons intact', async () => {
+		const fetchMock = stubFetch({
+			ok: true,
+			json: async () => stats,
+		});
+
+		await $getAdguardStats({
+			...input,
+			credential: 'admin:a:b:c',
+		});
+
+		expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe(
+			`Basic ${Buffer.from('admin:a:b:c').toString('base64')}`,
+		);
 	});
 
 	it('names the status in the message the log gets', async () => {
@@ -118,6 +167,61 @@ describe('$getAdguardStats', () => {
 
 		expect(res).toBeNull();
 		expect(err?.message).toContain('is not stats');
+	});
+
+	// The projection runs outside the error-as-value boundary, and the load reads every
+	// configured instance under one `Promise.all` — so `{}` here is not one empty box,
+	// it is a TypeError out of `.at(0)` that 500s the page and loses the instances that
+	// DID answer. Caught as a bad body instead, one instance fails alone.
+	it('reports a 200 whose top_blocked_domains is not a list as an error', async () => {
+		stubFetch({
+			ok: true,
+			json: async () => ({
+				...stats,
+				top_blocked_domains: {},
+			}),
+		});
+
+		const [err, res] = await $getAdguardStats(input);
+
+		expect(res).toBeNull();
+		expect(err?.message).toContain('is not stats');
+	});
+
+	// AdGuard omits the field on a fresh install, and the schema defaults it — so the
+	// projection's `.at(0)` has nothing to optional-chain.
+	it('defaults a missing top_blocked_domains to an empty list', async () => {
+		stubFetch({
+			ok: true,
+			json: async () => ({
+				num_dns_queries: 1,
+				num_blocked_filtering: 0,
+				avg_processing_time: 0,
+			}),
+		});
+
+		const [err, res] = await $getAdguardStats(input);
+
+		expect(err).toBeNull();
+		expect(res?.top_blocked_domains).toEqual([]);
+	});
+
+	// The same fresh install one wire value apart: Go's `encoding/json` writes a nil slice
+	// as `null`. `v.optional` defaults `undefined` only, so this body — a 200 from an
+	// instance that is answering correctly — used to fail the whole read.
+	it('defaults a null top_blocked_domains to an empty list', async () => {
+		stubFetch({
+			ok: true,
+			json: async () => ({
+				...stats,
+				top_blocked_domains: null,
+			}),
+		});
+
+		const [err, res] = await $getAdguardStats(input);
+
+		expect(err).toBeNull();
+		expect(res?.top_blocked_domains).toEqual([]);
 	});
 
 	it('reports a network failure as an error', async () => {

@@ -1,9 +1,11 @@
 <script module lang="ts">
+	import type { Stat } from '$lib/business/type/stats';
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect } from 'storybook/test';
-	import BoxAdguard from '$lib/presentation/components/box-adguard.svelte';
+	import BoxStats from '$lib/presentation/components/box-stats.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
+	import { providerNameLabel } from '$lib/presentation/util/provider-name';
 
 	// Built from the same locale the component reads, so a render in the wrong locale cannot
 	// pass by matching a hardcoded string.
@@ -13,35 +15,64 @@
 		unit: 'millisecond',
 		unitDisplay: 'narrow',
 	});
+	const percent = new Intl.NumberFormat(getLocale(), {
+		style: 'percent',
+		maximumFractionDigits: 1,
+	});
+
+	const healthy: Stat[] = [
+		{
+			key: 'dns-queries',
+			value: 1234,
+		},
+		{
+			key: 'blocked',
+			value: 56,
+		},
+		{
+			key: 'avg-latency',
+			value: 12,
+		},
+		{
+			key: 'top-blocked-domain',
+			value: 'ads.example.com',
+		},
+	];
 
 	const { Story } = defineMeta({
-		title: 'Components/Box Adguard',
-		component: BoxAdguard,
+		title: 'Components/Box Stats',
+		component: BoxStats,
 		tags: ['autodocs'],
 		args: {
+			provider: 'adguard',
 			href: 'http://adguard.local',
 			span: 6,
-			stats: {
-				dnsQueries: 1234,
-				numBlockedFiltering: 56,
-				avgProcessingTimeMs: 12,
-				topBlockedDomain: 'ads.example.com',
-			},
+			stats: healthy,
 		},
 	});
 </script>
 
-<!-- The whole box is one link to the admin UI, so the four readings sit inside an anchor -->
+<!-- The whole box is one link to the service's own UI, so the readings sit inside an anchor -->
 <Story
 	name="Healthy stats"
 	play={async ({ args, canvas, canvasElement }) => {
 		const link = canvas.getByRole('link');
 
 		// `rel="noreferrer"` is the point of the assertion, not the href: the dashboard
-		// URL is an internal address and must not travel to the AdGuard instance.
+		// URL is an internal address and must not travel to the service.
 		await expect(link).toHaveAttribute('href', args.href);
 		await expect(link).toHaveAttribute('target', '_blank');
 		await expect(link).toHaveAttribute('rel', 'noreferrer');
+
+		// The provider is a token in config and a product name on screen — the map is
+		// presentation's, and the sentence around it is a paraglide message taking it as a
+		// parameter. A raw `adguard` reaching the accessible name is the failure to catch.
+		await expect(link).toHaveAccessibleName(
+			m.stats_open({
+				provider: providerNameLabel.adguard,
+				host: 'adguard.local',
+			}),
+		);
 
 		// Labels asserted through `m` rather than a literal, because a hardcoded string here
 		// would be a second copy of messages/en.json that nothing keeps in step. The pairing
@@ -54,10 +85,10 @@
 				tile.querySelector('dd')?.textContent,
 			]),
 		).toEqual([
-			[m.adguard_dns_queries(), counts.format(1234)],
-			[m.adguard_blocked(), counts.format(56)],
-			[m.adguard_delay(), millis.format(12)],
-			[m.adguard_top_blocked_domain(), 'ads.example.com'],
+			[m.stat_dns_queries(), counts.format(1234)],
+			[m.stat_blocked(), counts.format(56)],
+			[m.stat_avg_latency(), millis.format(12)],
+			[m.stat_top_blocked_domain(), 'ads.example.com'],
 		]);
 
 		// The card is a translucent surface, so it carries its own backdrop-blur —
@@ -89,8 +120,8 @@
 	}}
 />
 
-<!-- AdGuard unreachable: business hands the failure back as a value, the store keeps no
-     stats, and `stats` arrives undefined through box-adguard-wrapper. The box stays and
+<!-- The service is unreachable: business hands the failure back as a value, the store keeps
+     no readings, and `stats` arrives undefined through box-stats-wrapper. The box stays and
      says why — a padded empty rectangle reads as a layout bug instead. -->
 <Story
 	name="Unreachable"
@@ -99,25 +130,46 @@
 	}}
 	play={async ({ canvas, canvasElement }) => {
 		await expect(canvasElement.querySelectorAll('p')).toHaveLength(1);
-		await expect(canvas.getByText(m.adguard_unavailable())).toBeInTheDocument();
+
+		// The provider names itself here too: on a page of several stats boxes, one line
+		// reading "statistics unavailable" says nothing about which one.
+		await expect(
+			canvas.getByText(
+				m.stats_unavailable({
+					provider: providerNameLabel.adguard,
+				}),
+			),
+		).toBeInTheDocument();
 
 		// The link is what makes the empty box useful — it is how an operator gets to the
-		// admin UI to find out why the probe failed.
+		// service's own UI to find out why the read failed.
 		await expect(canvas.getByRole('link')).toBeInTheDocument();
 	}}
 />
 
-<!-- A quiet DNS resolver reports zeros, not nothing: every reading is formatted, so a falsy
+<!-- A quiet resolver reports zeros, not nothing: every reading is formatted, so a falsy
      count must still render as a zero rather than collapse the tile. -->
 <Story
 	name="Zero traffic"
 	args={{
-		stats: {
-			dnsQueries: 0,
-			numBlockedFiltering: 0,
-			avgProcessingTimeMs: 0,
-			topBlockedDomain: '',
-		},
+		stats: [
+			{
+				key: 'dns-queries',
+				value: 0,
+			},
+			{
+				key: 'blocked',
+				value: 0,
+			},
+			{
+				key: 'avg-latency',
+				value: 0,
+			},
+			{
+				key: 'top-blocked-domain',
+				value: '',
+			},
+		],
 	}}
 	play={async ({ canvasElement }) => {
 		// Read off the `dd`s rather than by text: the two zero counts are the same string,
@@ -128,6 +180,61 @@
 			millis.format(0),
 			'',
 		]);
+	}}
+/>
+
+<!-- A provider emitting fewer readings than another simply fills fewer cells: the grid is
+     driven by the list, not by a hardcoded four, which is what keeps one component
+     covering every provider. -->
+<Story
+	name="Fewer readings"
+	args={{
+		stats: [
+			{
+				key: 'dns-queries',
+				value: 7,
+			},
+		],
+	}}
+	play={async ({ canvasElement }) => {
+		await expect(canvasElement.querySelectorAll('dl > div')).toHaveLength(1);
+		await expect(canvasElement.querySelector('dd')?.textContent).toBe(counts.format(7));
+	}}
+/>
+
+<!-- A second provider, and the one thing about its readings that breaks silently: the two
+     share-shaped keys carry a FRACTION, because `Intl`'s percent style multiplies by 100
+     itself. Pass a wire's own 0-100 through and 75 renders as 7,500% — no error anywhere. -->
+<Story
+	name="A fraction reads as a percentage"
+	args={{
+		provider: 'uptime-kuma',
+		href: 'http://kuma.local/status/home',
+		stats: [
+			{
+				key: 'monitors-up',
+				value: 8,
+			},
+			{
+				key: 'monitors-down',
+				value: 1,
+			},
+			{
+				key: 'uptime-24h',
+				value: 0.75,
+			},
+		],
+	}}
+	play={async ({ canvas, canvasElement }) => {
+		await expect([...canvasElement.querySelectorAll('dd')].map((dd) => dd.textContent)).toEqual([
+			counts.format(8),
+			counts.format(1),
+			percent.format(0.75),
+		]);
+
+		// The label map is complete over `StatKey`, so a reading a new provider emits and
+		// presentation has no words for cannot compile — this is the rendered half of it.
+		await expect(canvas.getByText(m.stat_uptime_24h())).toBeInTheDocument();
 	}}
 />
 

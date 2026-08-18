@@ -1,6 +1,6 @@
 {
 	"defaults": {
-		"BoxAdguard": { "span": 8 }
+		"BoxStats": { "span": 8 }
 	},
 	"pages": {
 		"/": {
@@ -11,8 +11,12 @@
 					"props": { "span": 4 }
 				},
 				{
-					"name": "BoxAdguard",
-					"props": { "href": "http://192.168.1.2" }
+					"name": "BoxStats",
+					"props": {
+						"provider": "adguard",
+						"href": "http://192.168.1.2",
+						"secret": "ADGUARD_MAIN"
+					}
 				},
 				{
 					"name": "Grid",

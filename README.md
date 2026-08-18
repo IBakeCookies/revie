@@ -20,7 +20,7 @@ Needs **node 22 or newer**. That is declared in `package.json`'s `engines`, and 
 ```sh
 npm install
 cp config.example.json config.json   # the boxes on the page
-cp .env.example .env                 # AdGuard credentials, optional
+cp .env.example .env                 # optional; provider secrets are DASHBOARD_SECRET_<NAME>
 npm run dev
 ```
 
@@ -92,6 +92,19 @@ props:
   `/api/ping`'s allowlist, so it is what you want for a link to somewhere on the public
   internet that you never wanted a status for.
 
+- `BoxStats` reads live numbers off a service. `provider` picks which one — see
+  [Stats providers](#stats-providers) — `href` is where that instance lives and what the
+  box links to, and `secret` names the environment variable holding its credential.
+  A page may hold as many as it likes: each is read separately and keyed by its own
+  provider **and** href, so two instances show their own numbers and can have two
+  different logins.
+- **Stats readings are cached for 30 seconds and the open page re-reads them every
+  minute**, so a reading on screen can be up to about a minute and a half old — and a
+  box that has just come back can take that long to fill in. The cache is what keeps an
+  instance that is switched off from costing every visitor the 3-second timeout before
+  the page renders at all. It lives in the server process, so a restart drops it and a
+  second instance behind a load balancer keeps its own; the page stops re-reading while
+  its tab is in the background.
 - A page key is a URL path and has to start with `/`. It may have more than one
   segment, so `"/media/plex"` works and is how pages are grouped. A key without the
   leading slash is dropped with a warning, because the navigation links straight to it
@@ -99,8 +112,8 @@ props:
 - A path that is not listed under `pages` returns 404.
 - A malformed container is dropped with a warning instead of breaking the page: an
   unknown container name, something that isn't an object, or a missing required prop
-  (`BoxService` needs `title`, `href` and `img.src`; `BoxAdguard` needs `href`). Its
-  siblings and its parent grid still render.
+  (`BoxService` needs `title`, `href` and `img.src`; `BoxStats` needs `provider` and
+  `href`). Its siblings and its parent grid still render.
 - A `Grid` or `SubGrid` with no `items` renders as empty, so a grid written before its
   children is safe to save.
 - `DASHBOARD_CONFIG` overrides the config path. The file is re-read whenever its
@@ -110,6 +123,82 @@ props:
 tracked starting point — your own copy holds your internal hostnames and ports, and it
 is the same file `node build` reads, so tracking it would let a `git checkout` revert
 the live dashboard.
+
+> **Migrating from `BoxAdguard`.** It is gone; `BoxStats` with `"provider": "adguard"`
+> replaces it. An un-migrated `config.json` does not merely lose the box: the unknown name
+> is a normalization warning, `/admin` refuses to save a config that produces one, and the
+> editor drops to the **raw JSON textarea for the whole file** until the name is fixed by
+> hand. That is the repair path working as designed, and it is the only way to fix it from
+> the browser.
+>
+> 1. `{ "name": "BoxAdguard", "props": { "href": "…" } }` becomes
+>    `{ "name": "BoxStats", "props": { "provider": "adguard", "href": "…", "secret": "ADGUARD_MAIN" } }`
+> 2. The same rename **inside `defaults`**, if you have one. A `defaults` key naming a
+>    container that does not exist matches nothing and warns about nothing, so the box
+>    silently loses its `span`.
+> 3. `ADGUARD_USERNAME` / `ADGUARD_PASSWORD` are **no longer read**. Replace them with
+>    `DASHBOARD_SECRET_ADGUARD_MAIN=admin:your-password`.
+
+### Stats providers
+
+A `BoxStats` names its provider with a token, and its credential with the NAME of an
+environment variable — never the credential itself, because `config.json` is the file you
+copied from a tracked example and a secret in the file format is a secret in someone's
+repository. The variable is `DASHBOARD_SECRET_` plus that name, **verbatim**: no
+uppercasing and no punctuation folding, so `"secret": "ADGUARD_MAIN"` is read from
+`DASHBOARD_SECRET_ADGUARD_MAIN` and a lowercase name reads a lowercase variable. One
+variable per instance, so two boxes can have two logins.
+
+| `provider`    | Reads                                                                 | `secret` holds                                |
+| ------------- | --------------------------------------------------------------------- | --------------------------------------------- |
+| `adguard`     | AdGuard Home: DNS queries, blocked, average delay, top blocked domain | `username:password`                           |
+| `pihole-v5`   | Pi-hole 5: DNS queries, blocked, block rate, blocklist domains        | the API token, from Settings → Show API token |
+| `pihole-v6`   | Pi-hole 6: the same four readings                                     | the web password, or an application password  |
+| `uptime-kuma` | Uptime Kuma: monitors up, monitors down, 24-hour uptime               | nothing — leave `secret` out                  |
+
+Three things about that table are worth saying out loud:
+
+- **Pi-hole 5 and Pi-hole 6 are separate tokens, and you have to know which you run.** They
+  share no path, no login and no field names, so there is nothing for one token to have
+  wrapped — and they take different secrets anyway. There is no auto-detection: it would
+  cost a round trip against a host that may be down, for a version you already know.
+- **`href` for `uptime-kuma` is the public STATUS PAGE**, `https://kuma.example/status/home`
+  — not the Kuma dashboard. The slug is that url's last segment, which is also why the box
+  needs no second prop. A status page needs no credential, so leave `secret` out entirely.
+- **These four are transcribed from vendor documentation, not from a live instance behind
+  this code.** Every other behaviour in this README has been reproduced; these endpoints
+  have not. If one reports nothing, the server log names the host and the status.
+
+A `secret` may only contain letters, digits and underscores — a shell cannot export
+`DASHBOARD_SECRET_ADGUARD-MAIN`, so a name with a dash in it points at a variable that can
+never be set. The editor refuses to save one and says which prop is wrong.
+
+**Write `href` out in full — a redirect costs you the read.** Both Pi-hole providers refuse
+to follow one, because v5's token is in the query string and v6's session id is in a header
+and a followed redirect would hand either to a host you never configured; the box reports the
+`301` instead. AdGuard follows, but its credential is an `Authorization` header, which
+`fetch` deletes when a redirect crosses an origin — and `http:` → `https:` is a different
+origin — so the read arrives unauthenticated and the instance answers `401`. Either way,
+point `href` at the scheme, host and port the service actually answers on.
+
+Two degradations, and they are different on purpose:
+
+- **The variable is named but not set** — an absence. The box is skipped, the server logs
+  the variable's name once, and nobody is toasted: that is your own setup decision, not a
+  failure to put in front of every visitor.
+- **The service refuses or does not answer** — a failure. The box says so, a dismissible
+  message names the provider and the instance, and the reason (a status, `fetch failed`)
+  goes to the server log. Each read is bounded at 3 seconds, so a box that is switched off
+  cannot hold the page.
+
+#### Self-signed TLS
+
+Node's `fetch` rejects a self-signed certificate outright and offers no per-request escape
+hatch, so a provider behind one cannot be read: install a real certificate, or terminate
+TLS at a reverse proxy and point `href` at that. `NODE_TLS_REJECT_UNAUTHORIZED=0` is not
+an option — it is process-global and silently unverifies every other request the server
+makes. This is the same wall the `tcp` status probe exists to get around, and it is why
+Proxmox, TrueNAS, Unifi and Portainer are not stats providers.
 
 ### Layout, and why there are no class names in the config
 
@@ -176,8 +265,9 @@ connect to is rejected. The endpoint only probes `host:port` pairs that appear i
 A dot only changes when a probe answers. A probe that **fails** — a network drop, a
 proxy erroring — says nothing about the service, so the dot keeps its last known state
 and a dismissible message names the service at the bottom of the page instead. An
-unreachable AdGuard box gets one too, which is otherwise visible only as an empty box.
-Each clears itself after a few seconds, a failure that repeats does not stack up, and
+unreachable `BoxStats` gets one too, naming the provider and the instance — otherwise
+that failure is visible only as an empty box, and a page holding two of them cannot say
+which. Each clears itself after a few seconds, a failure that repeats does not stack up, and
 both follow the page language. The technical detail behind them — `fetch failed`, an
 HTTP status, the host — goes to the server's log rather than the screen, so check there
 when the message is not enough.
@@ -224,11 +314,11 @@ the coverage report as artifacts. The open work is in [roadmap.md](roadmap.md);
 - Every component has a story beside it, and the story's `play` function is a real test —
   `npm run test:unit` runs them, so a broken component fails the suite.
 - Wrappers get a story but no `*.svelte.spec.ts`. A wrapper reads a store and forwards
-  props (`box-service-wrapper`, `box-adguard-wrapper`); the component next to it takes the
+  props (`box-service-wrapper`, `box-stats-wrapper`); the component next to it takes the
   same data as a plain prop and is tested directly, so a spec would just duplicate it —
   but only a story can supply the store context and prove the forwarding.
 - One e2e file per feature, named after it (`e2e/can-change-theme.e2e.ts`).
   Playwright points the preview server at `e2e/fixture-config.json`, so the suite
   never depends on the services of the machine it runs on: the preview server's own
-  port as the reachable service, a host that never resolves, and an AdGuard instance on
-  a closed port.
+  port as the reachable service, a host that never resolves, and a stats provider on a
+  closed port.

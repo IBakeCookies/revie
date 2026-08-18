@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import type { AdguardStats } from '$lib/business/type/adguard-stats';
-	import { setAdguardStore } from '$lib/business/store/adguard-store.svelte';
+	import type { Stat } from '$lib/business/type/stats';
+	import { setStatsStore } from '$lib/business/store/stats-store.svelte';
 
 	type Props = {
-		stats?: AdguardStats;
+		/** Keyed exactly as the load keys it — `statsKey(provider, href)`. */
+		stats: Record<string, Stat[]>;
 		children: Snippet;
 	};
 
@@ -16,7 +17,7 @@
 	   autodocs page, and the last play function to run would decide what all of them
 	   show. The store takes a THUNK, so flipping `stats` on a mounted harness still
 	   propagates. */
-	setAdguardStore(() => stats);
+	setStatsStore(() => stats);
 </script>
 
 {@render children()}

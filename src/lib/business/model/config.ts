@@ -38,6 +38,29 @@ const probeModes = ['tcp', 'http', 'none'] as const;
 export type ProbeMode = (typeof probeModes)[number];
 
 /**
+ * Which service a stats box reads. A token rather than a container per vendor: a dozen
+ * names is a dozen schema entries, a dozen branches before `config-container.svelte`'s
+ * `never` assert and a dozen components, while a token keeps presentation at one
+ * component and moves completeness to `Record<ProviderName, …>` in
+ * `business/model/stats.ts` — the same guarantee, one layer down.
+ *
+ * It lives HERE and not in `stats.ts`, and that is not arbitrary: this file is in the
+ * client bundle (`poll-services-state.ts` value-imports `collectServiceProbes`) while
+ * `stats.ts` value-imports every repository. `stats.ts` imports this type and never the
+ * reverse, so there is no runtime edge and no cycle.
+ *
+ * Pi-hole is TWO tokens rather than one with a version prop: v5 and v6 share no path, no
+ * auth and no field names, so a single token would be one branch wrapping two unrelated
+ * bodies — and the operator has to know which they run either way, because the two take
+ * different secrets. Auto-detection was refused for the same reason it is refused in
+ * `roadmap.md` #33: a round trip per cache miss, against a host that may be down, for a
+ * version the operator already knows.
+ */
+export const providerNames = ['adguard', 'pihole-v5', 'pihole-v6', 'uptime-kuma'] as const;
+
+export type ProviderName = (typeof providerNames)[number];
+
+/**
  * A Grid's children are `unknown` in the schema and containers in the type. A
  * container schema cannot name itself — that is a cycle TypeScript refuses to infer
  * through — and it should not: children are validated one at a time by recursing
@@ -87,9 +110,26 @@ const containerSchemas = {
 			{} as { src: string },
 		),
 	}),
-	BoxAdguard: v.object({
+	BoxStats: v.object({
 		span: spanProp,
+		provider: v.picklist(providerNames),
+		/** Where this instance lives, and what the box links to. */
 		href: v.string(),
+		/**
+		 * The NAME of the environment variable holding this instance's credential —
+		 * `"ADGUARD_MAIN"` is read from `DASHBOARD_SECRET_ADGUARD_MAIN` — never the
+		 * credential itself: `config.example.json` is tracked, so a secret in the file
+		 * format is a secret in someone's repository. One variable per instance, so two
+		 * instances of one provider can have two logins.
+		 *
+		 * Optional, and deliberately WITHOUT a default: an optional with one keeps what is
+		 * under it required, which would mark a prop nobody has to write.
+		 *
+		 * The pattern is what a shell can export. Without it, `"ADGUARD-MAIN"` names a
+		 * variable that can never be set and the log names it forever; with it, the editor
+		 * refuses the save and says which prop is wrong.
+		 */
+		secret: v.optional(v.pipe(v.string(), v.regex(/^[A-Za-z0-9_]+$/))),
 	}),
 	BoxDate: v.object({
 		span: spanProp,
@@ -272,8 +312,8 @@ export function isGrid(item: ConfigContainer): item is ConfigContainer<'Grid' | 
 	return item.name === 'Grid' || item.name === 'SubGrid';
 }
 
-export function isBoxAdguard(item: ConfigContainer): item is ConfigContainer<'BoxAdguard'> {
-	return item.name === 'BoxAdguard';
+export function isBoxStats(item: ConfigContainer): item is ConfigContainer<'BoxStats'> {
+	return item.name === 'BoxStats';
 }
 
 /**
@@ -341,7 +381,7 @@ function normalizeContainer(
 		props.span = span;
 	}
 
-	// Set unconditionally, not just when present: every traversal (findContainer,
+	// Set unconditionally, not just when present: every traversal (collectStatsTargets,
 	// collectServiceProbes) iterates `items`, so a grid whose children have not been
 	// written yet would throw on the first page load rather than render as empty.
 	if (CONTAINS_CHILDREN.includes(raw.name)) {
@@ -470,36 +510,67 @@ export function normalizeConfig(raw: unknown): { config: Config; warnings: strin
 	};
 }
 
-function scanContainer(item: ConfigContainer, target: ContainerName): ConfigContainer | undefined {
-	if (item.name === target) {
-		return item;
-	}
+/**
+ * How a reading is addressed everywhere downstream: the TTL cache, the page's record and
+ * the store all use this one string, so they cannot disagree about what a box asked for.
+ *
+ * The provider is in it because an href alone is not an identity. Two boxes at one href
+ * with different providers is a real config — a Pi-hole being migrated from v5 to v6
+ * answers both — and an href-keyed cache would then serve one provider's readings to the
+ * other: not a collision, wrong numbers. `readStats` cannot tell them apart on its own.
+ */
+export function statsKey(provider: ProviderName, href: string): string {
+	return `${provider} ${href}`;
+}
 
-	if (!isGrid(item)) {
-		return undefined;
-	}
+/** One stats box, as a reader needs to see it. */
+export type StatsTarget = {
+	key: string;
+	provider: ProviderName;
+	href: string;
+	/** The NAME of the variable holding the credential, as the config wrote it. */
+	secret?: string;
+};
 
-	for (const child of item.props.items) {
-		const found = scanContainer(child, target);
+function collectTargets(items: ConfigContainer[], into: Map<string, StatsTarget>): void {
+	for (const item of items) {
+		if (isGrid(item)) {
+			collectTargets(item.props.items, into);
 
-		if (found) {
-			return found;
+			continue;
+		}
+
+		if (!isBoxStats(item)) {
+			continue;
+		}
+
+		const key = statsKey(item.props.provider, item.props.href);
+
+		if (!into.has(key)) {
+			into.set(key, {
+				key,
+				provider: item.props.provider,
+				href: item.props.href,
+				secret: item.props.secret,
+			});
 		}
 	}
 }
 
-/** First container with the given name, at any nesting depth. */
-export function findContainer(
-	page: ConfigPage,
-	target: ContainerName,
-): ConfigContainer | undefined {
-	for (const container of page.containers) {
-		const found = scanContainer(container, target);
+/**
+ * Every stats instance on a page, at any nesting depth, each key once.
+ *
+ * Deduped for the same reason `collectServiceProbes` is: the caller reads what it gets
+ * back, so two boxes naming one instance would fetch it twice per page load and both
+ * render the later answer anyway. First occurrence wins — two boxes naming one target
+ * with two `secret`s is a config to fix, not a case worth arbitrating.
+ */
+export function collectStatsTargets(containers: ConfigContainer[]): StatsTarget[] {
+	const targets = new Map<string, StatsTarget>();
 
-		if (found) {
-			return found;
-		}
-	}
+	collectTargets(containers, targets);
+
+	return [...targets.values()];
 }
 
 /** A service that is meant to be measured, and how. `none` never reaches this shape. */

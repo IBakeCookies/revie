@@ -1,57 +1,161 @@
+import type { ConfigContainer, ProviderName, StatsTarget } from '$lib/business/model/config';
 import type { PageServerLoad } from './$types';
-import type { AdguardStats } from '$lib/business/type/adguard-stats';
-import type { ConfigPage } from '$lib/business/model/config';
-import type { Result } from '$lib/utils/useAsyncErrorAsValue';
+import type { Stat } from '$lib/business/type/stats';
 import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { findContainer, isBoxAdguard } from '$lib/business/model/config';
-import { readAdguardStats } from '$lib/business/model/adguard';
+import { collectStatsTargets } from '$lib/business/model/config';
 import { readConfig } from '$lib/business/model/config-source';
+import { readStats } from '$lib/business/model/stats';
 
 /**
- * `[null, null]` is "no box configured, or no credentials to read it with" — an
- * absence rather than a failure, so nothing is reported to the person looking at
- * the page. Only a box that was asked and did not answer produces an error.
+ * A stats box names the VARIABLE holding its credential, never the credential — so two
+ * instances of one provider can have two logins and `config.json` never holds a secret.
+ * The config's value is appended VERBATIM: folding case or punctuation would invent
+ * collisions whose failure mode is the wrong credential, silently, while verbatim lets
+ * the diagnostic below name the literal key it looked up.
  */
-async function loadAdguardStats(page: ConfigPage): Promise<Result<AdguardStats | null>> {
-	const container = findContainer(page, 'BoxAdguard');
+const SECRET_PREFIX = 'DASHBOARD_SECRET_';
+/**
+ * Which secret variables have already been reported missing. `$env/dynamic/private`
+ * cannot change without a restart, so each variable has exactly one thing to say per
+ * process — ungated it printed once per request, which the 60s refresh turns into once a
+ * minute per open tab. Bounded by `config.json`, like the stats cache, so it is not pruned.
+ */
+const warnedSecrets = new Set<string>();
 
-	if (!container || !isBoxAdguard(container)) {
-		return [null, null];
+/**
+ * Which box could not be read, named the way the page has to name it. Not one flag and
+ * not a provider list: readings are keyed per INSTANCE, so "Pi-hole is down" is true,
+ * useless and indistinguishable from both Pi-holes being down. The href is what
+ * identifies the box a user is looking at, and `service_probe_failed({ href })` is the
+ * standing precedent that an href is DATA crossing a layer, not copy.
+ */
+export type StatsFailure = {
+	/** The same key the readings are recorded under, so the page can dedupe on it. */
+	key: string;
+	provider: ProviderName;
+	href: string;
+};
+
+type StatsJob = {
+	target: StatsTarget;
+	credential?: string;
+};
+
+/**
+ * Which targets are worth reading, and with what. A target that names a variable which is
+ * not set is SKIPPED — not read, not flagged, not toasted — because that is an operator's
+ * own setup decision and toasting it would put it in front of every visitor on every page
+ * load. A target that names no variable at all is read anonymously: right for a provider
+ * that needs no credential, and a provider that does answers 401, which is an ordinary
+ * failure and says so.
+ */
+function planReads(targets: StatsTarget[]): StatsJob[] {
+	const jobs: StatsJob[] = [];
+
+	for (const target of targets) {
+		if (!target.secret) {
+			jobs.push({
+				target,
+			});
+
+			continue;
+		}
+
+		const name = `${SECRET_PREFIX}${target.secret}`;
+		const credential = env[name];
+
+		if (!credential) {
+			if (!warnedSecrets.has(name)) {
+				warnedSecrets.add(name);
+
+				console.warn(`${name} is not set, skipping ${target.href}`);
+			}
+
+			continue;
+		}
+
+		jobs.push({
+			target,
+			credential,
+		});
 	}
 
-	const { ADGUARD_USERNAME, ADGUARD_PASSWORD } = env;
-
-	if (!ADGUARD_USERNAME || !ADGUARD_PASSWORD) {
-		console.warn('ADGUARD_USERNAME / ADGUARD_PASSWORD are not set, skipping AdGuard stats');
-
-		return [null, null];
-	}
-
-	const [err, stats] = await readAdguardStats({
-		username: ADGUARD_USERNAME,
-		password: ADGUARD_PASSWORD,
-		href: container.props.href,
-	});
-
-	// Logged AND returned, and the two carry different things. The log is the operator
-	// channel: it names the host and the status, and outlives the tab. Both halves are
-	// already in `err.message` — the repository passes the href as the context
-	// `useAsyncErrorAsValue` prefixes — so prefixing it again here printed the host
-	// twice. What crosses to the page is only THAT it failed: the route turns that into
-	// a translated line, because `err.message` is English minted in `data`. Not
-	// `err.cause` in either: a bounded fetch's timeout arrives as a DOMException whose
-	// stack is ten frames of undici internals naming neither AdGuard nor the host.
-	if (err) {
-		console.error(err.message);
-
-		return [err, null];
-	}
-
-	return [null, stats];
+	return jobs;
 }
 
-export const load: PageServerLoad = async ({ url }) => {
+async function loadStats(containers: ConfigContainer[]): Promise<{
+	stats: Record<string, Stat[]>;
+	failed: StatsFailure[];
+}> {
+	// Concurrent, so the 3s bound stays the cost of the whole read rather than of each
+	// instance in turn — three dead boxes must not gate first byte for 9s. Collected first
+	// and folded after, so the log lines and the keys come out in config order rather than
+	// in whatever order the hosts happened to answer.
+	const reads = await Promise.all(
+		planReads(collectStatsTargets(containers)).map(
+			async ({ target, credential }) =>
+				[
+					target,
+					await readStats({
+						key: target.key,
+						provider: target.provider,
+						href: target.href,
+						credential,
+					}),
+				] as const,
+		),
+	);
+
+	const stats: Record<string, Stat[]> = {};
+	const failed: StatsFailure[] = [];
+
+	for (const [target, { result, isFresh }] of reads) {
+		const [err, read] = result;
+
+		// Logged AND reported, and the two carry different things. The log is the operator
+		// channel: it names the host and the status, and outlives the tab. Both halves are
+		// already in `err.message` — the repository passes the href as the context
+		// `useAsyncErrorAsValue` prefixes — so prefixing it again here printed the host
+		// twice. What crosses to the page is the provider and the href: the route turns
+		// those into a translated line, because `err.message` is English minted in `data`.
+		// Not `err.cause` in either: a bounded fetch's timeout arrives as a DOMException
+		// whose stack is ten frames of undici internals naming neither the service nor the
+		// host.
+		//
+		// Only what the read actually went to the network for, exactly as the config
+		// diagnostics below are gated: the failure still crosses on a cached one — the box
+		// is empty either way — while a dead box under a refreshing tab would otherwise
+		// print once per request again.
+		if (err) {
+			if (isFresh) {
+				console.error(err.message);
+			}
+
+			failed.push({
+				key: target.key,
+				provider: target.provider,
+				href: target.href,
+			});
+
+			continue;
+		}
+
+		stats[target.key] = read;
+	}
+
+	return {
+		stats,
+		failed,
+	};
+}
+
+export const load: PageServerLoad = async ({ depends, url }) => {
+	// The handle the client's refresh interval invalidates. `invalidate` re-runs the
+	// WHOLE load, so `readConfig` runs again on every tick too — accepted: it is
+	// mtime-cached, so a tick that changes nothing costs one `stat`.
+	depends('dashboard:stats');
+
 	const { config, warnings, error: configError, isFresh } = await readConfig();
 
 	// Only what the file re-read actually turned up, so a broken config costs one log
@@ -81,15 +185,14 @@ export const load: PageServerLoad = async ({ url }) => {
 		error(404, `No dashboard page is configured for "${url.pathname}"`);
 	}
 
-	const [adguardError, adguard] = await loadAdguardStats(page);
+	const stats = await loadStats(page.containers);
 
 	return {
 		containers: page.containers,
-		adguard,
-		// A flag, not the message: the words belong to presentation, which has the
-		// locale. One flag rather than a kind union because the only distinction worth
-		// drawing — bad credentials vs. a box that is switched off — is already in the
-		// log line above, and a user reads the same sentence either way.
-		adguardFailed: adguardError !== null,
+		stats: stats.stats,
+		// Data, not messages: the words belong to presentation, which has the locale.
+		// One entry per instance that was asked and did not answer, so a page holding two
+		// stats boxes can say which of them is the empty one.
+		failedStats: stats.failed,
 	};
 };
