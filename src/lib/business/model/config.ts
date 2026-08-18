@@ -134,6 +134,15 @@ const containerSchemas = {
 	BoxDate: v.object({
 		span: spanProp,
 	}),
+	BoxSearch: v.object({
+		span: spanProp,
+		/**
+		 * Where the query goes: the form's `action`. A GET submission REPLACES the query
+		 * string, so an href carrying one loses it — spell engine options in the path.
+		 */
+		href: v.string(),
+		placeholder: v.optional(v.string()),
+	}),
 	// Grid and SubGrid do not require `items`: it is defaulted below, so a grid
 	// written before its children still renders as empty.
 	Grid: v.object(gridProps),

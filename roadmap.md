@@ -17,9 +17,9 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 16 items are open — 15 from the review passes, plus #33
+**Numbers are stable, so gaps mean landed.** 11 items are open — 10 from the review passes, plus #33
 above, which came from asking what no review pass had proposed; **1, 2, 3, 4, 5,
-6, 7, 8, 11, 14, 16, 17, 19, 23, 25, 31, 32, 34, 35 and 36 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
+6, 7, 8, 9, 11, 13, 14, 16, 17, 19, 23, 24, 25, 26, 30, 31, 32, 34, 35 and 36 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants, and
 the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -52,9 +52,9 @@ records dropping zenith's shadcn dependencies deliberately.)_
 
 ## Storybook
 
-_(#7 — "Storybook is installed with zero stories" — landed in the zenith parity pass. All ten
-components now have a `*.stories.svelte` beside them whose play functions run as tests in a third
-vitest project. See AGENTS.md's "Already done".)_
+_(#7 — "Storybook is installed with zero stories" — landed in the zenith parity pass. Every
+component has a `*.stories.svelte` beside it whose play functions run as tests in a third
+vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Already done".)_
 
 ## Cleanup
 
@@ -75,11 +75,23 @@ vitest project. See AGENTS.md's "Already done".)_
    NOT do: the credentials-absent branch still only warns, an unconfigured box being an absence
    rather than a failure, and the three `console` calls on this path are now permanent by
    design — #23 covers the seven that are not.)_
-9. **Delete the browser cookie re-read in `ThemeStore`** (lines 99–109 + the `browser` import at
-   :2). The same cookie was already resolved through the same `resolveThemeName` to produce
-   `data.theme` in the same request, so it can only ever equal what was handed in — while its early
-   `return` makes the blocks below look conditional when they aren't. Unverifiable until #30's rune
-   harness exists.
+9. _(**Delete the browser cookie re-read in `ThemeStore`** — landed, and it took the whole read
+   path with it. The store reconciles two sources now, and AGENTS.md's appearance pipeline says so.
+   **The item's own line numbers were wrong and following them literally would have broken the OS
+   leg:** :99–109 of the pre-edit file were the `prefers-reduced-motion` seeding `if`, the
+   `addEventListener` and the `onMount` teardown, and #30 cited a third range (:88–96) for the
+   same deletion. The block that actually went was the `cookie` read, `seededPaused`, the two
+   `cookie?.` fallbacks and the early-returning `if (cookie?.theme)`. **Its blocker was stale too**
+   — #30's harness, `theme-store.svelte.spec.ts` and `appearance.spec.ts` all existed by the time
+   this ran. What the item did not foresee: `readClientAppearance` and `ClientAppearance` had no
+   other reader, so they are gone from `business/model/appearance.ts`, `$readAppearance`'s
+   `= documentCookies()` default lost its last caller, and `documentCookies` is deleted from
+   [cookie.ts](src/lib/data/storage/cookie.ts) — `CookieSource` is now server-only, over
+   `event.cookies` alone, and the two specs that covered the browser jar went with it.
+   *Accepted behavioural loss:* a theme switched in another tab while this one is loading no longer
+   snaps in on hydration — the tab keeps the server-stamped theme until its next full load, which
+   is what `hooks.server.ts` had already painted, so the paint is consistent instead of flipping
+   mid-hydration.)_
 10. **`git rm --cached dps.js`** — unrelated gacha-game DPS math at the repo root that
     `npm run lint` currently walks. Same treatment for the two tracked inlang cache blobs
     (`project.inlang/cache/plugins/*`): `git rm --cached` them.
@@ -104,11 +116,16 @@ vitest project. See AGENTS.md's "Already done".)_
 12. **Two missing config warnings**: a non-integer `span` is dropped silently and falls back to full
     width, and a `defaults` key naming an unknown component never matches and never warns. Both
     write into #23's diagnostics channel — land that first.
-13. **[src/hooks.ts](src/hooks.ts) is inert** — `reroute` de-localizes for route _matching_, then
-    the load reads the still-localized path, so `GET /de/services` 404s. Unreachable today
-    (`paraglide/runtime.js:35-39` is `strategy = ["cookie","globalVariable","baseLocale"]`, no
-    `"url"`), but adding `"url"` for shareable language links makes _every_ page 404 in German.
-    Delete it, or use `config.pages[deLocalizeUrl(url).pathname]`.
+13. _(**`src/hooks.ts` is inert** — landed as the deletion. The file is gone, and
+    [eslint.config.js](eslint.config.js)'s presentation block narrowed from `src/hooks*.ts` to
+    `src/hooks.server.ts` with it, so the glob no longer covers a file that does not exist.
+    **The item's second option was deliberately NOT taken:** rerouting to
+    `config.pages[deLocalizeUrl(url).pathname]` buys localized URLs, and nothing asked for them
+    — the strategy #26 shipped resolves the locale from the cookie and the browser preference,
+    so no path is ever localized and a `reroute` has nothing to de-localize. Bring the file back
+    with the load-side half if `"url"` ever joins the strategy for shareable language links.
+    Its own strategy citation had also gone stale independently: the generated runtime reads
+    `cookie globalVariable preferredLanguage baseLocale` since #26.)_
 
 ## Correctness & security (second review)
 
@@ -340,22 +357,28 @@ vitest project. See AGENTS.md's "Already done".)_
 
 ## Features
 
-24. **Add a `BoxSearch` container: a config-driven GET search form, no server code** — `M`
-    Add `'BoxSearch'` to `CONTAINER_NAMES` (config.ts:15), a `requiredProps.BoxSearch` entry
-    (config.ts:112-127 is a `Record<ContainerName, …>`, so this is compile-mandatory), and one branch
-    in config-container.svelte's if/else chain (:38-52, ending in the `never` assert). Props: `href`
-    (required), optional `placeholder`; renders `<form action={href} method="get"><input name="q">`
-    — hardcode `q` (Whoogle, SearXNG, Google, DuckDuckGo all use it). Add a `/`-key focus handler and
-    the two new message keys to **both** messages/en.json and messages/de.json (the keys-in-sync
-    invariant).
-    _Payoff:_ the dashboard itself takes no input — every `<form>` and `<input>` in the tree now
-    belongs to `/admin`, so on the pages a visitor actually loads the first thing they do after
-    their start page renders is leave for the address bar. The target is already self-hosted: config.json:227-228 links Whoogle at
-    `http://192.168.178.192:5000/` as a click-through.
-    _Files:_ src/lib/business/model/config.ts:15,112-127,
-    src/lib/presentation/components/config-container.svelte:38-52,
-    src/lib/presentation/components/box-search.svelte (new), messages/en.json, messages/de.json,
-    README.md:63-66
+24. _(**Add a `BoxSearch` container: a config-driven GET search form, no server code** — landed.
+    Sixth container: one `v.object` in `containerSchemas` (`href` required, `placeholder`
+    optional, `span` like every other container) and one branch before
+    `config-container.svelte`'s `never` assert. The box is
+    [box-search.svelte](src/lib/presentation/components/box-search.svelte) — a `method="get"` form
+    with one `type="search"` input named `q`, `rel="noreferrer"` so the dashboard's internal
+    address does not ride along, and a `/`-key handler on `svelte:window` that skips a keystroke
+    aimed at a field and `preventDefault`s the one it takes. It is the first container a visitor
+    can type into, and AGENTS.md records what that costs.
+    **Four of the item's own references were stale or wrong.** `CONTAINER_NAMES` and a
+    `requiredProps.BoxSearch` entry do not exist — the file header above says so, and
+    `containerSchemas` is the one declaration; the branch chain is :44-60, not :38-52; the props
+    list omits `span`, which every container carries and which the editor and `spanStyle()` both
+    expect; and "the two new message keys" is **one** — `search_label`, which is both the
+    `aria-label` and the placeholder's fallback, so a config that leaves `placeholder` out still
+    gets a box that says what it is. No key was needed for a submit button, because there is none:
+    one field that blocks implicit submission is all it takes for Enter to submit.
+    *Not built:* a prop for the query parameter name. `q` is hardcoded, which is the item's own
+    call and holds — Whoogle, SearXNG, Google and DuckDuckGo all read it, so a prop would be a
+    second caller that does not exist. The operator-facing consequence — a GET submission
+    REPLACES the action's query string, so an href carrying engine options loses them — is in
+    README.md, because no code can fix it.)_
 
 25. ~~**Add a `BoxBookmark` container so link-only boxes stop being probed**~~ — **LANDED as a
     `probe` mode instead, which is not what this item asked for.** Kept as a numbered item
@@ -381,27 +404,37 @@ missing or not valid` because a rejected enum value can still be a string.
     were left alone — that file is the operator's and gitignored, so only the entry under
     discussion was touched.
 
-26. **Add `preferredLanguage` to the Paraglide strategy** — `S`
-    `paraglide/runtime.js:35-39` is `strategy = ["cookie", "globalVariable", "baseLocale"]` and
-    vite.config.ts:11-14 passes only `project`/`outdir`, so a `de-DE` browser gets English on the
-    first SSR response and only reaches German by clicking the dropdown — and there is no way to link
-    a locale. Adding `preferredLanguage` also makes `test.use({ locale: 'de-DE' })` a usable e2e
-    lever.
-    _The counters half landed._ Every reading goes through `Intl.NumberFormat(getLocale())` at
-    **instance** scope in
-    [box-stats.svelte](src/lib/presentation/components/box-stats.svelte) — the same per-request
-    reason box-date.svelte's formatter sits there — and the messages are labels rather than
-    sentences with a number baked in, so `43871` is already `43.871` on a German page.
-    _Payoff:_ closes the first-render locale gap in a deliberately bilingual app. Nothing tests
-    the READINGS in German: box-date.svelte.spec.ts:20 matches `/\d{1,2}:\d{2}:\d{2}/` (true in
-    every locale), the box-stats stories compare against `m.*()` so they auto-follow any format
-    change, and e2e cannot render a populated stats box (fixture-config.json points at closed port
-    9999). Assert it in a story against a literal string — the compiled message accepts
-    `{ locale: 'de' }`, which is the lever
+26. _(**Add `preferredLanguage` to the Paraglide strategy** — landed. The strategy is
+    `cookie globalVariable preferredLanguage baseLocale`: an explicit choice still wins, and a
+    browser with no cookie yet gets its own language on the first SSR response instead of English.
+    It is spelled **twice** — the vite plugin call and the `paraglide` npm script — because the
+    CLI has no config file to read one from, which makes it the third sanctioned duplication in
+    the repo; AGENTS.md's Commands section and its "One definition per concept" rule both record
+    why and that the two must agree. Measured while landing it: with the flag on the plugin only,
+    `npm run paraglide` regenerated `runtime.js` with `preferredLanguage` dropped — so `check`,
+    `prepare`, CI and a fresh clone would have compiled a different locale resolution than
+    `dev`/`build`.
+    **Three of the item's own claims were wrong and are not carried forward.** (a) The lever it
+    named — `{ locale: 'de' }` on a compiled message, "which
     [can-see-provider-stats.e2e.ts](e2e/can-see-provider-stats.e2e.ts)'s German toast case
-    demonstrates for the one path that IS asserted in German since #8 landed.
-    _Files:_ vite.config.ts:11-14,
-    src/lib/presentation/components/box-stats.stories.svelte
+    demonstrates" — is neither: that case switches the header dropdown and reloads, and
+    `{ locale: 'de' }` cannot reach `box-stats` at all, because the box reads `getLocale()` at
+    mount for its `Intl` formatters as well as its messages. What landed instead is a story with
+    `overwriteGetLocale` in `beforeEach` and its teardown, asserting the two literals
+    (`DNS-Anfragen`, `1.234`) that every other stats story cannot see — the others build their
+    expectation from `m.*()` and `getLocale()`, so they stay green with de.json deleted. (b) It
+    cited vite.config.ts:11-14; the plugin call was at :13-16. (c) It said
+    box-date.svelte.spec.ts:20 matches `/\d{1,2}:\d{2}:\d{2}/` — that spec has no regex at all;
+    the locale-blind time pattern is box-date.stories.svelte:50, and it is `\d{2}`.
+    *One thing it did not foresee:* Playwright's default Chromium context sends no
+    `accept-language` at all, so [playwright.config.ts](playwright.config.ts) pins
+    `locale: 'en-US'` for the same reason it pins the fixture config and the fixture's env — the
+    suite must not read the language of the machine it runs on.
+    *Left open, deliberately:* the SSR response now varies by `Accept-Language` and nothing sets
+    `Vary` on it, so a caching reverse proxy in front of `node build` could hand a German page to
+    an English visitor. `url` is not in the strategy, so the middleware's only `Vary` branch is
+    unreachable. No shareable language link either — that is what `url` would buy, and #13
+    records what has to come back with it.)_
 
 ## Service integrations
 
@@ -664,29 +697,29 @@ distributed guess, which no per-address counter addresses and which a long token
     src/lib/business/model/theme.spec.ts, src/lib/test/invariants.spec.ts +
     src/lib/test/docs.spec.ts (new)
 
-30. **Cover `business/model/appearance.ts`, and build the repo's first rune harness for
-    `ThemeStore`** — `M`
-    Neither has a spec while everything around them does (theme.spec.ts,
-    appearance-repository.spec.ts, page.server.spec.ts). (1) appearance.ts is pure and node-testable
-    with the `from(jar)` fake at appearance-repository.spec.ts:11 — but that fake implements only
-    `get`, and `readOrMintScenerySeed`'s parameter is
-    `CookieSource & Parameters<typeof $createScenerySeedCookie>[0]` (appearance.ts:79-81), so it needs
-    a spied `set` to assert the no-second-mint path (:83) alongside the deleted-theme guard (:38 —
-    non-empty `themeClass`, `theme: undefined`). (2) ThemeStore's constructor registers `$effect`s
-    (:63,:68) **and** calls `onMount` (:75,:107), so it cannot be instantiated from a plain spec;
-    write `src/lib/test/theme-store-harness.svelte` driven from a `*.svelte.spec.ts`
-    (vite.config.ts:31 includes only that pattern) and cover the three-source reconciliation: cookie
-    beats the SSR seed (:88-96), an unknown SSR theme falls through to defaults (:99-116),
-    `initialSceneryPaused === undefined` honours `prefers-reduced-motion` (:74-84), and each setter
-    mirrors to the cookie.
-    _Payoff:_ AGENTS.md calls ThemeStore the subtlest machinery in the app and #9 asks someone to
-    delete lines 88-96 of it — with zero tests that edit is unverifiable, and a regression renders the
-    app unstyled or shifts the SSR'd scenery on hydration. The harness is reusable for any future
-    rune-constructor store (stats-store.svelte.ts, scenery-seed.ts, scenery-time.ts,
-    hooks.server.ts, data/config.ts and data/storage/cookie.ts also have no siblings).
-    _Files:_ src/lib/business/model/appearance.spec.ts (new),
-    src/lib/test/theme-store-harness.svelte +
-    src/lib/business/store/theme-store.svelte.spec.ts (new)
+30. _(**Cover `business/model/appearance.ts`, and build the repo's first rune harness for
+    `ThemeStore`** — landed, with one of its four store cases never written and one overtaken.
+    [appearance.spec.ts](src/lib/business/model/appearance.spec.ts) has the spied-`set` jar the
+    item specified and covers both `readOrMintScenerySeed` paths — a stored seed writes nothing,
+    an absent one mints once and the next read returns the same number.
+    [theme-store-harness.svelte](src/lib/test/theme-store-harness.svelte) is the repo's first rune
+    harness, driven from
+    [theme-store.svelte.spec.ts](src/lib/business/store/theme-store.svelte.spec.ts) (6 cases), and
+    AGENTS.md's "Already done" records why it lives under `src/lib/test/` rather than under
+    `presentation/`. Of the four `ThemeStore` cases the item listed: the deleted-theme fall-through
+    and the `prefers-reduced-motion` seeding are covered in both directions — seeding when the
+    payload records no choice, and NOT seeding over a payload that says motion is on — "cookie
+    beats the SSR seed" was **overtaken by #9**, which deleted the path, and the spec asserts the
+    payload seeding in its place; **"each setter mirrors to the cookie" was never written**, so
+    nothing calls `switchTheme`, `rerollScenery` or `toggleSceneryMotion`. That is the gap to close
+    next, and it is the half that would catch a write regression.
+    Two things the item asked for that are not covered and were not the store's: the
+    deleted-theme guard in `readRequestAppearance` (`appearance.ts` — non-empty `themeClass`,
+    `theme: undefined`) has no spec, and the harness has not been reused for any of the other
+    rune-constructor modules it named.
+    *Files:* src/lib/business/model/appearance.spec.ts,
+    src/lib/test/theme-store-harness.svelte,
+    src/lib/business/store/theme-store.svelte.spec.ts)_
 
 ## Upstream drift (the `zenith` ports)
 
@@ -731,7 +764,15 @@ The order that matters, beyond the group ranking:
 - ~~**#16 before #33**~~ — both landed. The TTL cache and the refresh interval went in first, so
   #33 inherited only the vendor in the names and the one global credential pair, which was its
   own work; it was the generalization #16 and #17 set up, not a parallel track.
-- **#30 before #9** — the `ThemeStore` edit is unverifiable without a rune harness.
+- ~~**#26 before #13**~~ — both landed, and #26 is what settled #13's choice. The item offered a
+  deletion or a load-side fix; a strategy of `cookie globalVariable preferredLanguage baseLocale`
+  localizes no path, so `reroute` had nothing left to de-localize and the deletion was the whole
+  of it. Reopening #13 is what adding `"url"` costs, and #26's own entry says why nobody has.
+- ~~**#30 before #9**~~ — both landed, in that order. The harness and its spec went in first,
+  so the `ThemeStore` deletion was made against six passing cases rather than against
+  nothing — and one of them, "cookie beats the SSR seed", had to be rewritten as the
+  payload-seeding case because #9 removed the path it was asserting. #30's remaining gap
+  (no setter writes a cookie in any test) is recorded on the item.
 - **#21 still needs its own axe pass**, even though the storybook gate now runs. `addon-a11y` globs
   every story (.storybook/main.ts:4) at `test: 'error'`, but landmarks, heading order across the
   config recursion, `document-title` and the 27 theme palettes only exist on the composed,

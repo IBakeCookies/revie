@@ -1,10 +1,8 @@
 import { getContext, setContext, onMount } from 'svelte';
-import { browser } from '$app/environment';
 // Appearance goes through business, never straight to the cookie repository:
 // data -> business -> presentation. Business also narrows the write signatures
 // to ThemeName, so a theme outside the catalogue cannot be persisted from here.
 import {
-	readClientAppearance,
 	updateScenerySeed,
 	updateSceneryMotion,
 	updateTheme,
@@ -32,7 +30,7 @@ const ALL_THEME_CLASSES = themes.map((t) => t.css).flat();
  * The catalogue lives in `business/model/theme.ts` and the cookies in
  * `data/repository/appearance-repository.ts`; this class owns only the
  * reactive state and the initial-value reconciliation, which is the subtle
- * part (three sources: SSR payload, cookie, OS preference).
+ * part (two sources: SSR payload, OS preference).
  */
 export class ThemeStore {
 	#theme = $state<ThemeName>(DEFAULT_THEME);
@@ -58,20 +56,10 @@ export class ThemeStore {
 		initialScenerySeed?: number,
 		initialSceneryPaused?: boolean,
 	) {
-		// A cached or prerendered document carries a serialized payload that may be
-		// stale — the cookie is the source of truth, and that holds for all three:
-		// the seed can have been rerolled and the motion toggled in another tab
-		// since this HTML was produced. Read once, applied below.
-		const cookie = browser ? readClientAppearance() : undefined;
-		// An explicit preference from EITHER source, so the OS query below still
-		// only seeds when neither has one. The cookie wins over the payload because
-		// it is the more recent record of the same choice.
-		const seededPaused = cookie?.sceneryPaused ?? initialSceneryPaused;
-
 		// No client-side mint: an absent seed falls back to the payload the server
 		// minted, never to a fresh number, which would shift the scenery.
-		this.#scenerySeed = cookie?.scenerySeed ?? initialScenerySeed ?? 0;
-		this.#sceneryPaused = seededPaused ?? false;
+		this.#scenerySeed = initialScenerySeed ?? 0;
+		this.#sceneryPaused = initialSceneryPaused ?? false;
 
 		$effect(() => {
 			document.documentElement.classList.remove(...ALL_THEME_CLASSES);
@@ -84,9 +72,9 @@ export class ThemeStore {
 
 		// Tracked rather than read once: the OS setting can flip mid-session and
 		// the CSS honors it immediately, so the control has to appear/disappear
-		// with it. No cookie also means no explicit preference yet, in which
-		// case the same query seeds the initial pause state — once, so a later
-		// flip cannot overwrite a choice the user has made since.
+		// with it. No recorded preference also means the same query seeds the
+		// initial pause state — once, so a later flip cannot overwrite a choice
+		// the user has made since.
 		onMount(() => {
 			const query = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -96,7 +84,7 @@ export class ThemeStore {
 
 			sync();
 
-			if (seededPaused === undefined && query.matches) {
+			if (initialSceneryPaused === undefined && query.matches) {
 				this.#sceneryPaused = true;
 			}
 
@@ -104,14 +92,6 @@ export class ThemeStore {
 
 			return () => query.removeEventListener('change', sync);
 		});
-
-		// Already resolved against the catalogue by business, so it names a theme
-		// that exists — see the stale-cookie fall-through below for the other case.
-		if (cookie?.theme) {
-			this.#theme = cookie.theme;
-
-			return;
-		}
 
 		// a stale cookie may still name a deleted theme — fall through to defaults
 		const seededTheme = resolveThemeName(initialTheme);

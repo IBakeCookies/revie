@@ -105,6 +105,22 @@ props:
   the page renders at all. It lives in the server process, so a restart drops it and a
   second instance behind a load balancer keeps its own; the page stops re-reading while
   its tab is in the background.
+- `BoxSearch` is a search box for whatever engine you run. `href` is the engine's endpoint —
+  what the form submits to — and `placeholder` is optional; leave it out and the box says
+  "Search". Pressing `/` anywhere on the page puts the cursor in it, and Enter submits.
+
+  The query is always sent as `q`, which is what Whoogle, SearXNG, Google and DuckDuckGo all
+  read:
+
+  ```json
+  { "name": "BoxSearch", "props": { "href": "http://192.168.178.192:5000/search", "span": 6 } }
+  ```
+
+  > **Do not put a query string in `href`.** A GET form REPLACES it, so
+  > `https://duckduckgo.com/?ia=web` submits as `https://duckduckgo.com/?q=…` and the `ia=web`
+  > is gone with no warning anywhere. Put engine options in the path, or configure them on the
+  > engine itself.
+
 - A page key is a URL path and has to start with `/`. It may have more than one
   segment, so `"/media/plex"` works and is how pages are grouped. A key without the
   leading slash is dropped with a warning, because the navigation links straight to it
@@ -113,7 +129,7 @@ props:
 - A malformed container is dropped with a warning instead of breaking the page: an
   unknown container name, something that isn't an object, or a missing required prop
   (`BoxService` needs `title`, `href` and `img.src`; `BoxStats` needs `provider` and
-  `href`). Its siblings and its parent grid still render.
+  `href`; `BoxSearch` needs `href`). Its siblings and its parent grid still render.
 - A `Grid` or `SubGrid` with no `items` renders as empty, so a grid written before its
   children is safe to save.
 - `DASHBOARD_CONFIG` overrides the config path. The file is re-read whenever its
@@ -283,8 +299,12 @@ Add the key to **both** catalogues, though — a missing translation fails nothi
 locale lacking a key the compiler emits `const de_<key> = en_<key>;` and succeeds, so the
 German page silently renders English.
 
-The locale is kept in a cookie and switched from the header dropdown. Page names come
-from `config.json` and are shown as written.
+On a first visit the page is rendered in **the browser's own language**, from the
+`Accept-Language` it sends — a German browser gets a German dashboard without touching anything,
+and anything other than German falls back to English. Choosing a language from the header
+dropdown writes a cookie, and the cookie wins from then on: an explicit choice is never
+overridden by the browser preference. Page names come from `config.json` and are shown as
+written.
 
 ## Checks
 

@@ -25,39 +25,11 @@ export const COOKIE_WRITE_OPTIONS = {
 const WRITE_ATTRIBUTES = `path=${COOKIE_WRITE_OPTIONS.path}; max-age=${COOKIE_WRITE_OPTIONS.maxAge}; SameSite=${COOKIE_WRITE_OPTIONS.sameSite}`;
 
 /**
- * Anything that can hand back a cookie by name — SvelteKit's `event.cookies`
- * on the server, `documentCookies()` in the browser. Structural on purpose:
- * the data layer must not depend on the framework.
+ * Anything that can hand back a cookie by name — SvelteKit's `event.cookies`.
+ * Structural on purpose: the data layer must not depend on the framework.
  */
 export interface CookieSource {
 	get(name: string): string | undefined;
-}
-
-/** Reads the browser's own cookie jar. Browser-only; call it inside a read. */
-export function documentCookies(): CookieSource {
-	return {
-		get(name) {
-			const pair = document.cookie
-				.split(';')
-				.map((entry) => entry.trim())
-				.find((entry) => entry.startsWith(`${name}=`));
-
-			if (!pair) return undefined;
-
-			const raw = pair.slice(name.length + 1);
-
-			try {
-				return decodeURIComponent(raw);
-			} catch {
-				// Cookies ignore the port, so any other app on this host can set a
-				// value that is not valid percent-encoding (`100%` throws URIError).
-				// This read is synchronous and hydration-critical, so it hands back
-				// the raw value the way SvelteKit's own parser does rather than
-				// throwing and taking the whole client render down with it.
-				return raw;
-			}
-		},
-	};
 }
 
 /** Browser-side write. Server-side writes go through SvelteKit's `cookies`. */

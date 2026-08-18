@@ -238,6 +238,27 @@
 	}}
 />
 
+<!-- The one container that is a form rather than a link: the branch has to hand config's
+     own props to it, `href` among them, or the box submits to the page it sits on. -->
+<Story
+	name="Box search"
+	args={{
+		container: {
+			name: 'BoxSearch',
+			props: {
+				href: 'http://whoogle.local:5000/search',
+				placeholder: 'Search the web',
+				span: 6,
+			},
+		},
+	}}
+	play={async ({ canvasElement }) => {
+		const form = canvasElement.querySelector('form');
+
+		await expect(form).toHaveAttribute('action', 'http://whoogle.local:5000/search');
+	}}
+/>
+
 <!-- The {:else}: business declared a container this component has no branch for. It
      is a compile error to reach it honestly, so the story forces the type — and it
      is its own story rather than a step in a play function because axe only ever

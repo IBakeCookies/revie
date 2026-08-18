@@ -9,12 +9,7 @@
  * seed should be minted, are model decisions — see `business/model/theme.ts`.
  */
 
-import {
-	COOKIE_WRITE_OPTIONS,
-	documentCookies,
-	writeCookie,
-	type CookieSource,
-} from '$lib/data/storage/cookie';
+import { COOKIE_WRITE_OPTIONS, writeCookie, type CookieSource } from '$lib/data/storage/cookie';
 
 const THEME_COOKIE = 'theme';
 const SCENERY_SEED_COOKIE = 'scenerySeed';
@@ -29,11 +24,8 @@ export interface StoredAppearance {
 	sceneryPaused: boolean | undefined;
 }
 
-/**
- * Read all three at once. Pass `event.cookies` on the server; omit the
- * argument in the browser to read `document.cookie`.
- */
-export function $readAppearance(source: CookieSource = documentCookies()): StoredAppearance {
+/** Read all three at once, out of `event.cookies`. */
+export function $readAppearance(source: CookieSource): StoredAppearance {
 	// `Number('')` is 0, so an empty-valued cookie would otherwise read as a
 	// perfectly valid seed 0 — pinning every such visitor to one arrangement,
 	// which is the opposite of what the seed is for.

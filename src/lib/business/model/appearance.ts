@@ -40,33 +40,6 @@ export function readRequestAppearance(cookies: CookieSource): RequestAppearance 
 	};
 }
 
-export interface ClientAppearance {
-	/** Resolved against the catalogue; undefined when nothing valid is stored. */
-	theme: ThemeName | undefined;
-	/** Undefined when absent — NOT minted here, minting is the server's job. */
-	scenerySeed: number | undefined;
-	/** Undefined means "no preference recorded" — defer to prefers-reduced-motion. */
-	sceneryPaused: boolean | undefined;
-}
-
-/**
- * What the browser's own cookies say — all three, over one read, because the
- * store reconciles them together: a cached document's serialized payload is
- * stale for the seed and the pause state exactly as it is for the theme.
- *
- * Browser-only. Each field is undefined when nothing valid is stored, so the
- * caller falls back to its own seed rather than rendering unstyled or minting.
- */
-export function readClientAppearance(): ClientAppearance {
-	const stored = appearanceRepository.$readAppearance();
-
-	return {
-		theme: resolveThemeName(stored.theme),
-		scenerySeed: stored.scenerySeed,
-		sceneryPaused: stored.sceneryPaused,
-	};
-}
-
 /*
  * Writes. Thin over the repository on purpose, but not pass-throughs: they
  * narrow to `ThemeName`, so presentation cannot persist a theme that is not in

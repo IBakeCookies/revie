@@ -3,23 +3,6 @@ import { render } from 'vitest-browser-svelte';
 import { DEFAULT_THEME } from '$lib/business/model/theme';
 import ThemeStoreHarness from '$lib/test/theme-store-harness.svelte';
 
-// Mocked at the store's own boundary: business. The cookie belongs to data, and whether
-// the test browser happens to carry one must not decide what these assert.
-// `vi.hoisted` because the factory runs while the mocked module is imported, which is
-// before a plain top-level `let` in this file has left its TDZ.
-const cookie = vi.hoisted(() => ({
-	theme: undefined as string | undefined,
-	scenerySeed: undefined as number | undefined,
-	sceneryPaused: undefined as boolean | undefined,
-}));
-
-vi.mock('$lib/business/model/appearance', () => ({
-	readClientAppearance: () => cookie,
-	updateTheme: () => {},
-	updateScenerySeed: () => {},
-	updateSceneryMotion: () => {},
-}));
-
 /** Stands in for the OS setting, which a test cannot flip. Returns the flip. */
 function stubReducedMotion(initial: boolean): (next: boolean) => void {
 	const listeners = new Set<() => void>();
@@ -46,10 +29,6 @@ function stubReducedMotion(initial: boolean): (next: boolean) => void {
 
 afterEach(() => {
 	vi.restoreAllMocks();
-
-	cookie.theme = undefined;
-	cookie.scenerySeed = undefined;
-	cookie.sceneryPaused = undefined;
 });
 
 describe('ThemeStore', () => {
@@ -88,23 +67,7 @@ describe('ThemeStore', () => {
 		await expect.element(screen.getByTestId('theme')).toHaveTextContent('abyss');
 	});
 
-	it('lets the cookie win over a stale SSR payload for the seed and the pause state', async () => {
-		stubReducedMotion(false);
-		cookie.scenerySeed = 7;
-		cookie.sceneryPaused = true;
-
-		const screen = await render(ThemeStoreHarness, {
-			initialScenerySeed: 3,
-			initialSceneryPaused: false,
-		});
-
-		// A cached document serializes what the cookies said when it was rendered; a
-		// reroll or a pause in another tab since then is what the cookie now holds.
-		await expect.element(screen.getByTestId('scenery-seed')).toHaveTextContent('7');
-		await expect.element(screen.getByTestId('scenery-paused')).toHaveTextContent('true');
-	});
-
-	it('keeps the SSR payload when no cookie names one, rather than minting a seed', async () => {
+	it('seeds the scenery from the SSR payload, which IS the resolved cookie value', async () => {
 		stubReducedMotion(false);
 
 		const screen = await render(ThemeStoreHarness, {
@@ -112,17 +75,28 @@ describe('ThemeStore', () => {
 			initialSceneryPaused: true,
 		});
 
+		// The same request read the same cookies to produce this payload, so a
+		// client-side re-read could only ever match it — and no client-side mint,
+		// which would shift the scenery away from the SSR'd style attribute.
 		await expect.element(screen.getByTestId('scenery-seed')).toHaveTextContent('3');
 		await expect.element(screen.getByTestId('scenery-paused')).toHaveTextContent('true');
 	});
 
-	it('does not let prefers-reduced-motion seed over a cookie that says motion is on', async () => {
+	it('honours prefers-reduced-motion when the payload records no choice', async () => {
 		stubReducedMotion(true);
-		cookie.sceneryPaused = false;
 
-		// The payload is undefined, so only the cookie records a choice — and the OS
-		// query seeds only when neither source does.
 		const screen = await render(ThemeStoreHarness, {});
+
+		await expect.element(screen.getByTestId('scenery-paused')).toHaveTextContent('true');
+	});
+
+	it('does not let prefers-reduced-motion seed over a payload that says motion is on', async () => {
+		stubReducedMotion(true);
+
+		// The payload records a choice, and the OS query seeds only when it does not.
+		const screen = await render(ThemeStoreHarness, {
+			initialSceneryPaused: false,
+		});
 
 		await expect.element(screen.getByTestId('scenery-paused')).toHaveTextContent('false');
 	});

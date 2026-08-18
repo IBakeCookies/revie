@@ -1,12 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readClientAppearance, readOrMintScenerySeed } from '$lib/business/model/appearance';
-
-/** The browser jar the client reader parses. Node has no `document` of its own. */
-function stubDocumentCookie(cookie: string): void {
-	vi.stubGlobal('document', {
-		cookie,
-	});
-}
+import { describe, expect, it } from 'vitest';
+import { readOrMintScenerySeed } from '$lib/business/model/appearance';
 
 /** A server cookie jar that records what was written, so a mint is observable. */
 function cookieJar(entries: Record<string, string>) {
@@ -21,38 +14,6 @@ function cookieJar(entries: Record<string, string>) {
 		},
 	};
 }
-
-afterEach(() => {
-	vi.unstubAllGlobals();
-});
-
-describe('readClientAppearance', () => {
-	it('hands back all three preferences from the browser jar', () => {
-		stubDocumentCookie('theme=abyss; scenerySeed=7; sceneryMotion=paused');
-
-		expect(readClientAppearance()).toEqual({
-			theme: 'abyss',
-			scenerySeed: 7,
-			sceneryPaused: true,
-		});
-	});
-
-	it('drops a theme that is no longer in the catalogue', () => {
-		stubDocumentCookie('theme=theme-removed-two-deploys-ago');
-
-		// Cookies outlive deploys. Passing the raw name through leaves the caller
-		// naming no CSS classes at all, and the app renders unstyled.
-		expect(readClientAppearance().theme).toBeUndefined();
-	});
-
-	it('leaves an absent seed undefined rather than minting one', () => {
-		stubDocumentCookie('theme=abyss');
-
-		// Minting is the server's job — a second mint would shift the scenery
-		// between the SSR'd style attribute and the hydrated one.
-		expect(readClientAppearance().scenerySeed).toBeUndefined();
-	});
-});
 
 describe('readOrMintScenerySeed', () => {
 	it('keeps a stored seed and writes nothing', () => {

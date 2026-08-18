@@ -61,6 +61,11 @@ export default defineConfig({
 	],
 	use: {
 		baseURL: previewUrl,
+		// The fixture's language, pinned for the same reason its config and its env are:
+		// `preferredLanguage` is in the paraglide strategy, so an unpinned Chromium sends the
+		// machine's own `Accept-Language` and every spec asserting English copy goes red on a
+		// de-* runner while staying green here.
+		locale: 'en-US',
 		trace: 'retain-on-failure',
 		video: 'retain-on-failure',
 	},

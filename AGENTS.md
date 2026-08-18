@@ -46,10 +46,17 @@ check clause fails on eslint's output.
 and **only the vite plugin regenerates it** — so anything that doesn't run vite
 (`svelte-check`, a fresh clone, CI) sees unresolved modules until the compiler has run.
 Measured: delete the directory and `npm run check` reports 13 errors in 9 files, 0 after one
-compile. That is why it is chained into `prepare` and `check`; don't un-chain it. Don't pass
-`--strategy` there either — [vite.config.ts](vite.config.ts) passes none, and paraglide 2.x
-has no config file for it, so a strategy would have to be spelled in both places
-([roadmap.md](roadmap.md) #26).
+compile. That is why it is chained into `prepare` and `check`; don't un-chain it.
+
+**`--strategy` IS spelled there, and it has to match [vite.config.ts](vite.config.ts) exactly.**
+Both read `cookie globalVariable preferredLanguage baseLocale`. Paraglide 2.x has no config file,
+so the strategy can only be an argument — and the two generators are used by different tools:
+`dev` / `build` / `storybook` / `vitest` compile through the plugin, while `check`, `prepare`, CI
+and a fresh clone compile through the CLI. Measured with the flag on the plugin only: one
+`npm run paraglide` rewrote `runtime.js` with `preferredLanguage` dropped, so SSR resolved the
+locale differently depending on which tool had last generated
+[src/lib/paraglide/](src/lib/paraglide). That is the third of the repo's three sanctioned
+duplications — see "One definition per concept" under Conventions.
 
 ## Architecture
 
@@ -277,7 +284,7 @@ config.json ─(disk read, no caching)→ data/config.ts
 
 - [business/model/config.ts](src/lib/business/model/config.ts) declares the names a config
   may use AND their prop schema — business owns the format. [config-container.svelte](src/lib/presentation/components/config-container.svelte)
-  is what actually renders, as an explicit `if/else` chain. Both list the same five names,
+  is what actually renders, as an explicit `if/else` chain. Both list the same six names,
   and that duplication is load-bearing: a component held in a variable has no statically
   known props, so spreading config props into it would need an `any`. **Adding a component
   means editing both.**
@@ -300,6 +307,30 @@ config.json ─(disk read, no caching)→ data/config.ts
   a technicality, and it is allowed **because `config.spec.ts` asserts both the drop and the
   path** — if a valibot change ever stopped validating defaults, the test fails loudly instead
   of silently turning a required prop optional.
+- **`BoxSearch` is the first container a VISITOR can type into, and that is the only thing
+  interesting about it.** Every other `<form>` and `<input>` in the tree belongs to `/admin`,
+  behind the shared token; this one renders on a page anybody on the LAN loads. It is still
+  **no server code at all** — a `method="get"` form whose `action` is config's `href`, so the
+  browser navigates to the engine and this app never sees the query. Four decisions:
+  1. **The parameter name `q` is hardcoded in the component, not a prop.** Whoogle, SearXNG,
+     Google and DuckDuckGo all read it, so a prop would be a second caller that does not exist.
+     The consequence belongs to the operator and cannot be fixed in code: **a GET submission
+     REPLACES the action's query string**, so an href like `https://duckduckgo.com/?ia=web`
+     silently loses `ia=web`. README.md says so, because only the docs can.
+  2. **`rel="noreferrer"` on the form.** The dashboard's URL is an internal address — a hostname
+     and port on someone's LAN — and a search submission is the one navigation in the app that
+     routinely leaves it for the public internet.
+  3. **The `/` shortcut must `preventDefault`, and that is not tidiness.** The character is
+     inserted against whatever is focused by the keypress stage, which is the field this handler
+     just focused, so an unprevented slash opens the box pre-filled with one — and opens
+     Firefox's quick find on the way. It also has to skip a keystroke aimed at an `input`,
+     including its own, or a typed slash never reaches a query.
+  4. **`aria-label` from `search_label`, never a literal, and the same message is the
+     placeholder's fallback.** A placeholder is not an accessible name — axe's `label` rule is
+     what caught the same shape on `box-stats`' anchor — and one message doing both means a
+     config that leaves `placeholder` out still gets a box that says what it is. There is no
+     submit button: one field that blocks implicit submission is all it takes for Enter to
+     submit, so **a second field would silently end that.**
 - `Grid` and `SubGrid` nest, so `config-container ↔ grid ↔ sub-grid` is a dependency cycle.
   It's deliberate (recursion), which is why `no-circular` exempts those three files by name
   rather than being turned down to a warning.
@@ -356,7 +387,7 @@ config.json ─(disk read, no caching)→ data/config.ts
   isn't a fourth edit point.** `containerFields` walks `containerSchemas`' runtime nodes
   (`entries` / `wrapped` / `default` / `type`) into plain data — `{ path, kind, isRequired }`
   — so adding a container to the schema and to `config-container.svelte` makes it appear in
-  the editor with no third edit, and `config.spec.ts` asserts that rather than asserting five
+  the editor with no third edit, and `config.spec.ts` asserts that rather than asserting six
   hardcoded names. Four things about it:
   1. **Valibot's internals stop in business.** The walk reads the schemas through one
      structural `SchemaNode` type that is **assigned** from `containerSchemas` rather than
@@ -551,9 +582,18 @@ The repository/business split is the one to respect: the repository does parsing
 I/O and **decides nothing**; business makes every decision and owns no cookie names. A new
 appearance cookie's name and write belong in the repository, its rules in business.
 
-- The store reconciles **three** sources: the SSR payload, `document.cookie`, and
-  `matchMedia`. Read the constructor comments in [theme-store.svelte.ts](src/lib/business/store/theme-store.svelte.ts)
-  before touching it.
+- The store reconciles **two** sources: the SSR payload and `matchMedia`. It read
+  `document.cookie` as a third until [roadmap.md](roadmap.md) #9, and **do not put that back.**
+  The same request had already resolved the same three cookies through the same
+  `resolveThemeName` to produce the payload, so the client read could only ever agree with what
+  it was handed — while its early `return` made the blocks under it look conditional when they
+  were not. What went with it: `readClientAppearance` in `business/model/appearance.ts` and
+  `documentCookies` in [cookie.ts](src/lib/data/storage/cookie.ts), so `CookieSource` is now
+  server-only, over `event.cookies` alone, and the data layer has no browser read left. The
+  cookie WRITES are untouched — the store still mirrors every change back through business, which
+  is the direction the diagram above shows. The trade is named: a theme switched in another tab
+  while this one is loading no longer snaps in on hydration, and that is the better paint, because
+  `hooks.server.ts` had already stamped the old theme's classes pre-paint.
 - `prefers-reduced-motion` is **tracked**, not read once, and its `onMount` is
   unconditional. [scenery/index.css](src/lib/presentation/style/scenery/index.css) pauses motion
   under it with `!important` and no opt-out, so while the OS asks for it there is nothing a resume
@@ -728,7 +768,7 @@ Things that break **silently** — no error, just wrong output.
   A control nested inside an already-blurred card needs none — `backdrop-filter` makes an
   element a **backdrop root**, so a nested blur cannot reach the scenery anyway; that is why
   [dropdown.svelte](src/lib/presentation/components/dropdown.svelte)'s trigger carries none
-  (it only ever sits in the blurred header). Four of the five containers a config can name keep
+  (it only ever sits in the blurred header). Five of the six containers a config can name keep
   theirs, because config decides whether they are nested and no component can know. `SubGrid` is
   the exception and not a counter-example: it can still be top-level, but it draws no surface at
   all, so `backdrop-blur-none` is there because there is nothing of its own to blur.
@@ -741,11 +781,11 @@ Things that break **silently** — no error, just wrong output.
   Measured on `solid-light` — inset `0.955` on a `0.96` page, so the clock box dissolved into
   the background while the card next to it was white with a shadow. The shape now:
 
-  | Who                                                                                                                       | Does what                                         |
-  | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-  | `box-date`, `box-stats`, `box-service`, `grid`, `config-container`'s `{:else}`, [+error.svelte](src/routes/+error.svelte) | READ it: `bg-(--box-surface,var(--surface-card))` |
-  | `grid`'s items `<div>`, `box-stats`'s `<dl>`                                                                              | DECLARE `[--box-surface:var(--surface-inset)]`    |
-  | `sub-grid`'s items `<div>`                                                                                                | PASS THROUGH: `[--box-surface:inherit]`           |
+  | Who                                                                                                                                     | Does what                                         |
+  | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+  | `box-date`, `box-stats`, `box-search`, `box-service`, `grid`, `config-container`'s `{:else}`, [+error.svelte](src/routes/+error.svelte) | READ it: `bg-(--box-surface,var(--surface-card))` |
+  | `grid`'s items `<div>`, `box-stats`'s `<dl>`                                                                                            | DECLARE `[--box-surface:var(--surface-inset)]`    |
+  | `sub-grid`'s items `<div>`                                                                                                              | PASS THROUGH: `[--box-surface:inherit]`           |
 
   Four things about it are load-bearing:
   1. **The declaration is on the items wrapper, never on the card that reads it.** Unlike a
@@ -837,7 +877,7 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  44 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
+  45 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
   **Six take parameters** — `service_probe_failed({ href })`, so the toast names the service it
   could not reach, `admin_container_add_at({ target, position })`, so each of a list's N+1
   insertion buttons has an accessible name that says which list and where,
@@ -853,6 +893,23 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   readings themselves ([box-stats.svelte](src/lib/presentation/components/box-stats.svelte)).
   A parameter is how DATA reaches a message; it is never how copy leaves a lower layer — see the
   no-copy-crosses-a-layer rule above.
+- **The locale is resolved `cookie → globalVariable → preferredLanguage → baseLocale`, and the
+  first visit is the interesting one.** The first SSR response follows `Accept-Language`
+  (`extractLocaleFromHeader`), and the client's first `getLocale()` then PERSISTS whatever it
+  resolved to the `PARAGLIDE_LOCALE` cookie behind paraglide's own `localeInitiallySet` flag — so
+  the browser preference is read once and pinned from then on, and the dropdown is thereafter
+  overriding a cookie rather than a header. Two consequences, both left open on purpose and
+  recorded in [roadmap.md](roadmap.md) #26: the SSR response now varies by `Accept-Language` with
+  no `Vary` header on it, because paraglide only sets one on the redirect branch `url` would
+  enable; and SSR resolves from the header while the client resolves from `navigator.languages`,
+  so anything rewriting `Accept-Language` in between is a hydration text mismatch. **A test must
+  never inherit the machine's language.** `test.use({ locale })` is what a Playwright spec needs —
+  a default Chromium context sends no `accept-language` at all and reports
+  `navigator.languages === ['en-US']`, so [playwright.config.ts](playwright.config.ts) pins
+  `locale: 'en-US'` rather than relying on that. In a story the lever is `overwriteGetLocale` in
+  `beforeEach` with its own teardown: `{ locale: 'de' }` on a message cannot reach a component
+  that reads `getLocale()` at mount for its `Intl` formatters, and `setLocale()` would write the
+  cookie into the shared browser page.
 
 ## Conventions
 
@@ -981,11 +1038,13 @@ the way any more — with `+layout.server.ts`, `[...slug]/+page.server.ts`,
 `service-store.svelte.ts` and `scripts/` exempted.
 
 **One definition per concept.** If you catch yourself writing "mirrors", "same as" or "keep in
-sync with", export the thing instead. This repo has exactly two exceptions, both documented
-above as load-bearing because **no export can span the two sides**: the five container names in
+sync with", export the thing instead. This repo has exactly three exceptions, all documented
+above as load-bearing because **no export can span the two sides**: the six container names in
 `business/model/config.ts` versus `config-container.svelte`'s `if/else` chain (a component held
-in a variable has no statically known props), and the `@theme` scales versus
-`extendTailwindMerge` in `style.ts` (one side is CSS). Anything else that reads "keep in sync"
+in a variable has no statically known props), the `@theme` scales versus
+`extendTailwindMerge` in `style.ts` (one side is CSS), and the paraglide strategy array in
+[vite.config.ts](vite.config.ts) versus the argv list inside `package.json`'s `paraglide` script
+(the CLI has no config file, so there is nothing for either side to import). Anything else that reads "keep in sync"
 is a bug waiting, not a convention.
 
 **Build the simplest thing that does what was asked.** No abstraction for a second caller that
@@ -1023,7 +1082,7 @@ Comments explain _why_, not _what_; the existing ones are the house style, match
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 16 open items, all but #33 from three
+The open work lives in [roadmap.md](roadmap.md) — 11 open items, all but #33 from three
 review passes and adversarially verified against the code, ordered by what breaks soonest. #33 is
 the exception: its core landed, so what is left of it is the remaining vendor files that plug into
 the seam. Several are straight ports from
@@ -1036,8 +1095,8 @@ is fixed** — the section below is what is.
 Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
 
 - **The two stores go through business.** `theme-store` uses
-  [business/model/appearance.ts](src/lib/business/model/appearance.ts) (`readClientAppearance`,
-  `updateTheme`, `updateScenerySeed`, `updateSceneryMotion`) and `service-store` uses
+  [business/model/appearance.ts](src/lib/business/model/appearance.ts) (`updateTheme`,
+  `updateScenerySeed`, `updateSceneryMotion` — writes only, since #9 took the client read out) and `service-store` uses
   [business/model/service.ts](src/lib/business/model/service.ts). Neither imports a repository. The
   business writers narrow to `ThemeName` on purpose — that's why they aren't pass-throughs.
 - **`Result<T>` / `AppError` replaced the old error tuple.** The old shape set `message` only
@@ -1086,7 +1145,7 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   config format a derivative of component internals. Business now declares the schema
   and names no component. Don't reintroduce a `ComponentProps`-derived container type,
   and don't reintroduce `ComponentRegistry` / `ComponentName` — neither name exists in
-  `src/` any more. A side effect worth keeping: the five Svelte components no longer
+  `src/` any more. A side effect worth keeping: the six Svelte components no longer
   leak into the `/api/ping` server bundle.
 - **`BoxService.title` is required**, in the schema — which is now the only place it could
   be said. It was optional in the derived type while the component demanded it, so a

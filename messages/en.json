@@ -24,6 +24,7 @@
 	"service_status_offline": "offline",
 	"service_status_unknown": "status unknown",
 	"service_probe_failed": "Could not check {href}",
+	"search_label": "Search",
 	"admin_title": "Administration",
 	"admin_config_heading": "Current configuration",
 	"admin_config_save": "Save configuration",

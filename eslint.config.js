@@ -260,9 +260,7 @@ export default defineConfig(
 		},
 	},
 	{
-		// `src/hooks*.ts` covers both src/hooks.ts and src/hooks.server.ts: they render
-		// and reroute, so they go through the business layer like any route would.
-		files: ['src/lib/presentation/**', 'src/routes/**', 'src/hooks*.ts'],
+		files: ['src/lib/presentation/**', 'src/routes/**', 'src/hooks.server.ts'],
 		rules: {
 			'no-restricted-imports': [
 				'error',

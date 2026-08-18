@@ -80,24 +80,6 @@ describe('$readAppearance', () => {
 	});
 });
 
-describe('reading the browser jar', () => {
-	afterEach(() => vi.unstubAllGlobals());
-
-	it('hands back a value that is not valid percent-encoding instead of throwing', () => {
-		// Cookies ignore the port, so another app on this host can set `theme`.
-		// `decodeURIComponent('100%')` throws, and this read runs during
-		// hydration — so it must not be able to take the client render down.
-		vi.stubGlobal('document', {
-			cookie: 'theme=100%; scenerySeed=7',
-		});
-
-		expect($readAppearance()).toMatchObject({
-			theme: '100%',
-			scenerySeed: 7,
-		});
-	});
-});
-
 describe('appearance writes', () => {
 	let written: string[];
 
@@ -107,9 +89,6 @@ describe('appearance writes', () => {
 		vi.stubGlobal('document', {
 			set cookie(value: string) {
 				written.push(value);
-			},
-			get cookie() {
-				return written.join('; ');
 			},
 		});
 	});
@@ -130,16 +109,6 @@ describe('appearance writes', () => {
 		expect(written[0]).toContain('scenerySeed=4294967295');
 		expect(written[1]).toContain('sceneryMotion=paused');
 		expect(written[2]).toContain('sceneryMotion=on');
-	});
-
-	it('round-trips a browser write back through the reader', () => {
-		$updateTheme('city-windows');
-		$updateScenerySeed(7);
-
-		expect($readAppearance()).toMatchObject({
-			theme: 'city-windows',
-			scenerySeed: 7,
-		});
 	});
 
 	it('mints the seed server-side with the same attributes', () => {

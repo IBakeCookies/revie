@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ConfigContainer } from '$lib/business/model/config';
 	import BoxDate from '$lib/presentation/components/box-date.svelte';
+	import BoxSearch from '$lib/presentation/components/box-search.svelte';
 	import BoxServiceWrapper from '$lib/presentation/components/box-service-wrapper.svelte';
 	import BoxStatsWrapper from '$lib/presentation/components/box-stats-wrapper.svelte';
 	import Grid from '$lib/presentation/components/grid.svelte';
@@ -51,6 +52,8 @@
 	<BoxStatsWrapper {...container.props} />
 {:else if container.name === 'BoxDate'}
 	<BoxDate {...container.props} />
+{:else if container.name === 'BoxSearch'}
+	<BoxSearch {...container.props} />
 {:else}
 	<p
 		class="border-danger text-ty-secondary col-span-12 rounded-lg border bg-(--box-surface,var(--surface-card)) p-box-md backdrop-blur"

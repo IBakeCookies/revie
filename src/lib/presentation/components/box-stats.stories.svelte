@@ -4,7 +4,7 @@
 	import { expect } from 'storybook/test';
 	import BoxStats from '$lib/presentation/components/box-stats.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { getLocale } from '$lib/paraglide/runtime';
+	import { getLocale, overwriteGetLocale } from '$lib/paraglide/runtime';
 	import { providerNameLabel } from '$lib/presentation/util/provider-name';
 
 	// Built from the same locale the component reads, so a render in the wrong locale cannot
@@ -19,6 +19,11 @@
 		style: 'percent',
 		maximumFractionDigits: 1,
 	});
+
+	// Captured before the German story swaps it: the runtime exports no reset, so a story that
+	// left `getLocale` on 'de' would render every story after it in German while the three
+	// formatters above stay English.
+	const originalGetLocale = getLocale;
 
 	const healthy: Stat[] = [
 		{
@@ -265,5 +270,28 @@
 		await expect(canvas.getByRole('link')).toHaveStyle({
 			'--span': '12',
 		});
+	}}
+/>
+
+<!-- The one story that does NOT build its expectation from `m.*()` / `getLocale()`. The others
+     follow whatever locale they run in, so they would stay green with de.json deleted and with
+     `Intl` handed the wrong locale. The literals are the assertion: 1234 is '1.234' in German
+     and '1,234' in English, and `stat_dns_queries` silently compiles to the English string
+     whenever de.json is missing the key. -->
+<Story
+	name="A reading in German"
+	beforeEach={() => {
+		// The box reads `getLocale()` at mount, for both `m.*()` and its `Intl` formatters, so
+		// the locale has to move before the render — `{ locale: 'de' }` on a message cannot
+		// reach it, and `setLocale()` would persist a cookie into the shared browser page.
+		overwriteGetLocale(() => 'de');
+
+		return () => overwriteGetLocale(originalGetLocale);
+	}}
+	play={async ({ canvasElement }) => {
+		const tile = canvasElement.querySelector('dl > div');
+
+		await expect(tile?.querySelector('dt')?.textContent).toBe('DNS-Anfragen');
+		await expect(tile?.querySelector('dd')?.textContent).toBe('1.234');
 	}}
 />
