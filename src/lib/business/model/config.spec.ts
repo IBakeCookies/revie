@@ -2,12 +2,14 @@ import type { ConfigContainer, ContainerField } from '$lib/business/model/config
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
+	collectServiceLinks,
 	collectServiceProbes,
 	collectStatsTargets,
 	containerFields,
 	containerNames,
 	isGrid,
 	normalizeConfig,
+	pageEntries,
 	providerNames,
 	statsKey,
 } from '$lib/business/model/config';
@@ -675,6 +677,118 @@ describe('collectServiceProbes', () => {
 		expect(warnings).toEqual(['Skipping container "BoxService", "probe" is missing or not valid']);
 
 		expect(collectServiceProbes(page.containers)).toEqual([]);
+	});
+});
+
+describe('collectServiceLinks', () => {
+	function boxAt(title: string, href: string, probe?: string) {
+		return {
+			name: 'BoxService',
+			props: {
+				title,
+				href,
+				img: {
+					src: 'https://icons.local/p.svg',
+				},
+				...(probe === undefined
+					? undefined
+					: {
+							probe,
+						}),
+			},
+		};
+	}
+
+	it('collects services at any nesting depth, carrying the title the tile shows', () => {
+		expect(collectServiceLinks(home.containers)).toEqual([
+			{
+				title: 'Proxmox',
+				href: 'https://proxmox.local:8006',
+			},
+		]);
+	});
+
+	/**
+	 * The one place this collector differs from `collectServiceProbes`, on purpose: a
+	 * bookmark is exactly the destination a jump list exists to offer, and its caller
+	 * navigates instead of measuring — there is nothing here for the mode to exclude.
+	 */
+	it('includes a probe:none bookmark, which the probe collector leaves out', () => {
+		const { page } = pageWith(
+			boxAt('Docs', 'https://pages.local/docs/', 'none'),
+			boxAt('Proxmox', 'https://proxmox.local:8006'),
+		);
+
+		expect(collectServiceLinks(page.containers)).toEqual([
+			{
+				title: 'Docs',
+				href: 'https://pages.local/docs/',
+			},
+			{
+				title: 'Proxmox',
+				href: 'https://proxmox.local:8006',
+			},
+		]);
+	});
+
+	it('returns one entry however many boxes name the same href, first title winning', () => {
+		const { page } = pageWith(boxAt('Plex', 'http://plex.local:32400'), {
+			name: 'Grid',
+			props: {
+				items: [boxAt('Media', 'http://plex.local:32400')],
+			},
+		});
+
+		expect(collectServiceLinks(page.containers)).toEqual([
+			{
+				title: 'Plex',
+				href: 'http://plex.local:32400',
+			},
+		]);
+	});
+
+	it('returns nothing for a page with no service box', () => {
+		const { page } = pageWith({
+			name: 'BoxDate',
+			props: {},
+		});
+
+		expect(collectServiceLinks(page.containers)).toEqual([]);
+	});
+});
+
+describe('pageEntries', () => {
+	it('lists every configured page with its navigation name', () => {
+		expect(pageEntries(config)).toEqual([
+			{
+				path: '/',
+				name: 'Home',
+			},
+			{
+				path: '/media/plex',
+				name: 'Plex',
+			},
+		]);
+	});
+
+	// The nav rail and the quick-jump both render this label, and an empty one would
+	// render a row that names nothing to point at.
+	it('falls back to the path when no name was written', () => {
+		const { config: unnamed } = normalizeConfig({
+			pages: {
+				'/unnamed': {
+					name: '',
+					containers: [],
+				},
+			},
+		});
+
+		expect(pageEntries(unnamed)).toEqual([
+			{
+				path: '/unnamed',
+				name: '/unnamed',
+			},
+		]);
 	});
 });
 

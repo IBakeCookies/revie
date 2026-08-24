@@ -2,14 +2,18 @@
 	import type { ConfigContainer } from '$lib/business/model/config';
 	import type { NotifyProbeFailed } from '$lib/business/store/service-store.svelte';
 	import type { Stat } from '$lib/business/type/stats';
+	import type { FeedItem } from '$lib/business/type/feed';
 	import ConfigContainerView from '$lib/presentation/components/config-container.svelte';
 	import { pollServicesState, serviceProbeKey } from '$lib/business/store/poll-services-state';
+	import { setFeedStore } from '$lib/business/store/feed-store.svelte';
 	import { setServicesStore } from '$lib/business/store/service-store.svelte';
 	import { setStatsStore } from '$lib/business/store/stats-store.svelte';
 
 	export type Props = {
 		/** Keyed by `statsKey(provider, href)`, exactly as the load returned it. */
 		stats: Record<string, Stat[]>;
+		/** Keyed by feed href alone, exactly as the load returned it. */
+		feeds: Record<string, FeedItem[]>;
 		containers: ConfigContainer[];
 		/**
 		 * Told which href failed to probe, so the route can raise a toast in the user's
@@ -20,7 +24,7 @@
 		notify?: NotifyProbeFailed;
 	};
 
-	let { stats, containers, notify }: Props = $props();
+	let { stats, feeds, containers, notify }: Props = $props();
 
 	// The sink is fixed for the life of the page — the route reads it from a store set
 	// one level up, which outlives this component.
@@ -28,6 +32,7 @@
 	const servicesStore = setServicesStore(notify);
 
 	setStatsStore(() => stats);
+	setFeedStore(() => feeds);
 
 	// The key, not `containers`: the stats refresh in `[...slug]/+page.svelte` re-runs the
 	// load every 60s and hands this component a rebuilt array each time, so an effect

@@ -177,6 +177,18 @@ const containerSchemas = {
 		href: v.string(),
 		placeholder: v.optional(v.string()),
 	}),
+	BoxFeed: v.object({
+		span: spanProp,
+		/** The feed URL — RSS 2.0, Atom or RDF — fetched server-side and cached. */
+		href: v.string(),
+		/**
+		 * How many rows the box shows. Optional, and deliberately WITHOUT a default,
+		 * like `probe` above: an optional with one keeps what is under it required,
+		 * which would mark a prop nobody has to write. The component defaults it, and
+		 * whatever it names is capped by what the read kept anyway.
+		 */
+		limit: v.optional(v.number()),
+	}),
 	// Grid and SubGrid do not require `items`: it is defaulted below, so a grid
 	// written before its children still renders as empty.
 	Grid: v.object(gridProps),
@@ -347,6 +359,32 @@ export const emptyConfig: Config = {
 	pages: {},
 };
 
+/** One configured page, as anything that links between pages needs to see it. */
+export type PageEntry = {
+	/** The URL path — the config key verbatim. */
+	path: string;
+	/**
+	 * The navigation name, falling back to the path when none was written. A page
+	 * with no name is still a destination, and an empty label would render nothing
+	 * to point at it.
+	 */
+	name: string;
+};
+
+/**
+ * Every configured page, in config order.
+ *
+ * The navigation rail and the quick-jump both link straight to these keys, so the
+ * `name || path` fallback is decided once here rather than restated beside each of
+ * them.
+ */
+export function pageEntries(config: Config): PageEntry[] {
+	return Object.entries(config.pages).map(([path, page]) => ({
+		path,
+		name: page.name || path,
+	}));
+}
+
 export function isBoxService(item: ConfigContainer): item is ConfigContainer<'BoxService'> {
 	return item.name === 'BoxService';
 }
@@ -371,6 +409,10 @@ export function isGrid(item: ConfigContainer): item is ConfigContainer<NestingNa
 
 export function isBoxStats(item: ConfigContainer): item is ConfigContainer<'BoxStats'> {
 	return item.name === 'BoxStats';
+}
+
+export function isBoxFeed(item: ConfigContainer): item is ConfigContainer<'BoxFeed'> {
+	return item.name === 'BoxFeed';
 }
 
 /**
@@ -706,4 +748,82 @@ export function collectServiceProbes(containers: ConfigContainer[]): ServiceProb
 		href,
 		probe,
 	}));
+}
+
+function collectFeeds(items: ConfigContainer[], into: Map<string, void>): void {
+	for (const item of items) {
+		if (isGrid(item)) {
+			collectFeeds(item.props.items, into);
+
+			continue;
+		}
+
+		if (!isBoxFeed(item)) {
+			continue;
+		}
+
+		into.set(item.props.href, undefined);
+	}
+}
+
+/**
+ * Every feed on a page, at any nesting depth, each href once.
+ *
+ * Deduped for the same reason the other two collectors are: two boxes naming one feed
+ * is a real config — a headlines box and an everything box over the same URL — and the
+ * read is keyed by href alone in `business/model/feed.ts`, so one fetch serves both and
+ * their separate `limit`s slice it at render time. First occurrence wins, and there is
+ * nothing else to win: unlike stats, no per-instance secret rides along.
+ */
+export function collectFeedTargets(containers: ConfigContainer[]): string[] {
+	const targets = new Map<string, void>();
+
+	collectFeeds(containers, targets);
+
+	return [...targets.keys()];
+}
+
+/** One service a quick-jump can offer: what its tile is called and where it goes. */
+export type ServiceLink = {
+	title: string;
+	href: string;
+};
+
+function collectLinks(items: ConfigContainer[], into: Map<string, ServiceLink>): void {
+	for (const item of items) {
+		if (isGrid(item)) {
+			collectLinks(item.props.items, into);
+
+			continue;
+		}
+
+		if (!isBoxService(item)) {
+			continue;
+		}
+
+		if (!into.has(item.props.href)) {
+			into.set(item.props.href, {
+				title: item.props.title,
+				href: item.props.href,
+			});
+		}
+	}
+}
+
+/**
+ * Every service on a page that a quick-jump can jump TO, at any nesting depth, each
+ * href once, carrying the title its tile shows.
+ *
+ * Unlike `collectServiceProbes`, a `probe: 'none'` bookmark IS collected — a bookmark
+ * is exactly the destination a jump list exists to offer, and this collector's caller
+ * navigates instead of measuring, so there is nothing here for the mode to exclude.
+ * Deduped like every other collector: one entry per href, first title wins — two boxes
+ * naming one host with two names is a config to fix, not a case worth arbitrating.
+ */
+export function collectServiceLinks(containers: ConfigContainer[]): ServiceLink[] {
+	const links = new Map<string, ServiceLink>();
+
+	collectLinks(containers, links);
+
+	return [...links.values()];
 }

@@ -63,6 +63,18 @@
 				}
 			]
 		},
+		"/news": {
+			"name": "News",
+			"containers": [
+				{
+					"name": "BoxFeed",
+					"props": {
+						"href": "http://127.0.0.1:9999/feed.xml",
+						"span": 12
+					}
+				}
+			]
+		},
 		"/media/plex": {
 			"name": "Plex",
 			"containers": [

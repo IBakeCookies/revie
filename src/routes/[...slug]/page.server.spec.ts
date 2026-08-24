@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from '$env/dynamic/private';
 import { readConfig } from '$lib/business/model/config-source';
 import { readStats } from '$lib/business/model/stats';
+import { readFeed } from '$lib/business/model/feed';
 import { statsKey } from '$lib/business/model/config';
 import { load } from './+page.server';
 
@@ -16,6 +17,10 @@ vi.mock('$lib/business/model/config-source', () => ({
 
 vi.mock('$lib/business/model/stats', () => ({
 	readStats: vi.fn(),
+}));
+
+vi.mock('$lib/business/model/feed', () => ({
+	readFeed: vi.fn(),
 }));
 
 const HREF = 'http://adguard.local';
@@ -51,6 +56,34 @@ const boxStatsWithoutSecret = {
 const boxDate = {
 	name: 'BoxDate' as const,
 	props: {},
+};
+
+const boxService = {
+	name: 'BoxService' as const,
+	props: {
+		title: 'Proxmox',
+		href: 'https://proxmox.local:8006',
+		img: {
+			src: 'https://icons.local/p.svg',
+		},
+	},
+};
+
+const FEED_HREF = 'https://example.local/feed.xml';
+const OTHER_FEED_HREF = 'https://example.other/rss.xml';
+
+const boxFeed = {
+	name: 'BoxFeed' as const,
+	props: {
+		href: FEED_HREF,
+	},
+};
+
+const secondBoxFeed = {
+	name: 'BoxFeed' as const,
+	props: {
+		href: OTHER_FEED_HREF,
+	},
 };
 
 // The domain shape, not AdGuard's wire shape: business hands the route the readings a
@@ -112,10 +145,28 @@ const down = {
 	cause: new Error('down'),
 };
 
+// The domain shape, not the wire: the projection is tested in business/model/feed.spec.ts.
+const items = [
+	{
+		title: 'First',
+		link: 'https://example.local/first',
+	},
+];
+
+const feedDown = {
+	message: 'Could not read the feed from https://example.local/feed.xml',
+	cause: new Error('down'),
+};
+
 beforeEach(() => {
 	env.DASHBOARD_SECRET_ADGUARD_MAIN = 'admin:secret';
 	env.DASHBOARD_SECRET_ADGUARD_OTHER = 'admin:other';
 	vi.mocked(readStats).mockResolvedValue(fresh([null, stats]));
+
+	vi.mocked(readFeed).mockResolvedValue({
+		result: [null, items],
+		isFresh: true,
+	});
 });
 
 afterEach(() => {
@@ -128,6 +179,91 @@ describe('load', () => {
 
 		expect(await load(event('/'))).toMatchObject({
 			containers: [boxDate],
+		});
+	});
+
+	/**
+	 * The quick-jump filters over every configured page, not just the one being
+	 * served — that is the whole of what it adds beside the nav rail. The name
+	 * fallback is `pageEntries`' own; asserted here because this is where it crosses.
+	 */
+	it('lists every configured page as a jump target, named or falling back to its path', async () => {
+		vi.mocked(readConfig).mockResolvedValue({
+			config: {
+				pages: {
+					'/': {
+						name: 'Home',
+						containers: [],
+					},
+					'/unnamed': {
+						containers: [],
+					},
+				},
+			},
+			warnings: [],
+			error: null,
+			mtimeMs: 1,
+			isFresh: false,
+		});
+
+		expect(await load(event('/'))).toMatchObject({
+			pages: [
+				{
+					path: '/',
+					name: 'Home',
+				},
+				{
+					path: '/unnamed',
+					name: '/unnamed',
+				},
+			],
+		});
+	});
+
+	/**
+	 * The services half of the same list, and the reason it is collected HERE: the
+	 * palette offers what is on screen, so another page's tile must stay off it even
+	 * though the whole config was in hand. Dedupe is `collectServiceLinks`' own.
+	 */
+	it('collects only the requested page’s services as jump targets', async () => {
+		vi.mocked(readConfig).mockResolvedValue({
+			config: {
+				pages: {
+					'/': {
+						name: 'Home',
+						containers: [
+							boxService,
+							{
+								name: 'Grid',
+								props: {
+									items: [
+										{
+											...boxService,
+										},
+									],
+								},
+							},
+						],
+					},
+					'/other': {
+						name: 'Other',
+						containers: [boxService],
+					},
+				},
+			},
+			warnings: [],
+			error: null,
+			mtimeMs: 1,
+			isFresh: false,
+		});
+
+		expect(await load(event('/'))).toMatchObject({
+			services: [
+				{
+					title: 'Proxmox',
+					href: 'https://proxmox.local:8006',
+				},
+			],
 		});
 	});
 
@@ -370,5 +506,111 @@ describe('load', () => {
 		});
 
 		expect(printed).not.toHaveBeenCalled();
+	});
+
+	/**
+	 * Feeds ride the same load, keyed by href alone — there is no provider token to fold
+	 * into a stats-style key. Two boxes naming one feed is one entry here and one fetch,
+	 * which is what `collectFeedTargets` dedupes to.
+	 */
+	it('asks every configured feed and keys the readings by href', async () => {
+		vi.mocked(readConfig).mockResolvedValue(configWith(boxFeed, secondBoxFeed));
+
+		vi.mocked(readFeed).mockImplementation(async ({ href }) =>
+			href === FEED_HREF
+				? {
+						result: [null, items],
+						isFresh: true,
+					}
+				: {
+						result: [
+							null,
+							[
+								{
+									title: 'Other',
+									link: 'https://example.other/other',
+								},
+							],
+						],
+						isFresh: true,
+					},
+		);
+
+		expect(await load(event('/'))).toMatchObject({
+			feeds: {
+				[FEED_HREF]: items,
+				[OTHER_FEED_HREF]: [
+					{
+						title: 'Other',
+						link: 'https://example.other/other',
+					},
+				],
+			},
+		});
+
+		expect(readFeed).toHaveBeenCalledTimes(2);
+	});
+
+	// One feed down does not blank the one that answered.
+	it('keeps the feeds that answered when another one did not', async () => {
+		const printed = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.mocked(readConfig).mockResolvedValue(configWith(boxFeed, secondBoxFeed));
+
+		vi.mocked(readFeed).mockImplementation(async ({ href }) =>
+			href === FEED_HREF
+				? {
+						result: [null, items],
+						isFresh: true,
+					}
+				: {
+						result: [feedDown, null],
+						isFresh: true,
+					},
+		);
+
+		const data = await load(event('/'));
+
+		expect(data).toMatchObject({
+			feeds: {
+				[FEED_HREF]: items,
+			},
+			failedFeeds: [OTHER_FEED_HREF],
+		});
+
+		// Spelled out for the same reason as the stats case above: the feed that did not
+		// answer has to be ABSENT, not present and empty.
+		expect(data).not.toHaveProperty(['feeds', OTHER_FEED_HREF]);
+
+		// A fresh failure is logged; the message already carries the href via its context.
+		expect(printed).toHaveBeenCalledWith(feedDown.message);
+	});
+
+	// Same gate as the stats read: a cached failure still crosses — the box is empty
+	// either way — but a refreshing tab must not re-print it once per request.
+	it('reports a feed failure the cache had already printed, without printing it again', async () => {
+		const printed = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.mocked(readConfig).mockResolvedValue(configWith(boxFeed));
+
+		vi.mocked(readFeed).mockResolvedValue({
+			result: [feedDown, null],
+			isFresh: false,
+		});
+
+		expect(await load(event('/'))).toMatchObject({
+			failedFeeds: [FEED_HREF],
+		});
+
+		expect(printed).not.toHaveBeenCalled();
+	});
+
+	it('skips the read when the page has no feed box', async () => {
+		vi.mocked(readConfig).mockResolvedValue(configWith(boxDate));
+
+		expect(await load(event('/'))).toMatchObject({
+			feeds: {},
+			failedFeeds: [],
+		});
+
+		expect(readFeed).not.toHaveBeenCalled();
 	});
 });

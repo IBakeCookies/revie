@@ -144,6 +144,28 @@ props:
   > is gone with no warning anywhere. Put engine options in the path, or configure them on the
   > engine itself.
 
+- **Quick jump** (`Ctrl`/`Cmd` + `K`). A palette over the page listing every configured
+  page plus the services on screen; type to filter by name or address, arrows move,
+  `Enter` opens. A page navigates within the dashboard, a service opens in a new tab.
+
+- `BoxFeed` renders a newsfeed — RSS 2.0, Atom or RDF — as a list of linked titles,
+  newest first. `href` is the feed URL, read server-side on every page load (most feeds
+  refuse a browser-side fetch), and an optional `"limit"` caps how many rows show —
+  ten by default, fifty at most however many the feed carries:
+
+  ```json
+  { "name": "BoxFeed", "props": { "href": "https://example.org/feed.xml", "limit": 5 } }
+  ```
+
+  Entries without both a title and a link are skipped rather than failing the box, so
+  one broken item costs itself. Two boxes may name one feed with different limits; the
+  read happens once between them.
+
+- **Feeds are cached for 5 minutes**, like the stats cache but slower, because feeds
+  change hourly at best: an open tab shows a list up to about six minutes old, and a
+  source that just came back can take that long to fill in. The cache lives in the
+  server process, so a restart drops it.
+
 - A page key is a URL path and has to start with `/`. It may have more than one
   segment, so `"/media/plex"` works and is how pages are grouped. A key without the
   leading slash is dropped with a warning, because the navigation links straight to it
@@ -152,7 +174,8 @@ props:
 - A malformed container is dropped with a warning instead of breaking the page: an
   unknown container name, something that isn't an object, or a missing required prop
   (`BoxService` needs `title`, `href` and `img.src`; `BoxStats` needs `provider` and
-  `href`; `BoxSearch` needs `href`). Its siblings and its parent grid still render.
+  `href`; `BoxSearch` needs `href`; `BoxFeed` needs `href`). Its siblings and its parent
+  grid still render.
 - A `Grid` or `SubGrid` with no `items` renders as empty, so a grid written before its
   children is safe to save.
 - `DASHBOARD_CONFIG` overrides the config path. The file is re-read whenever its
@@ -343,10 +366,11 @@ proxy erroring — says nothing about the service, so the dot keeps its last kno
 and a dismissible message names the service at the bottom of the page instead. An
 unreachable `BoxStats` gets one too, naming the provider and the instance — otherwise
 that failure is visible only as an empty box, and a page holding two of them cannot say
-which. Each clears itself after a few seconds, a failure that repeats does not stack up, and
-both follow the page language. The technical detail behind them — `fetch failed`, an
-HTTP status, the host — goes to the server's log rather than the screen, so check there
-when the message is not enough.
+which. A feed that does not answer gets one as well, naming its URL. Each clears itself
+after a few seconds, a failure that repeats does not stack up, and both follow the page
+language. The technical detail behind them — `fetch failed`, an HTTP status, the host —
+goes to the server's log rather than the screen, so check there when the message is not
+enough.
 
 ## Languages
 

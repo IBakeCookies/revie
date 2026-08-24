@@ -104,6 +104,25 @@
 	}
 
 	/**
+	 * What an insertion button names as the list it appends to: the page path, then
+	 * each owning container named by the `title` or `subTitle` its schema declares,
+	 * falling back to its type and the slot it occupies. Two same-type siblings have
+	 * to name differently, and position cannot do it — it counts within each list,
+	 * and every list starts at 1. Takes `unknown`: the button before an entry the
+	 * form cannot render still names the slot that entry occupies.
+	 */
+	function listTarget(parent: string, container: unknown, index: number): string {
+		const node = isRecord(container) ? container : {};
+
+		const label =
+			readField(node, 'title') ||
+			readField(node, 'subTitle') ||
+			`${typeof node.name === 'string' ? node.name : ''} ${index + 1}`;
+
+		return `${parent} · ${label}`;
+	}
+
+	/**
 	 * An empty field DELETES the key instead of writing `""`. That is what makes a required
 	 * prop left blank reach `normalizeConfig` as the absence it is, so the save is refused
 	 * with the diagnostic naming it — rather than being written as a box with no href.
@@ -267,6 +286,12 @@
 
 	const inputClass =
 		'bg-surface-inset border-line-strong focus-visible:ring-ring rounded-md border px-box-sm py-text-2xs font-mono text-xs focus-visible:ring-2 focus-visible:outline-none';
+
+	// The forms-plugin chevron sits 8px in from the right edge and spans 1.5em of
+	// this text size (~26px deep), but px-box-sm leaves only 12px — the value ran
+	// into the caret, because the utility beats the plugin's own 2.5rem padding.
+	// One wider rung clears it; inputs keep inputClass untouched.
+	const selectClass = `${inputClass} pr-box-2xl`;
 	const buttonClass =
 		'bg-surface-inset hover:bg-surface-hover focus-visible:ring-ring cursor-pointer rounded-md px-box-md py-text-2xs text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none';
 </script>
@@ -275,11 +300,9 @@
 	One insertion point. A list of N containers gets N + 1 of them, so a container can go
 	anywhere in it and not only at the end.
 
-	The label names the list it appends to — the parent container's type, or the page path,
-	both identifiers rather than copy. That is what makes it unambiguous which list an
-	insert targets: a Grid whose last child is a SubGrid renders its own trailing button
-	directly under that SubGrid's controls, where an unqualified "add" reads as the
-	SubGrid's and the Grid's looks missing.
+	The label names the list it appends to, built by `listTarget` — identifiers, not copy,
+	which is what keeps two same-type siblings' buttons apart: position counts within each
+	list and every list starts at 1, so "position 1" alone is true of all of them at once.
 -->
 {#snippet insertPoint(insert: (index: number) => void, index: number, target: string)}
 	<button
@@ -303,7 +326,10 @@
 
 	The snippet renders its own children, which is what covers arbitrary nesting without a
 	second component — and so without adding to the `config-container ↔ grid ↔ sub-grid`
-	cycle that `no-circular` exempts by name.
+	cycle that `no-circular` exempts by name. Two identifiers travel with it: `target`
+	names the list this container SITS IN, which is what its move buttons say, and
+	`childrenTarget` names THIS container, which is what its children's insertion
+	buttons say — one list each, and neither has to be derived from the other.
 -->
 {#snippet containerEditor(
 	container: Record<string, unknown>,
@@ -311,6 +337,7 @@
 	index: number,
 	id: string,
 	target: string,
+	childrenTarget: string,
 	move: (delta: -1 | 1) => void,
 )}
 	{@const name = typeof container.name === 'string' ? container.name : ''}
@@ -323,7 +350,7 @@
 
 				<select
 					id="{id}-name"
-					class={inputClass}
+					class={selectClass}
 					value={name}
 					onchange={(event) => {
 						const next = event.currentTarget.value;
@@ -417,7 +444,7 @@
 						{@render insertPoint(
 							(at) => addContainer(record(container, 'props'), field.path, at),
 							childIndex,
-							name,
+							childrenTarget,
 						)}
 
 						{#if isRecord(child)}
@@ -427,6 +454,7 @@
 								childIndex,
 								`${id}-${childIndex}`,
 								name,
+								listTarget(childrenTarget, child, childIndex),
 								(delta) => moveContainer(record(container, 'props'), field.path, childIndex, delta),
 							)}
 						{/if}
@@ -435,7 +463,7 @@
 					{@render insertPoint(
 						(at) => addContainer(record(container, 'props'), field.path, at),
 						listOf(propsOf(container), field.path).length,
-						name,
+						childrenTarget,
 					)}
 				</div>
 			{:else if field.kind === 'enum'}
@@ -447,7 +475,7 @@
 
 					<select
 						id="{id}-{field.path}"
-						class={inputClass}
+						class={selectClass}
 						aria-required={field.isRequired}
 						value={readField(container, field.path)}
 						onchange={(event) => writeField(container, field, event.currentTarget.value)}
@@ -601,6 +629,7 @@
 								index,
 								`admin-${pageIndex}-${index}`,
 								path,
+								listTarget(path, container, index),
 								(delta) => moveContainer(page, 'containers', index, delta),
 							)}
 						{/if}

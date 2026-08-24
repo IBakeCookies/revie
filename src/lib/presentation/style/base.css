@@ -69,6 +69,13 @@
 	--blur: 1.5rem;
 	--card-shadow: 0 16px 40px -12px oklch(0 0 0 / 0.2);
 
+	/* Native control surfaces — a select's opened option list, form-control
+	   scrollbars, the <dialog> canvas — follow color-scheme, not this palette:
+	   without it they render light under every dark theme (a white option list
+	   behind themed light text). Stated rather than left to the browser default,
+	   which is light everywhere. */
+	color-scheme: light;
+
 	/* seeds */
 	--surface-page: oklch(0.96 0.005 260);
 	--surface-card: oklch(0.995 0.002 260);
@@ -146,6 +153,17 @@
 		@apply font-sans;
 	}
 
+	/* A native <select>'s opened list paints its rows with OS colors, and the
+	   engines disagree about color-scheme there — Firefox ignores it outright,
+	   so `color-scheme: dark` alone still shipped unreadable options under dark
+	   themes. Styling the OPTIONS is what every engine honors; the seeds are
+	   what --color-popover aliases, so this matches the dropdown panel and
+	   toasts. The hover highlight stays the platform's. */
+	select option {
+		background-color: var(--surface-page);
+		color: var(--ty-primary);
+	}
+
 	/* Slim, theme-aware scrollbar for scrollable menus/panels (e.g. the theme
 	   dropdown). Thumb uses the semantic line color and only appears on hover. */
 	.nice-scrollbar {
@@ -181,6 +199,10 @@
    specificity, so the later block wins. Keep .dark above the theme blocks
    (and never use a higher-specificity selector here). */
 .dark {
+	/* Every dark theme carries this class beside its palette class, so one
+	   declaration covers all of them; the cascade note above puts it after :root. */
+	color-scheme: dark;
+
 	/* black-on-dark needs more weight to read as depth */
 	--card-shadow: 0 16px 40px -12px oklch(0 0 0 / 0.5);
 

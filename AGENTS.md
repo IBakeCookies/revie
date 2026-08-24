@@ -583,6 +583,45 @@ ReadProvider>` gives the identical compile-time completeness either way, so the 
   AdGuard answers 401. An href has to name the address the instance actually answers on, and
   README.md says so where an operator will read it.
 
+### The feed box
+
+The seventh container renders a LIST — titles linking out — which is the one shape no other box
+has, and roadmap #48's reason for existing. The plumbing is the stats seam run one more time,
+so what belongs here are only the differences:
+
+```
+config.json ─(href)→ business/model/config.ts   collectFeedTargets (bare hrefs, deduped)
+            ─(5-min TTL cache + one AbortSignal)→ business/model/feed.ts   readFeed
+            ─(fetch verbatim + XML parse + valibot PER ENTRY)→ data/repository/feed.ts
+            ─(project: cap 50)→ FeedItem[] ─→ FeedStore ─→ box-feed-wrapper ─→ box-feed.svelte
+```
+
+- **The cache key and store key are the bare href** — there is no provider token to fold in, so
+  `statsKey` has no analogue and two boxes naming one feed share one fetch legitimately; each
+  box's `limit` slices at render time.
+- **Validation degrades PER ENTRY, not per read.** A real feed carries the occasional ad or
+  empty stub, so entries failing `safeParse` are dropped and only a feed yielding ZERO readable
+  entries fails the box. Deliberately unlike the stats wires, where one unexpected shape errors
+  the whole instance: there a partial body means every field is suspect; here each surviving row
+  validated itself.
+- **fast-xml-parser's leniency is part of the contract.** It tolerates truncation — which then
+  lands in "without a single readable entry", the honest answer for an HTML page served with a
+  200 — and throws only on things like malformed attributes ("did not parse as XML"). Both paths
+  asserted. Entities inside CDATA stay literal, which is the XML spec and not a parser bug, and
+  `parseTagValue` is off so `<title>2026</title>` stays a string instead of failing validation
+  for being what it honestly said.
+- **No credential, so redirects FOLLOW**, unlike both Pi-holes: a public feed has nothing for a
+  redirect to leak, and `http:` → `https:` hops are ordinary for feeds.
+- **The box takes no `href`.** Its siblings each render the configured instance as ONE link,
+  while this one renders N links out of the items — so the URL lives on the WRAPPER, where it is
+  the store's lookup key, and the box stays a pure list that a story can mount without any
+  store at all. `limit` is clamped at the box (`max(1, floor())`): a hand-edited 0 must read as
+  one row, not as a broken feed.
+- **Feeds join both client-side gates**: the refresh interval counts them in `refreshable`, so a
+  feed-only install still refreshes, and `failedFeeds` rides the route's `reportedFailures` list
+  beside the stats keys — the two never collide, because a stats key always carries its provider
+  prefix.
+
 ### The appearance pipeline
 
 The subtlest machinery in the app. All three preferences are cookie-backed **so the server
@@ -1226,10 +1265,10 @@ file doesn't start the drift.
 ([vite.config.ts](vite.config.ts)). A spec that builds a fixture and forgets to assert is a
 green test that proves nothing, which is worse than no test.
 
-**`console` has exactly three homes, all of them routes or stores, and no lint rule guards
-them yet.** `business/store/service-store.svelte.ts` (1 — the probe diagnostic),
-`+layout.server.ts` (2 — config diagnostics) and `[...slug]/+page.server.ts` (4 — config
-diagnostics plus the stats operator channel). Measured: a global `no-console` reports 9, the
+**`console` has exactly three homes, all of them routes or stores, and `no-console: 'error'`
+guards everywhere else.** `business/store/service-store.svelte.ts` (1 — the probe diagnostic),
+`+layout.server.ts` (2 — config diagnostics) and `[...slug]/+page.server.ts` (5 — config
+diagnostics plus the stats and feed operator channels). Measured: a global `no-console` reports 9, the
 other two being outside `src` and neither a home — `dps.js`, which [roadmap.md](roadmap.md) #10
 deletes, and `scripts/screenshot.js`, a CLI whose whole job is to tell a terminal where it wrote
 a file. **#23 has landed, and this is what it bought:** `business/model/config.ts` and
@@ -1239,9 +1278,11 @@ the no-copy-crosses-a-layer rule, carrying the `AppError.message` that must neve
 They are unconditional rather than injected precisely because a diagnostic has a fixed sink, and
 that is the one thing zenith uses its `logger.ts` for. Don't add a fourth home, and don't reach
 for zenith's `no-console: 'error'` + a `logger.ts` to force the issue: a logger module would be a
-second seam competing with the injected notify. **The rule is now enableable** — nothing is in
-the way any more — with `+layout.server.ts`, `[...slug]/+page.server.ts`,
-`service-store.svelte.ts` and `scripts/` exempted.
+second seam competing with the injected notify. **`no-console: 'error'` is on**, with those four
+homes exempted in [eslint.config.js](eslint.config.js) — plus `dps.js`, until #10 deletes the
+file and its block with it. The exemption block sits after every layer block, where nothing can
+override it, and the `[...slug]` path is escaped there because minimatch reads unescaped
+brackets as a character class — a glob that silently matches nothing.
 
 **One definition per concept.** If you catch yourself writing "mirrors", "same as" or "keep in
 sync with", export the thing instead. This repo has exactly three exceptions, all documented

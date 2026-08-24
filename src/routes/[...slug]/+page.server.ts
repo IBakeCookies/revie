@@ -1,11 +1,18 @@
 import type { ConfigContainer, ProviderName, StatsTarget } from '$lib/business/model/config';
 import type { PageServerLoad } from './$types';
 import type { Stat } from '$lib/business/type/stats';
+import type { FeedItem } from '$lib/business/type/feed';
 import { error } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { collectStatsTargets } from '$lib/business/model/config';
+import {
+	collectFeedTargets,
+	collectServiceLinks,
+	collectStatsTargets,
+	pageEntries,
+} from '$lib/business/model/config';
 import { readConfig } from '$lib/business/model/config-source';
 import { readStats } from '$lib/business/model/stats';
+import { readFeed } from '$lib/business/model/feed';
 
 /**
  * A stats box names the VARIABLE holding its credential, never the credential — so two
@@ -150,6 +157,63 @@ async function loadStats(containers: ConfigContainer[]): Promise<{
 	};
 }
 
+/**
+ * Which feed did not answer, as the page has to name it. The href is the whole identity
+ * a feed read has — there is no provider token to disambiguate — and it doubles as the
+ * key the readings are recorded under, so the page can dedupe on it.
+ */
+export type FeedFailure = string;
+
+async function loadFeeds(containers: ConfigContainer[]): Promise<{
+	feeds: Record<string, FeedItem[]>;
+	failed: FeedFailure[];
+}> {
+	// Concurrent, so the 3s bound stays the cost of the whole read rather than of each
+	// feed in turn — same reasoning as loadStats above. Collected first and folded after,
+	// so the keys come out in config order rather than in whatever order the hosts
+	// happened to answer.
+	const reads = await Promise.all(
+		collectFeedTargets(containers).map(
+			async (href) =>
+				[
+					href,
+					await readFeed({
+						href,
+					}),
+				] as const,
+		),
+	);
+
+	const feeds: Record<string, FeedItem[]> = {};
+	const failed: FeedFailure[] = [];
+
+	for (const [href, { result, isFresh }] of reads) {
+		const [err, items] = result;
+
+		// Logged AND reported, split exactly like the stats read above: the log names the
+		// host and what was wrong with its answer and outlives the tab; what crosses to
+		// the page is the bare href, which the route turns into a translated line. Gated
+		// on `isFresh`, so a dead feed under a refreshing tab prints once per TTL window
+		// rather than once per request.
+		if (err) {
+			if (isFresh) {
+				console.error(err.message);
+			}
+
+			failed.push(href);
+
+			continue;
+		}
+
+		feeds[href] = items;
+	}
+
+	return {
+		feeds,
+		failed,
+	};
+}
+
 export const load: PageServerLoad = async ({ depends, url }) => {
 	// The handle the client's refresh interval invalidates. `invalidate` re-runs the
 	// WHOLE load, so `readConfig` runs again on every tick too — accepted: it is
@@ -185,14 +249,24 @@ export const load: PageServerLoad = async ({ depends, url }) => {
 		error(404, `No dashboard page is configured for "${url.pathname}"`);
 	}
 
-	const stats = await loadStats(page.containers);
+	const [stats, feeds] = await Promise.all([
+		loadStats(page.containers),
+		loadFeeds(page.containers),
+	]);
 
 	return {
+		// The jump targets the quick-jump filters over. Both are plain data: every
+		// candidate is already in memory, so there is no endpoint and no search to
+		// run server-side — presentation does the filtering against its own locale.
+		pages: pageEntries(config),
+		services: collectServiceLinks(page.containers),
 		containers: page.containers,
 		stats: stats.stats,
 		// Data, not messages: the words belong to presentation, which has the locale.
 		// One entry per instance that was asked and did not answer, so a page holding two
 		// stats boxes can say which of them is the empty one.
 		failedStats: stats.failed,
+		feeds: feeds.feeds,
+		failedFeeds: feeds.failed,
 	};
 };

@@ -66,6 +66,11 @@ export default defineConfig(
 				},
 			],
 
+			// A failure crosses a layer as a value, and what it means is decided by whoever
+			// holds the state; the `console` calls that remain are diagnostics, which have
+			// a fixed sink — the four homes exempted below, per AGENTS.md's console
+			// paragraph. Nowhere else.
+			'no-console': 'error',
 			'no-debugger': 'error',
 			'no-eval': 'error',
 			'no-alert': 'error',
@@ -301,6 +306,31 @@ export default defineConfig(
 					],
 				},
 			],
+		},
+	},
+	{
+		// The log half of the errors-as-values rule, and its only sinks: the
+		// `AppError.message` a toast must never render prints here, unconditionally,
+		// because a diagnostic has a fixed sink. AGENTS.md's console paragraph owns the
+		// list; don't add a fourth home. `scripts/` is a CLI telling a terminal where it
+		// wrote a file.
+		files: [
+			'src/routes/+layout.server.ts',
+			// Minimatch reads `[...slug]` as a character class, so the brackets are escaped.
+			'src/routes/\\[...slug\\]/+page.server.ts',
+			'src/lib/business/store/service-store.svelte.ts',
+			'scripts/**',
+		],
+		rules: {
+			'no-console': 'off',
+		},
+	},
+	{
+		// Unrelated gacha DPS math at the repo root; #10 deletes this file, and with it
+		// this block.
+		files: ['dps.js'],
+		rules: {
+			'no-console': 'off',
 		},
 	},
 );

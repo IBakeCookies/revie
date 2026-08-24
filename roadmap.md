@@ -17,11 +17,11 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 9 items are open — #10 from the review passes, the
-rest of #33's provider list above, and 38, 41, 42, 43, 44, 46 and 48 under New work; **1, 2, 3, 4, 5,
+**Numbers are stable, so gaps mean landed.** 5 items are open — #10 from the review passes, the
+rest of #33's provider list above, and 38, 42 and 43 under New work; **1, 2, 3, 4, 5,
 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 34,
-35, 36, 37, 39, 40, 45 and 47 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+35, 36, 37, 39, 40, 41, 44, 45, 46, 47 and 48 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
 and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -784,18 +784,43 @@ through with`theme: undefined` and the default's class set.
       stats.spec.ts (the verbatim-vs-fraction line in the projection), and a box-stats story
       asserting 18.7 renders as "18.7" rather than "19" or "18.7°C".
 
-41. **A quick-jump over the configured pages and services** (`M`). `/` puts the cursor in
-    BoxSearch, but there is no way to filter among the services on screen or jump between pages
-    except the nav rail — the one start-page interaction the box set does not cover yet. Shape:
-    a client-side filter listing page keys plus `BoxService` titles, Enter opens, arrows move.
-    Data obeys R1/R2: a collector beside `collectServiceProbes` (same traversal of the container
-    tree) runs in the load and crosses as data; presentation never imports the model. Decisions
-    to make: the trigger key (`/` is taken by BoxSearch — another key, or a header button), the
-    dialog semantics (focus trap, `aria-modal`, Escape) and what zero matches looks like.
-    _Deliberately not built:_ a fuzzy-match dependency (startsWith plus substring over a list the
-    size of one operator's config), a server search endpoint (every candidate is already on the
-    page). _Files:_ src/lib/business/model/config.ts, src/routes/[...slug]/+page.server.ts, a new
-    presentation component + its story
+41. ~~**A quick-jump over the configured pages and services**~~ (`M`) — **LANDED.**
+    [quick-jump.svelte](src/lib/presentation/components/quick-jump.svelte) mounts beside
+    the boxes in `[...slug]/+page.svelte`; the load returns `pages: pageEntries(config)`
+    and `services: collectServiceLinks(page.containers)` — plain data, filtered
+    client-side against the visitor's locale, no endpoint (every candidate was already
+    on the page, as the item refused). Three decisions the item left open:
+    - **The trigger is `Ctrl`/`Cmd`+`K`, keyboard-only** — `/` belongs to BoxSearch, and
+      a header button would be chrome for a keyboard affordance; touch users keep the
+      nav rail. `preventDefault` matters as much as it does there: without it the
+      browser moves focus to its own address-bar search.
+    - **The dialog semantics are the platform's, not hand-rolled**: a native `<dialog>`
+      opened with `showModal`, which is what traps focus and makes the page inert. Two
+      measured gaps closed in code: Chromium swallows a `.focus()` issued in the same
+      task as the `close()` that hid the field being left, so the restore is deferred a
+      task and falls back to `blur()`; and programmatic `close()` restores nothing when
+      the palette was opened from a bare page — the common case — so the component
+      captures and returns focus itself. Escape closes through the window handler
+      rather than the platform close-watcher, which answers real keys but not the
+      synthetic keydowns every test driver sends. Svelte 5's `autofocus` implementation
+      force-focuses post-mount even inside a CLOSED dialog, so the attribute is absent:
+      `showModal`'s own dialog-focusing steps land on the field anyway.
+    - **Zero matches** renders a translated line rather than an empty list that reads
+      as a broken feed; matching is substring over title AND href (typing a hostname
+      finds the box whose title says nothing about it), deliberately no fuzzy-match
+      dependency. `collectServiceLinks` differs from `collectServiceProbes` on one
+      point, recorded at the collector: `probe: 'none'` bookmarks ARE collected — a
+      bookmark is exactly what a jump list exists to offer.
+    - **Two story lessons are fences now**: anchor activations inside a storybook canvas
+      pointing at internal hrefs replaced the whole iframe page ("browser connection
+      closed", taking unrelated tests with it) — both interaction stories use a single
+      EXTERNAL service entry, whose activation is a new-tab that never touches the
+      document; and every play that opens the palette closes it again, so no modal
+      outlives its story in the shared canvas.
+      _Files:_ src/lib/business/model/config.ts, src/routes/[...slug]/+page.server.ts,
+      src/routes/+layout.server.ts (now shares `pageEntries` with the quick-jump instead
+      of restating the name fallback), src/lib/presentation/components/quick-jump.svelte +
+      story, README.md
 
 42. **A Dockerfile** (`M`). README defers it and #27 measured why the artifact is not standalone:
     `build/server/chunks/*.js` import `svelte` and `@sveltejs/kit` as bare specifiers and both are
@@ -816,16 +841,29 @@ through with`theme: undefined` and the default's class set.
     same invariant). The same spec already reads shipped files off its own location, so this is
     minutes. _Files:_ src/lib/test/invariants.spec.ts
 
-44. **Distinct accessible names for the editor's insertion buttons** (`S`). #35 records the wart:
-    two sibling containers of the same type both announce "Add container to Grid, position 1" —
-    position disambiguates within one list, not between lists sharing a parent type, so a page
-    with two Grids is unreadable by screen reader. Fix presentation-side in
-    [admin/+page.svelte](src/routes/admin/+page.svelte): compose `{target}` from what identifies
-    THIS list — the page path plus the container's `title`/`subTitle` when present, falling back
-    to the type — so the existing `admin_container_add_at({ target, position })` message needs no
-    new key. Fence: an assertion in can-edit-the-config.e2e.ts that two same-type siblings
-    produce two distinct role names; the move buttons already name correctly and stay.
-    _Files:_ src/routes/admin/+page.svelte, e2e/can-edit-the-config.e2e.ts
+44. ~~**Distinct accessible names for the editor's insertion buttons**~~ — **LANDED.**
+    `listTarget` in [admin/+page.svelte](src/routes/admin/+page.svelte) composes `{target}` from
+    identifiers only — the page path, then each owning container named by its `title` or
+    `subTitle`, falling back to `<type> <slot>` — so `admin_container_add_at({ target, position })`
+    needed no new key, as the item required. Three things the item's own plan did not say:
+    - **The literal fallback collides.** Two UNTITLED same-type siblings fall back to the same
+      type, so the fallback also carries the container's slot in its own list: `/services ·
+Grid 2` beside `/services · Grid 3`. The fence demands distinct names and `title` is
+      optional on Grid/SubGrid — an untitled pair is the ordinary case, not the edge.
+    - **The flaw's real site was the TRAILING insertion point of a children list**, which passed
+      the bare parent type — exactly what two freshly added Grids render, so the item's own
+      reproduction ("Add container to Grid, position 1" twice) never touched a composed name.
+      Every button that appends to one list now says that list's identity and counts within it;
+      an intermediate version had the per-child button naming the SIBLING it inserts before,
+      which answers a different question than "add to".
+    - **The move buttons stay as they were, and the ambiguity the item waved off is real**:
+      nested moves still say "Move container up in Grid, position 1" twice when two sibling
+      Grids each have a first child. Noticed, not fixed — the item says they stay, and the fence
+      does not cover them.
+      The fence is 'tells two same-type lists apart in the insertion buttons' in
+      [can-edit-the-config.e2e.ts](e2e/can-edit-the-config.e2e.ts): two untitled Grids, then one
+      titled, with the old colliding name asserted to reach zero.
+      _Files:_ src/routes/admin/+page.svelte, e2e/can-edit-the-config.e2e.ts
 
 45. ~~**Rate-limit `/api/ping`**~~ — **LANDED.** `takePingLimit`
     ([ping-limit.ts](src/lib/business/model/ping-limit.ts)) is [admin-auth.ts](src/lib/business/model/admin-auth.ts)'s
@@ -843,14 +881,24 @@ through with`theme: undefined` and the default's class set.
     src/lib/business/model/ping-limit.spec.ts (new), src/routes/api/ping/,
     src/routes/api/ping/ping.spec.ts
 
-46. **Enable `no-console`, with the four exemptions** (`S`). AGENTS.md says the rule is now
-    enableable — #23 took the model's prints out, and what remains is deliberate and permanent:
-    [+layout.server.ts](src/routes/+layout.server.ts), [...slug]/+page.server.ts,
-    [service-store.svelte.ts](src/lib/business/store/service-store.svelte.ts) and `scripts/`.
-    Two sequencing notes: `dps.js` still walks lint until #10 runs, so exempt it too or land
-    after; and flat-config block-wins semantics apply to `no-console` exactly as they do to
-    `no-restricted-imports`, so each layer block restating the rule must be checked, not just
-    added once. _Files:_ eslint.config.js
+46. ~~**Enable `no-console`, with the four exemptions**~~ — **LANDED.** `'no-console': 'error'`
+    sits in the main rules block of [eslint.config.js](eslint.config.js), and one exemption block
+    after every layer block turns it off for
+    [+layout.server.ts](src/routes/+layout.server.ts), `[...slug]/+page.server.ts`,
+    [service-store.svelte.ts](src/lib/business/store/service-store.svelte.ts) and `scripts/` —
+    plus `dps.js` in its own block, until #10 deletes the file with it. Two things worth
+    knowing:
+    - **Minimatch reads `[...slug]` as a character class**, so the unescaped path in a
+      flat-config `files:` glob silently matches NOTHING — the whole directory would have been
+      exempt with no error anywhere. It is spelled
+      `src/routes/\\[...slug\\]/+page.server.ts`. Verified both ways: a `console.log` probe
+      inside that directory but outside the named file errors, and the five real calls in
+      `+page.server.ts` pass.
+    - **The item's block-wins warning did not bite here**: no layer block names `no-console`, so
+      the main block's value survives under every `no-restricted-imports` restatement — the trap
+      is specific to a rule a later block redefines. The exemptions still come last, where
+      nothing can override them.
+      _Files:_ eslint.config.js
 
 47. ~~**An optional `timezone` prop on `BoxDate`**~~ — **LANDED**, both decisions as the item
     wrote them, with one refinement measured on the way. The zone is checked inside the schema,
@@ -871,26 +919,38 @@ Intl.DateTimeFormat(undefined, { timeZone })` in a try/catch rather than the
     _Files:_ src/lib/business/model/config.ts,
     src/lib/presentation/components/box-date.svelte + story, README.md's config section
 
-48. **A feed box — RSS/Atom through a list-shaped container** (`M`). What the research pass
-    found: Glance recentered the whole category around information feeds in 2024 (RSS, HN,
-    calendar) and Homepage and Dashy both ship RSS widgets; this app has six containers and not
-    one of them renders a LIST — BoxStats renders numbers only. So the work is two halves: the
-    container (`BoxFeed`: `href` required, maybe a `limit`; titles linking out, N rows) and the
-    plumbing it forces into existence — server-side fetch through the load (CORS kills a
-    client-side fetch of most feeds), a TTL cache beside readStats keyed by href, failures as
-    values crossing as data with the toast copy picked in the route (the failedStats seam), and
-    a real XML parser dependency (regex-extracting Atom is the kind of cleverness this repo
-    refuses; valibot validates AFTER parsing, never instead of). Adding the container is the
-    standard two edit points (`containerSchemas` +
-    [config-container.svelte](src/lib/presentation/components/config-container.svelte)'s chain);
-    the editor follows the schema automatically. The reusable half is the point: the *arr
-    release calendar (#33's Sonarr entry, `/api/v3/calendar`) becomes the SECOND consumer of
-    whatever list machinery lands here. _Deliberately not built:_ bodies and images (titles and
-    links only), multi-feed aggregation in one box (one href per box, cached separately — the
-    stats precedent). _Files:_ src/lib/data/repository/feed.ts (new),
-    src/lib/business/model/feed.ts (new, TTL cache), src/lib/business/model/config.ts,
-    src/lib/presentation/components/config-container.svelte, a new component + story,
-    messages/en.json, messages/de.json, README.md
+48. ~~**A feed box — RSS/Atom through a list-shaped container**~~ — **LANDED.** Kept as a
+    numbered item because the notes above and below cross-reference it. `BoxFeed` is the
+    seventh container: `href` required, optional `limit` (default 10, floored and clamped at
+    the box so a hand-edited 0 renders one row rather than reading as a broken feed),
+    fetched server-side through the load, cached 5 minutes in `business/model/feed.ts`
+    beside `readStats` and keyed by HREF ALONE — there is no provider token, so the URL is
+    the whole identity, and two boxes over one feed with different limits share one fetch.
+    Failures cross as `failedFeeds: string[]`, the route picking the words from
+    `m.feed_load_failed({ href })` behind the same dedupe list the stats toasts use. The
+    architecture is in [AGENTS.md](AGENTS.md) under "The feed box" and is deliberately not
+    restated here. What belongs here is only what this item's own plan got wrong or left open:
+    - **fast-xml-parser is lenient about truncation**, so "did not parse as XML" fires on
+      malformed attributes while a truncated or non-feed body lands in the honest
+      "without a single readable entry" error instead — measured, both paths asserted.
+    - **Entities are NOT decoded inside CDATA** — the XML spec says so, not the parser — so
+      the spec asserts a CDATA title arriving literal beside an entity in ordinary text
+      arriving decoded. The first draft of that test expected the wrong thing; the parser
+      was right.
+    - **`parseTagValue` is off**: otherwise `<title>2026</title>` arrives as a number and
+      fails validation for being what it honestly said. Asserted.
+    - **The e2e covers the failure half only** — the fixture's feed points at the same
+      deliberately closed port as its AdGuard box, and `/news` joined `is-accessible.e2e.ts`'s
+      audited paths. The success path is fenced by the wrapper stories against a populated
+      store, which is exactly where e2e cannot reach ("the fixture's provider port is closed
+      on purpose"). One fixture-coupled assertion had to move with it:
+      can-edit-the-config.e2e.ts pins the editor's page-key order.
+    - **Not built, per the item:** bodies and images; multi-feed aggregation. The *arr
+      calendar remains the second consumer this machinery is waiting for.
+      _Files:_ src/lib/data/repository/feed.ts (new), src/lib/business/model/feed.ts (new,
+      TTL cache), src/lib/business/model/config.ts,
+      src/lib/presentation/components/config-container.svelte, box-feed.svelte +
+      box-feed-wrapper.svelte + stories (new), messages/en.json, messages/de.json, README.md
 
 ## Sequencing
 

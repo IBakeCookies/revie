@@ -11,6 +11,7 @@
 
 	const ADGUARD_HREF = 'http://adguard.test:3000';
 	const SERVICE_HREF = 'http://jellyfin.test:8096';
+	const FEED_HREF = 'https://example.local/feed.xml';
 
 	/* The store's report seam. Handed in as a prop rather than read from a toast store,
 	   because that is the shape page.svelte is built to: a getContext here would make it
@@ -76,6 +77,14 @@
 							span: 6,
 						},
 					},
+					{
+						name: 'BoxFeed',
+						props: {
+							href: FEED_HREF,
+							limit: 2,
+							span: 12,
+						},
+					},
 				],
 			},
 		},
@@ -87,6 +96,21 @@
 		},
 	];
 
+	/* Shaped like the load's return, not like component props — the whole point of the
+	   store seam is that nothing between here and the box carries this as props. */
+	const feeds = {
+		[FEED_HREF]: [
+			{
+				title: 'Release notes',
+				link: 'https://example.local/release-notes',
+			},
+			{
+				title: 'Roadmap',
+				link: 'https://example.local/roadmap',
+			},
+		],
+	};
+
 	const { Story } = defineMeta({
 		title: 'Components/Page',
 		component: Page,
@@ -96,6 +120,7 @@
 			stats: {
 				[statsKey('adguard', ADGUARD_HREF)]: readings,
 			},
+			feeds,
 		},
 		// The poll starts from this component's $effect at mount, so the stub has to be
 		// installed before the story renders — one put up inside `play` arrives after the
@@ -164,6 +189,15 @@
 		// The other store: the dot only leaves "status unknown" once the poll this
 		// component starts has resolved a probe into the services store.
 		await expect(await canvas.findByLabelText('online')).toBeInTheDocument();
+
+		// And the third: `setFeedStore(() => feeds)` put the feed half of the payload
+		// where the wrapper could look it up, and the box's own limit did the trimming —
+		// two links out of the two entries the record carries.
+		await expect(
+			canvas.getByRole('link', {
+				name: 'Release notes',
+			}),
+		).toHaveAttribute('href', 'https://example.local/release-notes');
 	}}
 />
 

@@ -69,6 +69,7 @@
 	},
 	"dependencies": {
 		"clsx": "^2.1.1",
+		"fast-xml-parser": "^5.11.0",
 		"tailwind-merge": "^3.6.0",
 		"valibot": "^1.4.2"
 	}

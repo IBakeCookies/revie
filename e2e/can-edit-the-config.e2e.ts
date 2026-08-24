@@ -39,13 +39,15 @@ test('generates the container form from the schema, and refuses a container with
 		.click();
 
 	// Picking a Grid grows the form a children list, because `items` is described as one —
-	// nothing here knows which containers nest.
+	// nothing here knows which containers nest. The button names the list it appends to,
+	// built from the page path plus this Grid's slot in it: it is untitled, so the type
+	// and the slot carry the identity.
 	await containers.last().getByLabel('Container type').selectOption('Grid');
 
 	await containers
 		.last()
 		.getByRole('button', {
-			name: 'Add container to Grid, position 1',
+			name: 'Add container to /media/plex · Grid 2, position 1',
 		})
 		.click();
 
@@ -273,7 +275,7 @@ test('adds, renames, names and removes a page', async ({ page }) => {
 		return Object.keys(JSON.parse(await payload.inputValue()).pages);
 	}
 
-	expect(await paths()).toEqual(['/', '/services', '/media/plex']);
+	expect(await paths()).toEqual(['/', '/services', '/news', '/media/plex']);
 
 	await editor
 		.getByRole('button', {
@@ -282,7 +284,7 @@ test('adds, renames, names and removes a page', async ({ page }) => {
 		.click();
 
 	// A unique key, so two adds cannot collide into one page.
-	expect(await paths()).toEqual(['/', '/services', '/media/plex', '/new-page']);
+	expect(await paths()).toEqual(['/', '/services', '/news', '/media/plex', '/new-page']);
 
 	const pathInput = editor.getByLabel('Page path').last();
 	const nameInput = editor.getByLabel('Navigation name').last();
@@ -293,7 +295,7 @@ test('adds, renames, names and removes a page', async ({ page }) => {
 	await pathInput.fill('blog');
 	await pathInput.blur();
 
-	expect(await paths()).toEqual(['/', '/services', '/media/plex', '/blog']);
+	expect(await paths()).toEqual(['/', '/services', '/news', '/media/plex', '/blog']);
 	await expect(pathInput).toHaveValue('/blog');
 
 	// Renaming into an existing key would merge two pages; refused, and the input
@@ -301,7 +303,7 @@ test('adds, renames, names and removes a page', async ({ page }) => {
 	await pathInput.fill('/services');
 	await pathInput.blur();
 
-	expect(await paths()).toEqual(['/', '/services', '/media/plex', '/blog']);
+	expect(await paths()).toEqual(['/', '/services', '/news', '/media/plex', '/blog']);
 	await expect(pathInput).toHaveValue('/blog');
 
 	// The nav label, optional: absent means the nav falls back to the path.
@@ -318,10 +320,66 @@ test('adds, renames, names and removes a page', async ({ page }) => {
 		.last()
 		.click();
 
-	expect(await paths()).toEqual(['/', '/services', '/media/plex']);
+	expect(await paths()).toEqual(['/', '/services', '/news', '/media/plex']);
 
 	config = JSON.parse(await payload.inputValue());
 
 	// Removal takes the whole entry; nothing half-remains.
 	expect(config.pages['/blog']).toBeUndefined();
+});
+
+// The fence for the #35 wart: two sibling containers of ONE type used to offer the same
+// insertion button name twice, because position counts within each list and both lists
+// start at 1. Never saved — like every test in this file, nothing is submitted.
+test('tells two same-type lists apart in the insertion buttons', async ({ page }) => {
+	await signIn(page, ADMIN_TOKEN);
+
+	const editor = page.locator('form[action="?/save"]');
+
+	// Two untitled Grids on one page. The retyped container is found through its
+	// generated id rather than a group's name, which same-type siblings share by
+	// construction — `/services` is the second page key, so its ids are `admin-1-*`.
+	const added: [number, string][] = [
+		[2, 'admin-1-1'],
+		[3, 'admin-1-2'],
+	];
+
+	for (const [position, id] of added) {
+		await editor
+			.getByRole('button', {
+				name: `Add container to /services, position ${position}`,
+			})
+			.click();
+
+		await editor.locator(`#${id}-name`).selectOption('Grid');
+	}
+
+	// Untitled, the type plus the slot each occupies in the page's list carries the
+	// difference — and neither name is the old colliding one.
+	await expect(
+		editor.getByRole('button', {
+			name: 'Add container to /services · Grid 2, position 1',
+		}),
+	).toHaveCount(1);
+
+	await expect(
+		editor.getByRole('button', {
+			name: 'Add container to /services · Grid 3, position 1',
+		}),
+	).toHaveCount(1);
+
+	await expect(
+		editor.getByRole('button', {
+			name: 'Add container to Grid, position 1',
+		}),
+	).toHaveCount(0);
+
+	// Titled, the operator's own label takes over as the identifier.
+	await editor.locator('#admin-1-1-title').fill('Media');
+
+	await expect(
+		editor.getByRole('button', {
+			name: 'Add container to /services · Media, position 1',
+		}),
+	).toHaveCount(1);
 });

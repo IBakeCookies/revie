@@ -1,5 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import { isAdminEnabled } from '$lib/business/model/admin-auth';
+import { pageEntries } from '$lib/business/model/config';
 import { readConfig } from '$lib/business/model/config-source';
 import { readOrMintScenerySeed, readRequestAppearance } from '$lib/business/model/appearance';
 
@@ -22,11 +23,10 @@ export const load: LayoutServerLoad = async (event) => {
 	}
 
 	return {
-		// Only what the navigation needs; the containers are loaded per page.
-		pages: Object.entries(config.pages).map(([path, page]) => ({
-			path,
-			name: page.name || path,
-		})),
+		// Only what the navigation needs; the containers are loaded per page. The
+		// same entries the quick-jump lists — one definition in the model, not a
+		// second mapping restated here.
+		pages: pageEntries(config),
 		// undefined (unknown or absent) lets the client fall back to its defaults
 		theme: appearance.theme,
 		// undefined (no cookie yet) lets the client fall back to prefers-reduced-motion

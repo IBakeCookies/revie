@@ -3,8 +3,8 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { themes } from '../src/lib/business/model/theme';
 
-// Everything the fixture can render: two configured pages and the configured 404.
-const paths = ['/', '/services', '/nope'];
+// Everything the fixture can render: three configured pages and the configured 404.
+const paths = ['/', '/services', '/news', '/nope'];
 // The conformance levels this project claims, PLUS `best-practice` — which is not
 // optional here and is the whole reason this file exists. Measured against the installed
 // axe-core: `landmark-one-main`, `landmark-banner-is-top-level`, `landmark-unique`,
