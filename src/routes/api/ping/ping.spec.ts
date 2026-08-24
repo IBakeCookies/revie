@@ -42,13 +42,16 @@ const httpServer = http.createServer((req, res) => {
 
 let httpPort = 0;
 
-/** The handler only ever touches the request. */
-function event(body: BodyInit): Parameters<typeof POST>[0] {
+/** The handler only ever touches the request. The address defaults to one pool for
+    the behaviour tests — their few calls never reach the budget — while the rate-limit
+    cases name their own, because the counter is module-scope and shared by this file. */
+function event(body: BodyInit, clientAddress = '10.77.0.1'): Parameters<typeof POST>[0] {
 	return {
 		request: new Request('http://localhost/api/ping', {
 			method: 'POST',
 			body,
 		}),
+		getClientAddress: () => clientAddress,
 	} as Parameters<typeof POST>[0];
 }
 
@@ -249,6 +252,36 @@ describe('POST /api/ping', () => {
 	it('still opens a socket in tcp mode, where an http probe would have answered', async () => {
 		configuredWith(service('Listening', `http://127.0.0.1:${openPort}/up`, 'tcp'));
 
+		await expect(isAlive(`http://127.0.0.1:${openPort}`)).resolves.toEqual({
+			isAlive: true,
+		});
+	});
+});
+
+describe('POST /api/ping rate limit', () => {
+	const address = '10.78.0.1';
+
+	const body = () =>
+		JSON.stringify({
+			href: `http://127.0.0.1:${openPort}`,
+		});
+
+	it('answers an attempt past the per-address budget with 429', async () => {
+		for (let i = 0; i < 300; i += 1) {
+			await POST(event(body(), address));
+		}
+
+		await expect(POST(event(body(), address))).rejects.toMatchObject({
+			status: 429,
+		});
+	});
+
+	/**
+	 * The budget is per address on purpose: the dashboard's own tabs must never wait
+	 * behind someone else's spam, and a global counter would hand any LAN device the
+	 * power to silence every other visitor's status dots.
+	 */
+	it('leaves another address its own budget', async () => {
 		await expect(isAlive(`http://127.0.0.1:${openPort}`)).resolves.toEqual({
 			isAlive: true,
 		});

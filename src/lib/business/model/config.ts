@@ -38,6 +38,26 @@ const probeModes = ['tcp', 'http', 'none'] as const;
 export type ProbeMode = (typeof probeModes)[number];
 
 /**
+ * An unknown zone throws `RangeError` at format time — during SSR, taking the page
+ * with it — so validity is decided by asking Intl itself, the same lookup the box's
+ * own formatters will run. Anything it accepts here cannot throw later (`UTC` and
+ * case-variant spellings included — neither is in `supportedValuesOf`, measured);
+ * anything it rejects degrades like every other invalid prop, dropped with a
+ * warning naming `timezone`.
+ */
+function isSupportedTimeZone(zone: string): boolean {
+	try {
+		new Intl.DateTimeFormat(undefined, {
+			timeZone: zone,
+		});
+
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Which service a stats box reads. A token rather than a container per vendor: a dozen
  * names is a dozen schema entries, a dozen branches before `config-container.svelte`'s
  * `never` assert and a dozen components, while a token keeps presentation at one
@@ -140,6 +160,13 @@ const containerSchemas = {
 	}),
 	BoxDate: v.object({
 		span: spanProp,
+		/**
+		 * An IANA zone name pinning the box to one place's time instead of the
+		 * viewer's. Optional, and deliberately WITHOUT a default, like `probe`:
+		 * an optional with one keeps what is under it required, which would mark a
+		 * prop nobody has to write.
+		 */
+		timezone: v.optional(v.pipe(v.string(), v.check(isSupportedTimeZone))),
 	}),
 	BoxSearch: v.object({
 		span: spanProp,

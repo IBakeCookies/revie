@@ -1514,6 +1514,19 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   reintroduce the `ping` package: it also cost a fork+exec per unauthenticated POST, threw an
   unhandled rejection when the binary was missing from a slim image, and kept the brackets on
   an IPv6 literal (`new URL('http://[fd00::5]/').hostname`). `toEndpoint` strips them.
+- **`/api/ping` is rate-limited per client address.** `takePingLimit`
+  ([ping-limit.ts](src/lib/business/model/ping-limit.ts), beside `admin-auth.ts`) is that file's
+  backoff map reduced to a flat budget — 300 probes per rolling minute, a kind plus a number out
+  of the model, the route picking the 429 words. Five decisions: the slot is taken BEFORE the body
+  parses, so a throttled caller costs no work at all; every attempt counts, not only answered
+  ones — the budget bounds the work, and even the refusal paths cost a parse and a config read;
+  the ceiling is sustained rather than lifetime, so a window that drains buys a fresh budget and
+  the dashboard's own poll can never be locked out for good; it is per-address only, as auth on
+  ping was refused — behind a proxy that hides addresses it goes global, which is accepted; and
+  the budget sits at 300 because it is sized by MEASUREMENT against the burst profile, not the
+  steady state — every page load eagerly probes every configured service, and the e2e suite
+  measured 163 probes in its busiest rolling minute (4 fixture boxes, every test loading a page,
+  all from one address), so anything in the "few dozen" range ships a flake factory.
 - **A `BoxService` chooses its own probe, and the endpoint resolves the mode from the FILE.**
   `probe: 'tcp' | 'http' | 'none'` — `collectServiceProbes` in
   [config.ts](src/lib/business/model/config.ts) carries it, `configuredTargets` in
@@ -1556,7 +1569,16 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   meant a `git pull` during an update silently reverted the live dashboard.
 - **[box-date.svelte](src/lib/presentation/components/box-date.svelte)'s `Intl` formatter is at
   instance scope.** The module body runs once per node process while the locale is per request,
-  so hoisting it back freezes every SSR response to the first visitor's locale.
+  so hoisting it back freezes every SSR response to the first visitor's locale. An optional
+  `timezone` prop threads into both formatters — `timeZone: undefined` falls through to the
+  viewer's own zone — and is validated inside the schema by asking Intl itself (`new
+Intl.DateTimeFormat(undefined, { timeZone })` in a try/catch), because an unknown zone throws
+  `RangeError` at format time, during SSR; that probe is the exact predicate for "throws later",
+  which is why it beats `Intl.supportedValuesOf('timeZone')` — measured on node, neither `UTC`
+  nor case-variant spellings are in that list, yet Intl formats both. A bad one drops the
+  container with the standard warning like every other invalid prop. A pinned box renders
+  identically on server and client, which retires the one clock-shaped hydration variable for that
+  config.
 - **The zenith parity pass (2026-08-04) is settled; these are its decisions, not defaults.**
   Tooling was brought in step with `zenith` in one pass. What was taken, and what was
   deliberately refused:

@@ -17,11 +17,11 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 13 items are open — #10 from the review passes, the
-rest of #33's provider list above, and 37–39 and 41–48 under New work; **1, 2, 3, 4, 5,
+**Numbers are stable, so gaps mean landed.** 11 items are open — #10 from the review passes, the
+rest of #33's provider list above, and 37–39, 41–44 and 46–48 under New work; **1, 2, 3, 4, 5,
 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 34,
-35, 36 and 40 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+35, 36, 40, 45 and 47 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
 and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -812,17 +812,21 @@ and each was checked against AGENTS.md so it proposes nothing a recorded decisio
     produce two distinct role names; the move buttons already name correctly and stay.
     _Files:_ src/routes/admin/+page.svelte, e2e/can-edit-the-config.e2e.ts
 
-45. **Rate-limit `/api/ping`** (`M`). The endpoint is unauthenticated by design, but nothing
-    bounds frequency: any LAN device can hammer TCP connects at every configured service — a DoS
-    on the operator's own boxes, run from their own dashboard. The pattern exists:
-    [admin-auth.ts](src/lib/business/model/admin-auth.ts)'s module-scope per-address map with
-    `clientAddress` passed in (R1) and pruned so it cannot grow without bound. Simpler here — a
-    fixed budget per address window (the app's own poll fires 4 probes an hour per service, so a
-    few dozen a minute is generous), answering a KIND plus a number like the login lockout does,
-    with the route picking every word. _Not built_, deliberately: auth on ping (its allowlist is
-    the design), anything global that could lock out the operator's own tab behind a shared
-    proxy address. _Files:_ src/lib/business/model/ (beside admin-auth.ts),
-    src/routes/api/ping/, a spec keyed on fake addresses like admin-auth.spec.ts
+45. ~~**Rate-limit `/api/ping`**~~ — **LANDED.** `takePingLimit`
+    ([ping-limit.ts](src/lib/business/model/ping-limit.ts)) is [admin-auth.ts](src/lib/business/model/admin-auth.ts)'s
+    backoff map reduced to a flat budget: 300 probes per rolling minute per client address, a
+    kind plus a number out of the model, the route picking the 429 words. Decisions taken on the
+    way: the slot is taken BEFORE the body parses, so a throttled caller costs no work at all;
+    every attempt counts, not only allowed ones; the ceiling is sustained rather than lifetime
+    (the window draining buys a fresh budget, so the dashboard's own poll can never be locked out
+    for good); and it is per-address only, as this item refused globals. **The item's own sizing
+    was wrong by an order of magnitude:** "a few dozen a minute" measured at 163 probes in the
+    e2e suite's busiest rolling minute — every page load eagerly probes every fixture box, all
+    from the one address the browser answers from — and a budget under that shipped six red e2e
+    tests before it was measured. It ships at 300, which still caps sustained abuse at a few
+    connects a second. _Files:_ src/lib/business/model/ping-limit.ts (new),
+    src/lib/business/model/ping-limit.spec.ts (new), src/routes/api/ping/,
+    src/routes/api/ping/ping.spec.ts
 
 46. **Enable `no-console`, with the four exemptions** (`S`). AGENTS.md says the rule is now
     enableable — #23 took the model's prints out, and what remains is deliberate and permanent:
@@ -833,15 +837,23 @@ and each was checked against AGENTS.md so it proposes nothing a recorded decisio
     `no-restricted-imports`, so each layer block restating the rule must be checked, not just
     added once. _Files:_ eslint.config.js
 
-47. **An optional `timezone` prop on `BoxDate`** (`S`) — the world clock. A dashboard mounted
-    where family lives in another timezone shows them THEIR time; `Intl.DateTimeFormat` takes
-    `timeZone`, and the schema-generated editor picks a string field up for free. Two decisions:
-    validate the zone at normalize time (`Intl.supportedValuesOf('timeZone')` — an unknown zone
-    throws `RangeError` at format time, and config degrades rather than breaks, so it warns and
-    drops like every bad prop); and thread it into the formatter that must stay instance-scope
-    because the locale is per request. Side effect worth having: a fixed timezone renders
-    identically on server and client, removing the one clock-shaped hydration variable.
-    _Files:_ src/lib/business/model/config.ts (schema + warning sentence),
+47. ~~**An optional `timezone` prop on `BoxDate`**~~ — **LANDED**, both decisions as the item
+    wrote them, with one refinement measured on the way. The zone is checked inside the schema,
+    so an unknown one drops the container with the standard `"timezone" is missing or not valid`
+    warning instead of throwing `RangeError` mid-SSR — but the check is `new
+Intl.DateTimeFormat(undefined, { timeZone })` in a try/catch rather than the
+    `Intl.supportedValuesOf('timeZone')` lookup the item named: neither `UTC` nor case-variant
+    spellings are in that list (417 entries, measured) while Intl formats both, and the probe is
+    the exact predicate for "throws later". The prop threads into BOTH formatters, which stay
+    instance-scoped and are `$derived` besides — an instance can survive a config refresh with
+    only its props patched, and a formatter built at init would keep rendering the old zone.
+    One more thing the item did not spell out: `'x'` — the value every other described field is
+    fence-filled with — is not a zone, so [config.spec.ts](src/lib/business/model/config.spec.ts)'s
+    `fillValue` special-cases the path with `'UTC'`, the first constrained string the walk has
+    described. The story pins `Pacific/Kiritimati` and recomputes its expectation from the node's
+    own `datetime` attribute, so render tick and assertion cannot disagree about which second
+    they are reading.
+    _Files:_ src/lib/business/model/config.ts,
     src/lib/presentation/components/box-date.svelte + story, README.md's config section
 
 48. **A feed box — RSS/Atom through a list-shaped container** (`M`). What the research pass

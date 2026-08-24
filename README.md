@@ -122,6 +122,12 @@ props:
   the page renders at all. It lives in the server process, so a restart drops it and a
   second instance behind a load balancer keeps its own; the page stops re-reading while
   its tab is in the background.
+- `BoxDate` shows today's date and a running clock, in each visitor's own timezone.
+  An optional `"timezone"` pins it to one IANA zone instead, so everyone sees the
+  same box wherever they are:
+  `{ "name": "BoxDate", "props": { "timezone": "Australia/Sydney" } }`. A zone the
+  runtime doesn't know is dropped with a warning like any other invalid prop, so
+  spell it as in the tz database (`Europe/Berlin`).
 - `BoxSearch` is a search box for whatever engine you run. `href` is the engine's endpoint —
   what the form submits to — and `placeholder` is optional; leave it out and the box says
   "Search". Pressing `/` anywhere on the page puts the cursor in it, and Enter submits.
@@ -325,6 +331,12 @@ in the background is not probed at all. The probe opens a TCP connection to the 
 **and port** — so a dead service on a live host reads as offline, and two boxes on one host can
 disagree. A scheme without a port to connect to is rejected. The endpoint only probes `host:port`
 pairs that appear in `config.json`; anything else is rejected too.
+
+Because the endpoint is unauthenticated, its frequency is bounded as well: each client address can
+ask for up to 300 probes per rolling minute — far more than the dashboard's own polling ever
+produces, even under rapid navigation — and past that it answers **429** until its minute drains.
+The counter lives in the server process, so a restart resets it, and behind a proxy that hides
+client addresses the budget is shared by everyone behind it.
 
 A dot only changes when a probe answers. A probe that **fails** — a network drop, a
 proxy erroring — says nothing about the service, so the dot keeps its last known state

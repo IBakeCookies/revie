@@ -5,10 +5,12 @@
 
 	export type Props = {
 		span?: number;
+		/** An IANA zone name; unset means the viewer's own. */
+		timezone?: string;
 		class?: ClassValue;
 	};
 
-	let { span, class: className }: Props = $props();
+	let { span, class: className, timezone }: Props = $props();
 
 	// Instance scope, not module scope: the module body runs once per node
 	// process while the locale is per request, so a module-level formatter
@@ -16,17 +18,30 @@
 	//
 	// Two formatters, not one: the clock is the reading and the date is its
 	// caption, so they are set at different sizes and cannot come from one string.
-	const dateFormatter = new Intl.DateTimeFormat(getLocale(), {
-		weekday: 'long',
-		day: '2-digit',
-		month: 'long',
-		year: 'numeric',
-	});
-	const timeFormatter = new Intl.DateTimeFormat(getLocale(), {
-		hour: '2-digit',
-		minute: '2-digit',
-		second: '2-digit',
-	});
+	//
+	// Derived, not built once at init: an instance can survive a config refresh
+	// with only its props patched, and a formatter that captured the first value
+	// would keep rendering the old zone. `timeZone` is undefined-safe — unset
+	// falls through to the viewer's own zone, while a pinned zone renders
+	// identically on server and client, which retires this box's one
+	// clock-shaped hydration variable.
+	const dateFormatter = $derived(
+		new Intl.DateTimeFormat(getLocale(), {
+			weekday: 'long',
+			day: '2-digit',
+			month: 'long',
+			year: 'numeric',
+			timeZone: timezone,
+		}),
+	);
+	const timeFormatter = $derived(
+		new Intl.DateTimeFormat(getLocale(), {
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit',
+			timeZone: timezone,
+		}),
+	);
 
 	let now = $state(new Date());
 

@@ -3,6 +3,7 @@ import net from 'node:net';
 import { error, json } from '@sveltejs/kit';
 import { readConfig } from '$lib/business/model/config-source';
 import { type ServiceProbe, collectServiceProbes } from '$lib/business/model/config';
+import { takePingLimit } from '$lib/business/model/ping-limit';
 
 const PROBE_TIMEOUT_MS = 2000;
 
@@ -144,7 +145,16 @@ async function probeHttp(href: string): Promise<boolean> {
 	}
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress }) => {
+	// Before anything the caller could make us compute — a throttled address costs
+	// no body parse and no config read. The words are this route's; the model only
+	// answers with a kind and a number.
+	const limit = takePingLimit(getClientAddress());
+
+	if (limit.status === 'throttled') {
+		error(429, `Too many probes, retry in ${limit.retryAfterSeconds} seconds`);
+	}
+
 	const body = await request.json().catch(() => undefined);
 	const href = typeof body?.href === 'string' ? body.href : undefined;
 	const endpoint = href ? toEndpoint(href) : undefined;

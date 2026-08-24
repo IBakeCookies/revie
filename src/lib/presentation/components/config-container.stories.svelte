@@ -149,8 +149,9 @@
 	}}
 />
 
-<!-- BoxDate takes nothing but `span`, which is what makes it the branch that proves
-     the spread carries the common props and nothing else. -->
+<!-- BoxDate declares nothing required — `span` and an optional `timezone` — which
+     keeps it the branch that proves the spread carries the common props and
+     nothing else. -->
 <Story
 	name="Box date"
 	play={async ({ canvas, canvasElement }) => {

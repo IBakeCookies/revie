@@ -459,6 +459,35 @@ describe('containers that would throw while rendering', () => {
 		expect(page.containers.map((c) => c.name)).toEqual(['BoxDate']);
 	});
 
+	it('keeps a BoxDate pinned to a zone Intl knows', () => {
+		const { page, warnings } = pageWith({
+			name: 'BoxDate',
+			props: {
+				timezone: 'Pacific/Kiritimati',
+			},
+		});
+
+		expect(warnings).toEqual([]);
+
+		expect(page.containers[0].props).toEqual({
+			timezone: 'Pacific/Kiritimati',
+		});
+	});
+
+	// An unknown zone throws RangeError at format time — during SSR — so it is
+	// rejected here instead, where the container degrades like every other bad prop.
+	it('drops a BoxDate whose timezone Intl does not know', () => {
+		const { page, warnings } = pageWith({
+			name: 'BoxDate',
+			props: {
+				timezone: 'Mars/Olympus',
+			},
+		});
+
+		expect(page.containers).toEqual([]);
+		expect(warnings).toEqual(['Skipping container "BoxDate", "timezone" is missing or not valid']);
+	});
+
 	it('drops a bad child without dropping its siblings or the grid', () => {
 		const { page } = pageWith({
 			name: 'Grid',
@@ -690,6 +719,13 @@ function fillValue(field: ContainerField): unknown {
 		return field.options?.[0];
 	}
 
+	// The second value a free-form text field can still fail: `timezone` is checked
+	// against Intl's zone list, so `'x'` drops the container with a warning. A real,
+	// universally-known zone keeps the form-fill fence honest for a constrained string.
+	if (field.path === 'timezone') {
+		return 'UTC';
+	}
+
 	return 'x';
 }
 
@@ -790,6 +826,11 @@ describe('containerFields', () => {
 			{
 				path: 'span',
 				kind: 'number',
+				isRequired: false,
+			},
+			{
+				path: 'timezone',
+				kind: 'string',
 				isRequired: false,
 			},
 		]);

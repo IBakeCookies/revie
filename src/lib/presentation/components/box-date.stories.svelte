@@ -1,6 +1,7 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { expect } from 'storybook/test';
+	import { getLocale } from '$lib/paraglide/runtime';
 	import BoxDate from '$lib/presentation/components/box-date.svelte';
 
 	const { Story } = defineMeta({
@@ -79,5 +80,34 @@
 		await expect(canvasElement.querySelector('div')).toHaveStyle({
 			'--span': '12',
 		});
+	}}
+/>
+
+<!-- A pinned zone renders ITS clock, not the viewer's. The expectation is
+     recomputed from the node's own `datetime` attribute with an identical
+     formatter, so render tick and assertion cannot disagree about which second
+     they are looking at — and the two reads below are synchronous, so no update
+     can land between them. -->
+<Story
+	name="Pins the clock to a timezone"
+	args={{
+		span: 6,
+		timezone: 'Pacific/Kiritimati',
+	}}
+	play={async ({ canvasElement }) => {
+		const time = canvasElement.querySelector('time');
+
+		await expect(time).toHaveAttribute('datetime');
+
+		const shown = time!.textContent?.trim();
+
+		const expected = new Intl.DateTimeFormat(getLocale(), {
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit',
+			timeZone: 'Pacific/Kiritimati',
+		}).format(new Date(time!.getAttribute('datetime')!));
+
+		await expect(shown).toBe(expected);
 	}}
 />
