@@ -90,6 +90,15 @@
 <svelte:head>
 	<title>{pageName ? `${pageName} · ${m.app_title()}` : m.app_title()}</title>
 	<link rel="icon" href={favicon} />
+	<!-- Pinned-to-home-screen plumbing. The manifest's strings are static on
+	     purpose (a static file cannot be localized — it names the product), and
+	     theme-color is two OS-scoped values rather than a JS mirror of the theme
+	     catalogue: the light default's white page and the revie ground the
+	     favicon already encodes. -->
+	<link rel="manifest" href="/manifest.webmanifest" />
+	<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+	<meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+	<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#18262f" />
 </svelte:head>
 
 <!-- Theme scenery: fixed decorative layers behind the app. display:none by

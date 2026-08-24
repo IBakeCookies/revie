@@ -1,0 +1,22 @@
+{
+	"name": "Revie Dashboard",
+	"short_name": "Revie",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#071218",
+	"theme_color": "#18262f",
+	"icons": [
+		{
+			"src": "/icons/icon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any"
+		},
+		{
+			"src": "/icons/icon-maskable.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

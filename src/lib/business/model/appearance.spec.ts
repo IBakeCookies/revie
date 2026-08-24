@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { readOrMintScenerySeed } from '$lib/business/model/appearance';
+import { readOrMintScenerySeed, readRequestAppearance } from '$lib/business/model/appearance';
+import { DEFAULT_THEME, getClassesToAdd } from '$lib/business/model/theme';
 
 /** A server cookie jar that records what was written, so a mint is observable. */
 function cookieJar(entries: Record<string, string>) {
@@ -54,5 +55,31 @@ describe('readOrMintScenerySeed', () => {
 
 		expect(secureJar.writes[0].secure).toBe(true);
 		expect(plainJar.writes[0].secure).toBe(false);
+	});
+});
+
+describe('readRequestAppearance', () => {
+	it('resolves a stored theme that still exists', () => {
+		const jar = cookieJar({
+			theme: 'aurora',
+		});
+
+		const read = readRequestAppearance(jar);
+
+		expect(read.theme).toBe('aurora');
+		expect(read.themeClass).toBe(getClassesToAdd('aurora').join(' '));
+	});
+
+	it('falls through to the default when the cookie names a deleted theme', () => {
+		const jar = cookieJar({
+			theme: 'theme-removed-two-deploys-ago',
+		});
+
+		const read = readRequestAppearance(jar);
+
+		// Casting instead of resolving leaves a stale cookie naming no CSS
+		// classes at all, and the app renders unstyled.
+		expect(read.theme).toBeUndefined();
+		expect(read.themeClass).toBe(getClassesToAdd(DEFAULT_THEME).join(' '));
 	});
 });

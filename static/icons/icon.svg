@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+	<title>Revie Dashboard</title>
+	<!-- The revie theme's ground and status green, drawn for 16px: three tiles, 3-unit
+	     gaps, no stroke and no text — anything finer closes up in a tab strip. Vite
+	     inlines this into every page's <head>, so the file stays small deliberately.
+	     Byte-copy of src/lib/presentation/assets/favicon.svg for the web app manifest,
+	     which needs a URL and cannot name a Vite-inlined data URI — keep the two in
+	     step by hand when the mark changes. -->
+	<defs>
+		<linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#18262f" />
+			<stop offset="1" stop-color="#071218" />
+		</linearGradient>
+	</defs>
+	<rect width="32" height="32" rx="7.5" fill="url(#ground)" />
+	<rect x="5" y="5" width="10" height="22" rx="2.5" fill="#1bd79e" />
+	<rect x="18" y="5" width="9" height="9.5" rx="2.5" fill="#ffffff" fill-opacity="0.55" />
+	<rect x="18" y="17.5" width="9" height="9.5" rx="2.5" fill="#ffffff" fill-opacity="0.28" />
+</svg>

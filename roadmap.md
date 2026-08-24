@@ -17,11 +17,11 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 11 items are open — #10 from the review passes, the
-rest of #33's provider list above, and 37–39, 41–44 and 46–48 under New work; **1, 2, 3, 4, 5,
+**Numbers are stable, so gaps mean landed.** 9 items are open — #10 from the review passes, the
+rest of #33's provider list above, and 38, 41, 42, 43, 44, 46 and 48 under New work; **1, 2, 3, 4, 5,
 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 34,
-35, 36, 40, 45 and 47 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+35, 36, 37, 39, 40, 45 and 47 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
 and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -705,22 +705,28 @@ number up. These six came from reading the shipped app against what a start page
 than from a review pass; like every item here they name their edit points and their refusals,
 and each was checked against AGENTS.md so it proposes nothing a recorded decision forbids.
 
-37. **Cover `ThemeStore`'s cookie writes — the gap #30 named and did not fill** (`S`). Nothing
-    calls `switchTheme`, `rerollScenery` or `toggleSceneryMotion`, so no test fails if a setter
-    stops mirroring to its cookie — the write half, which is the half that catches a write
-    regression. The harness exists
-    ([theme-store-harness.svelte](src/lib/test/theme-store-harness.svelte)), so this is three
-    cases in [theme-store.svelte.spec.ts](src/lib/business/store/theme-store.svelte.spec.ts):
-    switching writes the theme cookie with the chosen name, rerolling writes `scenerySeed`,
-    toggling writes `scenery-paused`. Assert on the spied-jar pattern
-    [appearance.spec.ts](src/lib/business/model/appearance.spec.ts) uses, not `document.cookie`
-    — the browser half writes through business (`updateTheme` / `updateScenerySeed` /
-    `updateSceneryMotion` in [appearance.ts](src/lib/business/model/appearance.ts)) into the
-    repository's writers, and `writeCookie` reads `location.protocol` INSIDE itself for `secure`,
-    so a jar spy is the only stable seam. While there, settle #30's second leftover: the
-    deleted-theme guard in `readRequestAppearance` has no spec either — take it or record why
-    not. _Files:_ src/lib/business/store/theme-store.svelte.spec.ts,
-    src/lib/test/theme-store-harness.svelte
+37. ~~**Cover `ThemeStore`'s cookie writes — the gap #30 named and did not fill**~~ — **LANDED.**
+    The three cases live in
+    [theme-store.svelte.spec.ts](src/lib/business/store/theme-store.svelte.spec.ts) beside the
+    six read cases, driven through three buttons the harness grew
+    ([theme-store-harness.svelte](src/lib/test/theme-store-harness.svelte)): switching writes the
+    theme cookie with the chosen name, rerolling mints a 32-bit seed and persists that exact
+    value, toggling writes the flipped preference. The seam is the jar spy this item named,
+    taken literally: the spec mocks the repository's writers
+    ([appearance-repository.ts](src/lib/data/repository/appearance-repository.ts)), because
+    `writeCookie` reads `location.protocol` INSIDE itself for `secure` — `document.cookie`
+    cannot be read back with its attributes intact, so the repository's writers are the only
+    stable assertion point. One trap the item did not name: the spec is rune-compiled, so NAMED
+    imports of the `$`-prefixed writers are a build error (`dollar_prefix_invalid`) — `import
+    - as`walks around it, which is the bypass AGENTS.md says the tripwire is bypassable by.
+Verified the way the item implied: deleting`updateTheme(newTheme)`from the store fails
+exactly the switching case and nothing else.
+**#30's second leftover is settled too, by taking it:** the deleted-theme guard in`readRequestAppearance`has two cases in
+[appearance.spec.ts](src/lib/business/model/appearance.spec.ts) — a stored theme that
+still exists resolves with its own class set, and a cookie naming a deleted theme falls
+through with`theme: undefined` and the default's class set.
+      _Files:_ src/lib/business/store/theme-store.svelte.spec.ts,
+      src/lib/test/theme-store-harness.svelte
 
 38. **Stop a failed stats refresh from parking the tab on the error page** (`M`). The deliberate
     gap #16 recorded: the 60s `invalidate('dashboard:stats')`
@@ -737,16 +743,25 @@ and each was checked against AGENTS.md so it proposes nothing a recorded decisio
     surface — `/api/ping`'s allowlist is the precedent). _Files:_ src/routes/api/stats/ (new),
     src/routes/[...slug]/, src/lib/business/store/stats-store.svelte.ts
 
-39. **Web app manifest, theme-color and touch icons** (`S`). A dashboard people pin to tablets
-    and phones ships a favicon alone — no manifest, no `theme-color`, no apple-touch-icon (grep
-    of [app.html](src/app.html)). Small work, two traps: the CSP needs nothing new while
-    everything is same-origin (`manifest-src` falls back to `default-src: 'self'`, and
-    [svelte.config.js](svelte.config.js) already allows the icon hosts in `img-src`) — do not add
-    a directive nobody needs; and the manifest is a static file, so its strings are not
-    localized — name it after the product, never `m.app_title()`, or a German home screen reads
-    English. _Deliberately not built:_ per-theme `theme-color` — that is a JS mirror of the theme
-    catalogue into a meta tag, machinery for a title-bar tint nobody has asked for.
-    _Files:_ static/, src/app.html
+39. ~~**Web app manifest, theme-color and touch icons**~~ — **LANDED.**
+    [manifest.webmanifest](static/manifest.webmanifest) names the product ("Revie Dashboard"),
+    as the item required — a static file cannot be localized, so `m.app_title()` stays out. Both
+    traps held: the CSP needed NOTHING new — `manifest-src` falls back to `default-src: 'self'`
+    and the icons ride the existing wholesale `img-src` — so no directive was added; and
+    theme-color is two OS-scoped metas in [+layout.svelte](src/routes/+layout.svelte) (the light
+    default's white page, and the revie ground the favicon already encodes, for dark), not the
+    refused per-theme JS mirror. The icons: the manifest's "any" icon is a byte-copy of the
+    favicon at [static/icons/icon.svg](static/icons/icon.svg) — a manifest needs a URL and
+    cannot name a Vite-inlined data URI, and the copy says in place that the twin is hand-kept —
+    plus two PNGs generated from the favicon's own geometry with the repo's Playwright Chromium,
+    there being no ImageMagick on the machine:
+    [apple-touch-icon.png](static/icons/apple-touch-icon.png) (180, full-bleed — the OS rounds
+    the corners of an app icon, so the SVG's rounded-rect ground became the background gradient)
+    and [icon-maskable.png](static/icons/icon-maskable.png) (512, the mark inside the maskable
+    safe zone). The generator was a one-off in /tmp, deliberately not committed — a committed
+    generator would be a second definition of the mark; if the favicon changes, the PNGs are
+    re-derived from it the same way.
+    _Files:_ static/, src/routes/+layout.svelte
 
 40. ~~**A weather provider through the existing seam — Open-Meteo**~~ — **LANDED**, and the
     six-edit-point claim held exactly: repository file, registry entry, `providerNames` token,

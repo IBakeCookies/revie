@@ -28,3 +28,13 @@
 <p data-testid="motion-toggleable">{themeStore.sceneryMotionToggleable}</p>
 <p data-testid="scenery-seed">{themeStore.scenerySeed}</p>
 <p data-testid="scenery-paused">{themeStore.sceneryPaused}</p>
+
+<!-- Test support: the setters are how a change reaches its cookie, so a spec
+     needs a way to fire all three. 'aurora' is any catalogue entry. -->
+<button data-testid="switch-theme" onclick={() => themeStore.switchTheme('aurora')}>
+	switch
+</button>
+<button data-testid="reroll-scenery" onclick={() => themeStore.rerollScenery()}>reroll</button>
+<button data-testid="toggle-motion" onclick={() => themeStore.toggleSceneryMotion()}>
+	toggle
+</button>

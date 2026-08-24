@@ -1,7 +1,30 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { DEFAULT_THEME } from '$lib/business/model/theme';
+/* Namespace rather than named imports: this file is rune-compiled, where `$`
+   names are reserved (`dollar_prefix_invalid`). */
+import * as appearanceRepository from '$lib/data/repository/appearance-repository';
 import ThemeStoreHarness from '$lib/test/theme-store-harness.svelte';
+
+/**
+ * The jar spy. `writeCookie` reads `location.protocol` INSIDE itself for
+ * `secure`, so the only stable seam to assert a browser-side cookie write on
+ * is the repository's writers — everything below them ends in
+ * `document.cookie`, which a test cannot read back with its attributes intact.
+ * `$readAppearance` stays unused: the harness seeds initial values via props,
+ * as the SSR payload does.
+ */
+vi.mock('$lib/data/repository/appearance-repository', () => ({
+	$readAppearance: vi.fn(() => ({
+		theme: undefined,
+		scenerySeed: undefined,
+		sceneryPaused: undefined,
+	})),
+	$updateTheme: vi.fn(),
+	$updateScenerySeed: vi.fn(),
+	$updateSceneryMotion: vi.fn(),
+	$createScenerySeedCookie: vi.fn(),
+}));
 
 /** Stands in for the OS setting, which a test cannot flip. Returns the flip. */
 function stubReducedMotion(initial: boolean): (next: boolean) => void {
@@ -99,5 +122,56 @@ describe('ThemeStore', () => {
 		});
 
 		await expect.element(screen.getByTestId('scenery-paused')).toHaveTextContent('false');
+	});
+});
+
+describe('ThemeStore mirrors every change back to its cookie', () => {
+	beforeEach(() => {
+		vi.mocked(appearanceRepository.$updateTheme).mockClear();
+		vi.mocked(appearanceRepository.$updateScenerySeed).mockClear();
+		vi.mocked(appearanceRepository.$updateSceneryMotion).mockClear();
+	});
+
+	it('switching writes the theme cookie with the chosen name', async () => {
+		stubReducedMotion(false);
+
+		const screen = await render(ThemeStoreHarness, {});
+
+		await screen.getByTestId('switch-theme').click();
+
+		await expect.element(screen.getByTestId('theme')).toHaveTextContent('aurora');
+		expect(vi.mocked(appearanceRepository.$updateTheme).mock.calls).toEqual([['aurora']]);
+	});
+
+	it('rerolling mints a seed in range and persists that exact value', async () => {
+		stubReducedMotion(false);
+
+		const screen = await render(ThemeStoreHarness, {
+			initialScenerySeed: 3,
+		});
+
+		await screen.getByTestId('reroll-scenery').click();
+
+		const [seed] = vi.mocked(appearanceRepository.$updateScenerySeed).mock.calls[0] ?? [];
+		// `randomScenerySeed`'s own contract: a 32-bit unsigned integer.
+		expect(Number.isInteger(seed)).toBe(true);
+		expect(seed).toBeGreaterThanOrEqual(0);
+		expect(seed).toBeLessThan(0x100000000);
+
+		await expect.element(screen.getByTestId('scenery-seed')).toHaveTextContent(String(seed));
+		expect(vi.mocked(appearanceRepository.$updateScenerySeed).mock.calls).toEqual([[seed]]);
+	});
+
+	it('toggling motion writes the flipped preference', async () => {
+		stubReducedMotion(false);
+
+		const screen = await render(ThemeStoreHarness, {
+			initialSceneryPaused: false,
+		});
+
+		await screen.getByTestId('toggle-motion').click();
+
+		await expect.element(screen.getByTestId('scenery-paused')).toHaveTextContent('true');
+		expect(vi.mocked(appearanceRepository.$updateSceneryMotion).mock.calls).toEqual([[true]]);
 	});
 });
