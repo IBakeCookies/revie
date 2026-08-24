@@ -118,3 +118,17 @@ describe('hand-mirrored invariants', () => {
 		}
 	});
 });
+
+describe('the CSP nonce', () => {
+	it('app.html nonces its pre-paint script, and script-src is spelled out for kit to hang it on', () => {
+		const appHtml = readRepoFile('src/app.html');
+		const svelteConfig = readRepoFile('svelte.config.js');
+
+		/* Without the placeholder the inline no-FOUC script carries no nonce, so CSP blocks it and a
+		   first visit on a dark-preferring OS gets a light flash — with no error anywhere. */
+		expect(appHtml).toMatch(/<script[^>]*\bnonce="%sveltekit\.nonce%"/);
+
+		/* Left to default-src, kit has no directive of its own to attach the nonce to. */
+		expect(svelteConfig).toMatch(/['"]script-src['"]\s*:/);
+	});
+});

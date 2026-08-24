@@ -890,10 +890,12 @@ src/app.html          ─→ <script nonce="%sveltekit.nonce%"> on the pre-paint
   to `default-src` so kit has an explicit directive to hang the nonce on.
 - **The handle is first, so `handleAdmin`'s thrown 404 and its 303 carry none of these headers** —
   they are produced above it. Known, accepted, and not worth a second mechanism for one 404.
-- **Nothing fences the nonce.** Remove it from `app.html` and CSP blocks the pre-paint script, so a
-  first visit on a dark-preferring OS gets a light flash — invisible to every test in the repo.
-  `npm run dev` is not a check either: kit nonces vite's injected scripts too, so dev is green
-  whatever `app.html` says.
+- **The nonce is fenced, textually.** [invariants.spec.ts](src/lib/test/invariants.spec.ts) asserts
+  both halves: `app.html` carries `nonce="%sveltekit.nonce%"` on its pre-paint script, and
+  `script-src` is spelled out in [svelte.config.js](svelte.config.js) for kit to hang it on. Drop
+  either and CSP blocks the pre-paint script — a first visit on a dark-preferring OS gets a light
+  flash, with no error anywhere. A runtime check cannot serve instead: `npm run dev` nonces vite's
+  injected scripts too, so dev is green whatever `app.html` says.
 
 ## Invariants
 

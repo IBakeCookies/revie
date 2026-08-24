@@ -17,11 +17,11 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 5 items are open — #10 from the review passes, the
-rest of #33's provider list above, and 38, 42 and 43 under New work; **1, 2, 3, 4, 5,
+**Numbers are stable, so gaps mean landed.** 4 items are open — #10 from the review passes, the
+rest of #33's provider list above, and 38 and 42 under New work; **1, 2, 3, 4, 5,
 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 34,
-35, 36, 37, 39, 40, 41, 44, 45, 46, 47 and 48 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+35, 36, 37, 39, 40, 41, 43, 44, 45, 46, 47 and 48 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
 and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -298,8 +298,9 @@ vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Alre
        `.glass-dark main { background-color: rgba(0,0,0,0.2) }` — a scrim that spanned the page only
        because `<main>` did. It targets `.page-shell` now; left on `main` it painted a dark band behind
        the content grid alone.
-       _Still open, and not this item's:_ the WCAG 1.4.1 dot defect is closed, but nothing fences the
-       CSP nonce, and `document-title` remains invisible to the storybook gate by construction.
+       _Still open, and not this item's:_ the WCAG 1.4.1 dot defect is closed, but nothing fenced the
+       CSP nonce — since closed as #43 — and `document-title` remains invisible to the storybook gate
+       by construction.
 
 ## Architecture & extensibility
 
@@ -832,14 +833,14 @@ through with`theme: undefined` and the default's class set.
     sequencing. _Deliberately not built:_ registry push in CI (nobody has said where images go).
     _Files:_ Dockerfile (new), .dockerignore (new), README.md
 
-43. **Fence the CSP nonce** (`S`). AGENTS.md records it twice and both times as a hole: nothing
-    fences the nonce, so deleting `nonce="%sveltekit.nonce%"` from [app.html](src/app.html) lets
-    CSP silently kill the pre-paint script — a first visit on a dark-preferring OS gets a light
-    flash, and no test in the repo goes red. One assertion in
-    [invariants.spec.ts](src/lib/test/invariants.spec.ts) closes it: app.html carries the nonce
-    placeholder, and `script-src` is spelled out for kit to hang it on (the second half of the
-    same invariant). The same spec already reads shipped files off its own location, so this is
-    minutes. _Files:_ src/lib/test/invariants.spec.ts
+43. ~~**Fence the CSP nonce**~~ — **LANDED.** One `it` at the end of
+    [invariants.spec.ts](src/lib/test/invariants.spec.ts), under its own `the CSP nonce` describe,
+    asserting both halves of the invariant: app.html carries `nonce="%sveltekit.nonce%"` on a
+    script tag, and svelte.config.js spells out `'script-src'`. Both verified to fail — deleting
+    the attribute from app.html fails the first expect, deleting the directive from
+    svelte.config.js fails the second, each leaving the rest of the suite green. AGENTS.md's CSP
+    section no longer records the hole.
+    _Files:_ src/lib/test/invariants.spec.ts
 
 44. ~~**Distinct accessible names for the editor's insertion buttons**~~ — **LANDED.**
     `listTarget` in [admin/+page.svelte](src/routes/admin/+page.svelte) composes `{target}` from
