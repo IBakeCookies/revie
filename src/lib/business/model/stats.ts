@@ -20,6 +20,8 @@ import { $getAdguardStats, type AdguardWire } from '$lib/data/repository/adguard
 import { $getPiholeV5Stats, type PiholeV5Wire } from '$lib/data/repository/pihole-v5';
 import { $getPiholeV6Stats, type PiholeV6Wire } from '$lib/data/repository/pihole-v6';
 import { $getUptimeKumaStats, type UptimeKumaWire } from '$lib/data/repository/uptime-kuma';
+import { $getProxmoxStats, type ProxmoxWire } from '$lib/data/repository/proxmox';
+import { $getOpenMeteoStats, type OpenMeteoWire } from '$lib/data/repository/open-meteo';
 
 /**
  * The page load awaits every read, so without a bound of our own an unreachable host
@@ -179,6 +181,79 @@ export function projectUptimeKuma(data: UptimeKumaWire): Stat[] {
 }
 
 /**
+ * The cluster's guests and load, off the one endpoint a standalone node answers too.
+ * Guests are the `vm` entries — BOTH qemu VMs and LXC containers arrive as that type —
+ * and running/stopped are counted separately rather than one being the other's remainder,
+ * the same rule Uptime Kuma's monitors follow: a paused or otherwise odd guest is neither.
+ * A template is excluded from both counts: on the wire it is a stopped guest, but it is
+ * not something an operator stopped.
+ */
+export function projectProxmox(data: ProxmoxWire): Stat[] {
+	const guests = data.data.filter((entry) => entry.type === 'vm' && entry.template === undefined);
+	const nodes = data.data.filter((entry) => entry.type === 'node' && entry.status === 'online');
+
+	return [
+		{
+			key: 'guests-running',
+			value: guests.filter((guest) => guest.status === 'running').length,
+		},
+		{
+			key: 'guests-stopped',
+			value: guests.filter((guest) => guest.status === 'stopped').length,
+		},
+		{
+			// The wire reports fractions already, so nothing to divide. The mean is
+			// unweighted across online nodes — for the single-node setup this box mostly
+			// serves there is one node and it is exact — with `|| 1` because a cluster
+			// answering with no online node must render 0%, not "NaN%".
+			key: 'cpu-share',
+			value: nodes.reduce((total, node) => total + (node.cpu ?? 0), 0) / (nodes.length || 1),
+		},
+		{
+			// Memory aggregates as a SUM rather than a mean: 32 GB half-used beside 8 GB
+			// idle is 40 of 48 used, not 25%.
+			key: 'memory-share',
+			value:
+				nodes.reduce((total, node) => total + (node.mem ?? 0), 0) /
+				(nodes.reduce((total, node) => total + (node.maxmem ?? 0), 0) || 1),
+		},
+	];
+}
+
+/**
+ * The current weather off the one provider that needs no secret and no handshake. The
+ * dimensionals pass through UNTOUCHED — their unit is whatever the operator pinned into
+ * the href (`temperature_unit=fahrenheit`, `wind_speed_unit=ms`), and converting here
+ * would second-guess a query this layer never sees. Humidity is the exception because it
+ * is not dimensional: a share on every wire, so it is normalized to the fraction its key
+ * names, exactly like blocked-share above.
+ */
+export function projectOpenMeteo(data: OpenMeteoWire): Stat[] {
+	return [
+		{
+			key: 'temperature',
+			value: data.current.temperature_2m,
+		},
+		{
+			key: 'apparent-temperature',
+			value: data.current.apparent_temperature,
+		},
+		{
+			key: 'humidity',
+			value: data.current.relative_humidity_2m / 100,
+		},
+		{
+			key: 'wind-speed',
+			value: data.current.wind_speed_10m,
+		},
+		{
+			key: 'precipitation',
+			value: data.current.precipitation,
+		},
+	];
+}
+
+/**
  * Every provider a config may name. A missing key is a compile error, which is the same
  * guarantee the container schema gives the renderer — adding a provider is a repository
  * file, a projection and one line here.
@@ -188,6 +263,8 @@ const providers: Record<ProviderName, ReadProvider> = {
 	'pihole-v5': (input) => read($getPiholeV5Stats(input), projectPiholeV5),
 	'pihole-v6': (input) => read($getPiholeV6Stats(input), projectPiholeV6),
 	'uptime-kuma': (input) => read($getUptimeKumaStats(input), projectUptimeKuma),
+	proxmox: (input) => read($getProxmoxStats(input), projectProxmox),
+	'open-meteo': (input) => read($getOpenMeteoStats(input), projectOpenMeteo),
 };
 
 export type ReadStatsInput = {

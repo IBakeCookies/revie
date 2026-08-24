@@ -133,8 +133,7 @@
 
 	/**
 	 * Inserts at `index`, so every position in a list is reachable and not only the end —
-	 * reordering is not on offer, so an append-only form cannot put a box before an
-	 * existing one at all.
+	 * an append-only form cannot put a box before an existing one at all.
 	 *
 	 * A whole-value assignment rather than a splice, for the reason `record` above gives: a
 	 * list the form has just created is a fresh proxy, and writing into the array that went
@@ -154,6 +153,116 @@
 			},
 			...existing.slice(index),
 		];
+	}
+
+	/**
+	 * Moves the container at `index` within its list by `delta` (-1 up, 1 down).
+	 * Adjacent by construction, so this is a swap of the pair around `lo` — and the
+	 * same whole-value assignment as `addContainer`, for the same reason.
+	 */
+	function moveContainer(
+		parent: Record<string, unknown>,
+		key: string,
+		index: number,
+		delta: -1 | 1,
+	): void {
+		const list = parent[key];
+		const target = index + delta;
+
+		if (!Array.isArray(list) || target < 0 || target >= list.length) {
+			return;
+		}
+
+		const lo = Math.min(index, target);
+
+		parent[key] = [...list.slice(0, lo), list[lo + 1], list[lo], ...list.slice(lo + 2)];
+	}
+
+	/**
+	 * A page key is a URL path — the nav links to it and the route matches it — so
+	 * renaming IS moving the entry under a new key, at the same position among its
+	 * siblings. The value is carried over untouched, `defaults` and all.
+	 */
+	function renamePage(previous: string, next: string): boolean {
+		if (!isRecord(draft?.pages) || previous === next || Object.hasOwn(draft.pages, next)) {
+			return false;
+		}
+
+		const rebuilt: Record<string, unknown> = {};
+
+		for (const [key, value] of Object.entries($state.snapshot(draft.pages))) {
+			if (key === previous) {
+				rebuilt[next] = value;
+			} else {
+				rebuilt[key] = value;
+			}
+		}
+
+		draft.pages = rebuilt;
+
+		return true;
+	}
+
+	function removePage(path: string): void {
+		if (!isRecord(draft?.pages)) {
+			return;
+		}
+
+		delete draft.pages[path];
+	}
+
+	/**
+	 * Appends under the first free `/new-page` key, so two adds cannot collide into
+	 * one page and every state this leaves behind normalizes warning-free — a page
+	 * with no containers parses as empty, which is what the insertion point below it
+	 * is for.
+	 */
+	function addPage(): void {
+		if (!isRecord(draft)) {
+			return;
+		}
+
+		const pages = record(draft, 'pages');
+		let candidate = '/new-page';
+
+		for (let n = 2; Object.hasOwn(pages, candidate); n += 1) {
+			candidate = `/new-page-${String(n)}`;
+		}
+
+		pages[candidate] = {
+			containers: [],
+		};
+	}
+
+	/**
+	 * The nav label, optional like the schema says: an empty field DELETES the key,
+	 * the same absence semantics `writeField` gives every prop, so the nav falls
+	 * back to the path rather than rendering an empty link text.
+	 */
+	function writePageName(page: Record<string, unknown>, value: string): void {
+		if (value === '') {
+			delete page.name;
+
+			return;
+		}
+
+		page.name = value;
+	}
+
+	/**
+	 * What a path edit has to satisfy before `renamePage` will take it. A key
+	 * without the leading slash is dropped outright when the config is read — and
+	 * refuse-on-warnings would make that drop block every save — so the form fixes
+	 * the common case itself instead of writing a file it could never read back.
+	 */
+	function normalizePagePath(value: string): string | undefined {
+		const trimmed = value.trim();
+
+		if (trimmed === '') {
+			return undefined;
+		}
+
+		return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 	}
 
 	const inputClass =
@@ -201,6 +310,8 @@
 	siblings: unknown[],
 	index: number,
 	id: string,
+	target: string,
+	move: (delta: -1 | 1) => void,
 )}
 	{@const name = typeof container.name === 'string' ? container.name : ''}
 	<fieldset class="border-line-soft flex flex-col gap-text-2xs rounded-xl border p-box-md">
@@ -215,7 +326,28 @@
 					class={inputClass}
 					value={name}
 					onchange={(event) => {
-						container.name = event.currentTarget.value;
+						const next = event.currentTarget.value;
+
+						if (next === name) {
+							return;
+						}
+
+						container.name = next;
+
+						// Props the NEW type does not declare are dropped here rather than
+						// left for normalizeConfig to strip: refuse-on-warnings turns any
+						// leftover (`items` surviving a Grid → BoxDate switch) into an
+						// unsavable file the form cannot show, so keeping them was never an
+						// option. What both schemas declare stays — `span` survives every
+						// switch, `items` survives Grid ↔ SubGrid. Snapshot first: the values
+						// go back in as a fresh plain object, which is the same whole-value
+						// assignment `addContainer` makes.
+						const shared = new Set(fieldsOf(next).map((field) => field.path.split('.')[0]));
+						const previous = $state.snapshot(propsOf(container));
+
+						container.props = Object.fromEntries(
+							Object.entries(previous).filter(([key]) => shared.has(key)),
+						);
 					}}
 				>
 					<!-- A name the schema no longer declares still has to be visible and
@@ -230,15 +362,48 @@
 				</select>
 			</label>
 
-			<button
-				type="button"
-				class={buttonClass}
-				onclick={() => {
-					siblings.splice(index, 1);
-				}}
-			>
-				{m.admin_container_remove()}
-			</button>
+			<div class="flex items-end gap-text-3xs">
+				<!-- Glyphs rather than words: two of these sit on every fieldset, and the
+				     accessible name carries what a sighted operator gets from position —
+				     which list and which slot — so the word would repeat it twice over.
+				     Disabled at the edges rather than hidden: a hidden button moves the row
+				     under the pointer between clicks. -->
+				<button
+					type="button"
+					class="disabled:opacity-50 {buttonClass}"
+					disabled={index === 0}
+					aria-label={m.admin_container_move_up({
+						target,
+						position: index + 1,
+					})}
+					onclick={() => move(-1)}
+				>
+					↑
+				</button>
+
+				<button
+					type="button"
+					class="disabled:opacity-50 {buttonClass}"
+					disabled={index === siblings.length - 1}
+					aria-label={m.admin_container_move_down({
+						target,
+						position: index + 1,
+					})}
+					onclick={() => move(1)}
+				>
+					↓
+				</button>
+
+				<button
+					type="button"
+					class={buttonClass}
+					onclick={() => {
+						siblings.splice(index, 1);
+					}}
+				>
+					{m.admin_container_remove()}
+				</button>
+			</div>
 		</div>
 
 		{#each fieldsOf(name) as field (field.path)}
@@ -261,6 +426,8 @@
 								listOf(propsOf(container), field.path),
 								childIndex,
 								`${id}-${childIndex}`,
+								name,
+								(delta) => moveContainer(record(container, 'props'), field.path, childIndex, delta),
 							)}
 						{/if}
 					{/each}
@@ -368,8 +535,61 @@
 
 			{#each pages as [path, page], pageIndex (path)}
 				<div class="flex flex-col gap-text-2xs">
-					<!-- h4 under the h3 above; a page path is an identifier, not copy. -->
-					<h4 class="font-mono text-sm font-semibold">{path}</h4>
+					<div class="flex flex-wrap items-end justify-between gap-text-sm">
+						<!-- The key IS the URL path, so it is edited in place; the nav label is
+						     optional and falls back to the path when absent. -->
+						<div class="flex flex-wrap items-end gap-text-sm">
+							<label
+								class="text-ty-secondary flex flex-col gap-text-3xs text-xs"
+								for="admin-page-{pageIndex}-path"
+							>
+								{m.admin_page_path()}
+
+								<input
+									id="admin-page-{pageIndex}-path"
+									class="{inputClass} font-mono"
+									type="text"
+									spellcheck="false"
+									value={path}
+									onchange={(event) => {
+										const next = normalizePagePath(event.currentTarget.value);
+
+										// A rename that would not parse as a page key never
+										// commits, and the input shows the key still in force —
+										// a silent revert beats a draft that can never be saved.
+										if (next === undefined || !renamePage(path, next)) {
+											event.currentTarget.value = path;
+										}
+									}}
+								/>
+							</label>
+
+							<label
+								class="text-ty-secondary flex flex-col gap-text-3xs text-xs"
+								for="admin-page-{pageIndex}-name"
+							>
+								{m.admin_page_name()}
+
+								<input
+									id="admin-page-{pageIndex}-name"
+									class={inputClass}
+									type="text"
+									value={typeof page.name === 'string' ? page.name : ''}
+									oninput={(event) => writePageName(page, event.currentTarget.value)}
+								/>
+							</label>
+						</div>
+
+						<button type="button" class={buttonClass} onclick={() => removePage(path)}>
+							{m.admin_page_remove()}
+						</button>
+					</div>
+
+					<!-- h4 under the h3 above; a page path is an identifier, not copy — and it is
+					     also the id the header's pen links to as `/admin#<page path>`, so kit
+					     scrolls here and continues tabbing from here. The scroll margin is what
+					     keeps the sticky header off the heading it just arrived at. -->
+					<h4 id={path} class="scroll-mt-section-lg font-mono text-sm font-semibold">{path}</h4>
 
 					{#each listOf(page, 'containers') as container, index (index)}
 						{@render insertPoint((at) => addContainer(page, 'containers', at), index, path)}
@@ -380,6 +600,8 @@
 								listOf(page, 'containers'),
 								index,
 								`admin-${pageIndex}-${index}`,
+								path,
+								(delta) => moveContainer(page, 'containers', index, delta),
 							)}
 						{/if}
 					{/each}
@@ -391,6 +613,10 @@
 					)}
 				</div>
 			{/each}
+
+			<button type="button" class="{buttonClass} self-start" onclick={addPage}>
+				{m.admin_page_add()}
+			</button>
 		{/if}
 
 		{#if form && 'rejection' in form}

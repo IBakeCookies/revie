@@ -50,12 +50,14 @@
 	const menuItem =
 		'py-text-xs px-box-md cursor-pointer w-full text-left rounded-md hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
+	// The config page this URL is on, or undefined — /admin is a path the guard takes
+	// back and the configured 404 was never a key, so neither of them is one.
+	const configPage = $derived(data.pages.find((page) => page.path === currentPage.url.pathname));
+
 	// The page's own name first, so a browser tab and a bookmark say which page they
 	// are — nothing in the app owned <title> before, which is the one axe violation
 	// no component story can cover.
-	const pageName = $derived(
-		data.pages.find((page) => page.path === currentPage.url.pathname)?.name,
-	);
+	const pageName = $derived(configPage?.name);
 
 	// Derived, not inlined into the style attribute beside dataSceneryStyle: the seed
 	// vars only change on a reroll, while sceneryNow ticks every minute — and two of
@@ -255,6 +257,40 @@
 				>
 					{m.admin_title()}
 				</a>
+
+				<!-- The same area, opened at the page being looked at rather than at the top of a
+				     form listing every one of them. The fragment is the config key itself, which
+				     is the id the admin page puts on that page's heading — so kit's own
+				     deep-link handling does the scroll AND moves the sequential focus starting
+				     point with it, and neither side needs code for either.
+
+				     Only on a config page: the two paths that are not one have no key to name.
+				     Icon-only, so the accessible name is the whole of what says which page it
+				     edits — and it takes no flex-1, because a glyph stretched over a third of a
+				     phone's row reads as a third menu rather than as a shortcut. -->
+				{#if configPage}
+					<a
+						href="/admin#{configPage.path}"
+						aria-label={m.admin_edit_page({
+							name: configPage.name,
+						})}
+						class="hover:bg-surface-card hover:shadow-card focus-visible:ring-ring flex items-center justify-center rounded-full px-box-sm py-box-3xs transition focus-visible:ring-2 focus-visible:outline-none"
+					>
+						<svg
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							class="size-4"
+							aria-hidden="true"
+						>
+							<path d="M12 20h9" />
+							<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+						</svg>
+					</a>
+				{/if}
 			{/if}
 		</div>
 	</header>

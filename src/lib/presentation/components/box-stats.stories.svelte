@@ -19,6 +19,9 @@
 		style: 'percent',
 		maximumFractionDigits: 1,
 	});
+	const decimal = new Intl.NumberFormat(getLocale(), {
+		maximumFractionDigits: 1,
+	});
 
 	// Captured before the German story swaps it: the runtime exports no reset, so a story that
 	// left `getLocale` on 'de' would render every story after it in German while the three
@@ -240,6 +243,52 @@
 		// The label map is complete over `StatKey`, so a reading a new provider emits and
 		// presentation has no words for cannot compile — this is the rendered half of it.
 		await expect(canvas.getByText(m.stat_uptime_24h())).toBeInTheDocument();
+	}}
+/>
+
+<!-- The first provider that needs no secret and no handshake, and the shape that breaks
+     quietly if the formats map drifts: the dimensionals carry NO unit — it is whatever
+     the operator pinned into the href — so 18.7 must render as "18.7", not "19" (the
+     counts formatter rounding) or "18.7°C" (a unit the server never chose). -->
+<Story
+	name="Weather without a secret"
+	args={{
+		provider: 'open-meteo',
+		href: 'https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m',
+		stats: [
+			{
+				key: 'temperature',
+				value: 18.7,
+			},
+			{
+				key: 'apparent-temperature',
+				value: 17.2,
+			},
+			{
+				key: 'humidity',
+				value: 0.63,
+			},
+			{
+				key: 'wind-speed',
+				value: 11.4,
+			},
+			{
+				key: 'precipitation',
+				value: 0,
+			},
+		],
+	}}
+	play={async ({ canvas, canvasElement }) => {
+		await expect([...canvasElement.querySelectorAll('dd')].map((dd) => dd.textContent)).toEqual([
+			decimal.format(18.7),
+			decimal.format(17.2),
+			percent.format(0.63),
+			decimal.format(11.4),
+			decimal.format(0),
+		]);
+
+		await expect(canvas.getByText(m.stat_temperature())).toBeInTheDocument();
+		await expect(canvas.getByText(m.stat_humidity())).toBeInTheDocument();
 	}}
 />
 

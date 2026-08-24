@@ -48,6 +48,13 @@
 		style: 'percent',
 		maximumFractionDigits: 1,
 	});
+	// One decimal, because a reading rounded to whole degrees hides exactly the change the
+	// box exists to show. Deliberately NO unit style: the unit is whatever the operator
+	// pinned into the href (`temperature_unit=fahrenheit`, `wind_speed_unit=ms`), so a
+	// hardcoded °C or km/h would lie about the number beside it.
+	const decimal = new Intl.NumberFormat(getLocale(), {
+		maximumFractionDigits: 1,
+	});
 
 	/** Complete over the numeric keys alone, so there is no entry for a reading that is a name. */
 	const formats: Record<NumericStatKey, Intl.NumberFormat> = {
@@ -59,6 +66,15 @@
 		'monitors-up': counts,
 		'monitors-down': counts,
 		'uptime-24h': percent,
+		'guests-running': counts,
+		'guests-stopped': counts,
+		'cpu-share': percent,
+		'memory-share': percent,
+		temperature: decimal,
+		'apparent-temperature': decimal,
+		humidity: percent,
+		'wind-speed': decimal,
+		precipitation: decimal,
 	};
 
 	// Which instance this box points at. A page may hold several, so without this two
@@ -110,6 +126,44 @@
 			},
 			'uptime-24h': {
 				label: m.stat_uptime_24h(),
+				accent: 'border-l-info',
+			},
+			'guests-running': {
+				label: m.stat_guests_running(),
+				accent: 'border-l-success',
+			},
+			'guests-stopped': {
+				label: m.stat_guests_stopped(),
+				accent: 'border-l-danger',
+			},
+			'cpu-share': {
+				label: m.stat_cpu_share(),
+				accent: 'border-l-info',
+			},
+			'memory-share': {
+				label: m.stat_memory_share(),
+				accent: 'border-l-info',
+			},
+			// Weather is a fact, not a state — there is no good/bad axis for an accent to
+			// carry, so every reading takes the neutral edge the load readings use.
+			temperature: {
+				label: m.stat_temperature(),
+				accent: 'border-l-info',
+			},
+			'apparent-temperature': {
+				label: m.stat_apparent_temperature(),
+				accent: 'border-l-info',
+			},
+			humidity: {
+				label: m.stat_humidity(),
+				accent: 'border-l-info',
+			},
+			'wind-speed': {
+				label: m.stat_wind_speed(),
+				accent: 'border-l-info',
+			},
+			precipitation: {
+				label: m.stat_precipitation(),
 				accent: 'border-l-info',
 			},
 		};

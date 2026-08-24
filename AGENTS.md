@@ -480,7 +480,8 @@ config.json ─(provider + href + secret)→ business/model/config.ts   collectS
             ─(project)→ Stat[] ─→ StatsStore ─→ box-stats.svelte
 ```
 
-Four ship: `adguard`, `pihole-v5`, `pihole-v6`, `uptime-kuma`. Adding a fifth is **six** edit
+Six ship: `adguard`, `pihole-v5`, `pihole-v6`, `uptime-kuma`, `proxmox`, `open-meteo`. Adding another is
+**six** edit
 points, not the five this list used to name: a repository file, one entry in `providers`, one
 token in `providerNames`, one product name in `providerNameLabel`, and — per reading it adds
 that nothing else emits — a `StatKey` with its `stat_*` message in BOTH catalogues, **plus an
@@ -737,6 +738,35 @@ things about it are decisions:
   anyone who can load the dashboard that an admin area exists — and so does `adminEnabled` in
   the SSR payload, whether or not the link renders. That is the price of a UI entry point, and
   it is why the gate is the token rather than always-on.
+
+- **A second entry point sits beside that link: a pen to `/admin#<page path>`, and it needed no
+  code on either side of the fragment.** The editor's per-page `<h4>` carries the config key as
+  its `id`, and kit's client router already resolves a fragment with
+  `getElementById(decodeURIComponent(hash))`, scrolls it into view, then moves the **sequential
+  focus navigation starting point** to it through a `location.replace`
+  (`node_modules/@sveltejs/kit/src/runtime/client/client.js:2007-2028` and `reset_focus`). So an
+  `$effect` calling `focus()` was written and then deleted — it would have duplicated the scroll
+  and been strictly worse, because focusing a heading STEALS focus where kit only moves where Tab
+  continues from. Three things about it:
+  1. **The id is the config key verbatim, slashes included** — `/media/plex`. That is a legal
+     HTML id and `getElementById` matches it exactly; only a `querySelector('#…')` would choke on
+     it, and neither kit nor the browser uses one. Don't slugify the key — the header has nothing
+     but the key to build the href from, so both sides would have to agree on the transform.
+  2. **`scroll-mt-section-lg` on that heading is load-bearing, not padding.** The header is
+     `sticky top-0`, so a scroll landing the heading at viewport top puts it under the header.
+     Nothing fails; the operator just arrives at a block whose title is covered.
+  3. **The pen renders only where `configPage` is defined**, which excludes `/admin` itself and
+     the configured 404 — neither is a `pages` key, so there is no block to land on. Same
+     `adminEnabled` gate as the link, and no "is signed in" flag for the same reason: signed
+     out, `handleAdmin` redirects it to the login form. Measured: a direct hit keeps the
+     destination through signing in with no code on either side — the browser re-attaches the
+     fragment to each redirect that lacks one (the 303 to the login form, then the action's 303
+     back to `/admin`), so `/admin#/media/plex` → sign-in → `/admin#/media/plex`, and kit
+     resolves it after authentication. The signed-out **click** loses it instead — kit follows
+     the redirect client-side and nothing re-attaches — which is that acceptance stated
+     precisely; carrying the intent would need exactly the sessionStorage queue this repo has
+     refused twice. The direct-hit path is fenced by
+     [can-reach-the-admin-area.e2e.ts](e2e/can-reach-the-admin-area.e2e.ts).
 
 - **The login backoff is process state in `business/model`, and the client address is a
   parameter.** Five failures per address, then `min(5s × 2^(n − 6), 60s)`, cleared by a success
@@ -1016,12 +1046,17 @@ oklch(1 0 0 / 0.05)`, so the ladder that renders is card → inset and brightens
   English. (Verified: delete a `de` key, recompile, and the compile is green.) Coverage is not
   checked anywhere. That directory is gitignored — never edit it. Add keys to **both**
   [messages/en.json](messages/en.json) (base) and [messages/de.json](messages/de.json); currently
-  45 keys plus `$schema`, in sync — held there by hand until [roadmap.md](roadmap.md) #29 lands.
-  **Six take parameters** — `service_probe_failed({ href })`, so the toast names the service it
+  52 keys plus `$schema`, held in sync by
+  [invariants.spec.ts](src/lib/test/invariants.spec.ts), the drift fence #29 landed.
+  **Nine take parameters** — `service_probe_failed({ href })`, so the toast names the service it
   could not reach, `admin_container_add_at({ target, position })`, so each of a list's N+1
   insertion buttons has an accessible name that says which list and where,
+  `admin_container_move_up` / `admin_container_move_down` with the same two parameters, for the
+  same reason on the reorder buttons,
   `admin_sign_in_locked({ seconds })`, so a locked-out operator knows whether to wait or to go
-  looking for the token, and the three `stats_*` keys, which all take `{ provider }` — a
+  looking for the token, `admin_edit_page({ name })`, because the header's pen is icon-only and
+  its accessible name is the whole of what says which page it opens the editor at, and the three
+  `stats_*` keys, which all take `{ provider }` — a
   PRODUCT name out of [provider-name.ts](src/lib/presentation/util/provider-name.ts), never
   the config token — plus `{ host }` on `stats_open`, so two `BoxStats` instances on one page
   do not offer a screen reader two links with the same name, and `{ href }` on
@@ -1255,9 +1290,10 @@ Comments explain _why_, not _what_; the existing ones are the house style, match
 
 ## Roadmap
 
-The open work lives in [roadmap.md](roadmap.md) — 11 open items, all but #33 from three
-review passes and adversarially verified against the code, ordered by what breaks soonest. #33 is
-the exception: its core landed, so what is left of it is the remaining vendor files that plug into
+The open work lives in [roadmap.md](roadmap.md), ordered by what breaks soonest; the review-pass
+items there were adversarially verified against the code, while the entries under "New work"
+(2026-08-22) came from reading the shipped app. #33 is the
+exception among the review-pass items: its core landed, so what is left of it is the remaining vendor files that plug into
 the seam. Several are straight ports from
 `zenith`, which has already solved them; those items name the upstream files. It is its own file
 because it churns as items land, while this one is the architecture and should not. **Nothing in it
@@ -1470,7 +1506,7 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
   `Record<ContainerName, …>`; a phantom `ComponentRegistry` bullet in this very section,
   contradicting the "registry is gone" one above it; the claim that a missing translation fails
   the build (it does not — see Invariants); and the unrecorded `solid-light` `@custom-variant`
-  carve-out. [roadmap.md](roadmap.md) #29 is the fence that would have caught all of them.
+  carve-out. [docs.spec.ts](src/lib/test/docs.spec.ts) — #29's fence — is what catches that class now.
 - **`/api/ping` opens a TCP connection to `host:port`; it does not ICMP the host.** The dot
   claims a service is up, and ICMP only ever answered for the box — a dead service on a live
   host stayed green and two boxes on one host could never disagree. The allowlist is keyed on

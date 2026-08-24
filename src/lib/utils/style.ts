@@ -4,41 +4,52 @@ import { extendTailwindMerge } from 'tailwind-merge';
 
 // because this was hard to find, I will leave it here
 // https://github.com/dcastil/tailwind-merge/blob/v2.2.1/src/lib/default-config.ts
+
+/**
+ * The custom spacing scale from style/tokens.css: boxes (padding), grid (gaps
+ * between blocks), text (rhythm between lines of content), page.
+ *
+ * Exported rather than left inline because the two sides must agree and no
+ * export can span TS and CSS: either one drifting makes cn() keep both of a
+ * conflicting pair with no error anywhere. src/lib/test/invariants.spec.ts is
+ * the fence that holds this list against the `--spacing-*` declarations
+ * tokens.css actually makes.
+ */
+export const SPACING_SCALE = [
+	'box-3xs',
+	'box-2xs',
+	'box-xs',
+	'box-sm',
+	'box-md',
+	'box-lg',
+	'box-xl',
+	'box-2xl',
+	'grid-2xs',
+	'grid-xs',
+	'grid-sm',
+	'grid-md',
+	'grid-lg',
+	'grid-xl',
+	'text-3xs',
+	'text-2xs',
+	'text-xs',
+	'text-sm',
+	'text-md',
+	'text-lg',
+	'text-xl',
+	'text-2xl',
+	'page-sm',
+	'page-md',
+	'page',
+	'section',
+	'section-lg',
+	'empty-state',
+];
+
 const customTwMerge = extendTailwindMerge({
 	extend: {
-		// The custom spacing scale from style/tokens.css: boxes (padding), grid
-		// (gaps between blocks), text (rhythm between lines of content), page.
 		theme: {
-			spacing: [
-				'box-3xs',
-				'box-2xs',
-				'box-xs',
-				'box-sm',
-				'box-md',
-				'box-lg',
-				'box-xl',
-				'box-2xl',
-				'grid-2xs',
-				'grid-xs',
-				'grid-sm',
-				'grid-md',
-				'grid-lg',
-				'grid-xl',
-				'text-3xs',
-				'text-2xs',
-				'text-xs',
-				'text-sm',
-				'text-md',
-				'text-lg',
-				'text-xl',
-				'text-2xl',
-				'page-sm',
-				'page-md',
-				'page',
-				'section',
-				'section-lg',
-				'empty-state',
-			],
+			spacing: SPACING_SCALE,
 
 			// The one `--shadow-*` key tokens.css adds. Unlisted, tailwind-merge reads
 			// `shadow-card` as a shadow COLOR instead, so `shadow-none` did not merge it

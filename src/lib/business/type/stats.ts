@@ -11,9 +11,17 @@
  * second field would restate what the key already says, with nothing forcing the two to
  * agree — which is the whole reason the union is closed.
  *
- * `blocked-share` and `uptime-24h` are FRACTIONS, 0..1, because `Intl`'s percent style is
- * what formats them and it multiplies by 100 itself. Both vendors that emit one report
- * 0–100, so both projections divide — the unit is the key's, not the wire's.
+ * The open-meteo keys are the one deliberate deviation, and it is why they name no unit:
+ * `temperature`, `wind-speed` and `precipitation` arrive in whatever unit system the
+ * operator pinned into their href (`temperature_unit=fahrenheit`), so no single unit is
+ * the key's to name, and the labels say no unit either. Converting in the projection
+ * would second-guess a query this layer never sees.
+ *
+ * `blocked-share`, `uptime-24h`, `cpu-share`, `memory-share` and `humidity` are
+ * FRACTIONS, 0..1, because `Intl`'s percent style is what formats them and it multiplies
+ * by 100 itself. The vendors that emit one report 0–100 (or 0–1 already), so each
+ * projection hands over the fraction the key names — the unit is the key's, not the
+ * wire's.
  */
 export type NumericStatKey =
 	| 'dns-queries'
@@ -23,7 +31,16 @@ export type NumericStatKey =
 	| 'blocklist-domains'
 	| 'monitors-up'
 	| 'monitors-down'
-	| 'uptime-24h';
+	| 'uptime-24h'
+	| 'guests-running'
+	| 'guests-stopped'
+	| 'cpu-share'
+	| 'memory-share'
+	| 'temperature'
+	| 'apparent-temperature'
+	| 'humidity'
+	| 'wind-speed'
+	| 'precipitation';
 
 export type TextStatKey = 'top-blocked-domain';
 

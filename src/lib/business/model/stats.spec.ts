@@ -2,17 +2,23 @@ import type { AdguardWire } from '$lib/data/repository/adguard';
 import type { PiholeV5Wire } from '$lib/data/repository/pihole-v5';
 import type { PiholeV6Wire } from '$lib/data/repository/pihole-v6';
 import type { UptimeKumaWire } from '$lib/data/repository/uptime-kuma';
+import type { ProxmoxWire } from '$lib/data/repository/proxmox';
+import type { OpenMeteoWire } from '$lib/data/repository/open-meteo';
 import { $getAdguardStats } from '$lib/data/repository/adguard';
 import { $getPiholeV5Stats } from '$lib/data/repository/pihole-v5';
 import { $getPiholeV6Stats } from '$lib/data/repository/pihole-v6';
 import { $getUptimeKumaStats } from '$lib/data/repository/uptime-kuma';
+import { $getProxmoxStats } from '$lib/data/repository/proxmox';
+import { $getOpenMeteoStats } from '$lib/data/repository/open-meteo';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { providerNames } from '$lib/business/model/config';
 import {
 	projectAdguard,
 	projectPiholeV5,
 	projectPiholeV6,
+	projectProxmox,
 	projectUptimeKuma,
+	projectOpenMeteo,
 	readStats,
 } from '$lib/business/model/stats';
 
@@ -32,6 +38,14 @@ vi.mock('$lib/data/repository/pihole-v6', () => ({
 
 vi.mock('$lib/data/repository/uptime-kuma', () => ({
 	$getUptimeKumaStats: vi.fn(),
+}));
+
+vi.mock('$lib/data/repository/proxmox', () => ({
+	$getProxmoxStats: vi.fn(),
+}));
+
+vi.mock('$lib/data/repository/open-meteo', () => ({
+	$getOpenMeteoStats: vi.fn(),
 }));
 
 /** Mirrors `STATS_TTL_MS`, which the module does not export — the same shape as `poll-services-state.spec.ts`. */
@@ -138,6 +152,49 @@ const uptimeKuma: UptimeKumaWire = {
 	},
 };
 
+/**
+ * One node online beside its guests — running, stopped, a template, and an entry that is
+ * neither node nor guest (`sdn`, which the same call returns).
+ */
+const proxmox: ProxmoxWire = {
+	data: [
+		{
+			type: 'node',
+			status: 'online',
+			cpu: 0.1,
+			mem: 30_000_000_000,
+			maxmem: 60_000_000_000,
+		},
+		{
+			type: 'vm',
+			status: 'running',
+		},
+		{
+			type: 'vm',
+			status: 'stopped',
+		},
+		{
+			type: 'vm',
+			status: 'stopped',
+			template: 1,
+		},
+		{
+			type: 'sdn',
+			status: 'ok',
+		},
+	],
+};
+
+const openMeteo: OpenMeteoWire = {
+	current: {
+		temperature_2m: 18.7,
+		apparent_temperature: 17.2,
+		relative_humidity_2m: 63,
+		precipitation: 0.2,
+		wind_speed_10m: 11.4,
+	},
+};
+
 const failure = {
 	message: 'answered 200 with a body that is not stats',
 };
@@ -238,6 +295,98 @@ describe('projectUptimeKuma', () => {
 	});
 });
 
+describe('projectProxmox', () => {
+	it('counts running and stopped guests, leaving the template out of both', () => {
+		expect(projectProxmox(proxmox)).toContainEqual({
+			key: 'guests-running',
+			value: 1,
+		});
+
+		expect(projectProxmox(proxmox)).toContainEqual({
+			key: 'guests-stopped',
+			value: 1,
+		});
+	});
+
+	it('reads CPU as the mean across online nodes, as the fraction the key names', () => {
+		expect(projectProxmox(proxmox)).toContainEqual({
+			key: 'cpu-share',
+			value: 0.1,
+		});
+	});
+
+	it('aggregates memory as used of total rather than a mean of shares', () => {
+		expect(projectProxmox(proxmox)).toContainEqual({
+			key: 'memory-share',
+			value: 0.5,
+		});
+	});
+
+	// A cluster answering with no online node must render 0%, not "NaN%" — the same
+	// empty-answer guard Uptime Kuma's mean uptime carries.
+	it('reports zero load for no online nodes rather than NaN', () => {
+		expect(
+			projectProxmox({
+				data: [
+					{
+						type: 'vm',
+						status: 'running',
+					},
+				],
+			}),
+		).toEqual([
+			{
+				key: 'guests-running',
+				value: 1,
+			},
+			{
+				key: 'guests-stopped',
+				value: 0,
+			},
+			{
+				key: 'cpu-share',
+				value: 0,
+			},
+			{
+				key: 'memory-share',
+				value: 0,
+			},
+		]);
+	});
+});
+
+/**
+ * The dimensionals go over untouched — their unit is whatever the operator pinned into
+ * the href, and this layer never sees it — while humidity normalizes to the fraction its
+ * key names, because a share has no unit system to preserve.
+ */
+describe('projectOpenMeteo', () => {
+	it('maps the current block verbatim and turns humidity into the fraction the key names', () => {
+		expect(projectOpenMeteo(openMeteo)).toEqual([
+			{
+				key: 'temperature',
+				value: 18.7,
+			},
+			{
+				key: 'apparent-temperature',
+				value: 17.2,
+			},
+			{
+				key: 'humidity',
+				value: 0.63,
+			},
+			{
+				key: 'wind-speed',
+				value: 11.4,
+			},
+			{
+				key: 'precipitation',
+				value: 0.2,
+			},
+		]);
+	});
+});
+
 describe('readStats', () => {
 	beforeEach(() => {
 		vi.mocked($getAdguardStats).mockReset();
@@ -260,6 +409,8 @@ describe('readStats', () => {
 		vi.mocked($getPiholeV5Stats).mockResolvedValue([null, piholeV5]);
 		vi.mocked($getPiholeV6Stats).mockResolvedValue([null, piholeV6]);
 		vi.mocked($getUptimeKumaStats).mockResolvedValue([null, uptimeKuma]);
+		vi.mocked($getProxmoxStats).mockResolvedValue([null, proxmox]);
+		vi.mocked($getOpenMeteoStats).mockResolvedValue([null, openMeteo]);
 
 		for (const provider of providerNames) {
 			const read = await readStats({

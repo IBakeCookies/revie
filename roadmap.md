@@ -17,10 +17,11 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 3 items are open — #10 and #29 from the review
-passes, plus #33 above, which came from asking what no review pass had proposed; **1, 2, 3, 4, 5,
-6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 30, 31, 32, 34,
-35 and 36 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+**Numbers are stable, so gaps mean landed.** 13 items are open — #10 from the review passes, the
+rest of #33's provider list above, and 37–39 and 41–48 under New work; **1, 2, 3, 4, 5,
+6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+34,
+35, 36 and 40 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
 and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -99,6 +100,9 @@ vitest project — 12 of each since #24 added `BoxSearch`. See AGENTS.md's "Alre
     _Half landed in the zenith parity pass:_ `project.inlang/cache/` is now in
     [.gitignore](.gitignore), as zenith's is — but the blobs were already tracked, so the line is
     inert until the `git rm --cached` actually runs. `dps.js` is still tracked.
+    **Folded in:** also delete the dead `npm run preview` script from package.json — #28 moved
+    the e2e webServer to `node build` and recorded "`npm run preview` now has no caller in the
+    repo" as what it left behind.
 11. _(**Re-seed scenery per theme group** — landed, ported from zenith. `hashName` (FNV-1a) and
     `themeRandom(seed, name)` are in
     [scenery-seed.ts](src/lib/presentation/util/scenery-seed.ts), one stream per theme, one `vars`
@@ -548,7 +552,8 @@ distributed guess, which no per-address counter addresses and which a long token
     test would dirty the tree and poison every later test through the stamp cache; the e2e covers
     the rejection, where nothing is written. Interim UI only: a plain `<textarea>`, which is #35's
     to replace.
-35. ~~**A schema-driven form over the containers, not a JSON textarea**~~ — **LANDED.** Generated
+35. ~~**A schema-driven form over the containers, not a JSON textarea**~~ — **LANDED**, and three
+    of the gaps below landed with it (pages, reorder, type-switch clearing). Generated
     from `containerSchemas` via `containerFields`, arbitrary nesting through a self-referencing
     snippet, and every list has N+1 insertion points so a container can go anywhere in it. The
     architecture is in [AGENTS.md](AGENTS.md) under "Config-driven rendering", including the
@@ -556,16 +561,22 @@ distributed guess, which no per-address counter addresses and which a long token
     file. The raw `<textarea>` did not die — it is now the **repair path**, shown exactly when
     `needsRawEditor` says a save would be refused, because a form can neither save nor fix a file
     whose problem the schema does not describe.
-    **What it deliberately does not do**, and what is therefore still open:
-    - **Pages cannot be added, removed or renamed**, and a page's `name` is not editable. Only the
-      containers inside existing pages are. A new page still means editing the file.
-    - **Containers cannot be reordered** — insertion covers "put one here", not "move that one".
-      Add/remove at a position plus retyping is the workaround.
-    - **Switching a container's type leaves the old type's props in the file**, invisible in the
-      form (`items` and all its children survive a Grid → BoxDate switch). Harmless —
-      `normalizeConfig` strips them on read — and it is the flip side of preserving keys the
-      schema does not name, which is what protects `defaults`. Clearing them on a type change
-      would be the fix, and would also throw away a switch made by mistake.
+    **Landed since, all presentation-side in [+page.svelte](src/routes/admin/+page.svelte), no
+    model change:**
+    - **Pages can be added, removed and renamed, and a page's `name` is editable.** The key IS
+      the URL path, so renaming rebuilds the `pages` record in place to keep the entry's
+      position; a rename that would collide with an existing key or arrive without its leading
+      slash never commits, because refuse-on-warnings would make the dropped key block every
+      save. Add picks the first free `/new-page` key so two adds cannot merge; an emptied name
+      deletes it, which is how the nav falls back to the path.
+    - **Containers reorder** — ↑/↓ per fieldset, disabled at the edges, accessible names
+      carrying `{target}` + `{position}` like the insertion buttons do. A ±1 move is an
+      adjacent swap, written as one whole-value assignment.
+    - **Switching a container's type drops the props the new type does not declare** and keeps
+      the intersection (`span` survives every switch, `items` survives Grid ↔ SubGrid). This
+      stopped being "harmless" when #22 made normalizeConfig warn about every undeclared key:
+      refuse-on-warnings turned a leftover `items` into a save the form could never lift.
+      **What it deliberately still does not do:**
     - **No `use:enhance`**, so saving is a full page POST, and **the payload is built client-side**
       — without JS the form's edits do nothing and a save rewrites the file's own bytes. Lossless
       in content, but it does re-serialize the file's whitespace.
@@ -573,7 +584,8 @@ distributed guess, which no per-address counter addresses and which a long token
       render shifts the numbers a sighted operator counts. The ordering itself is correct.
     - **Two sibling containers of the same type give their insertion buttons the same accessible
       name** (`Add container to Grid, position 1` twice, on a page with two Grids). Position
-      disambiguates within a list, not between lists that share a parent type.
+      disambiguates within a list, not between lists that share a parent type. The move buttons
+      do not share the flaw — they were named after this note existed.
       _Files:_ src/routes/admin/, src/lib/business/model/config.ts,
       src/lib/business/model/config-source.ts
 36. ~~**Close the two known gaps in the admin area**~~ — **LANDED.** Kept as a numbered item
@@ -625,39 +637,20 @@ distributed guess, which no per-address counter addresses and which a long token
     is not stable across `dot` versions, so a runner upgrade would fail unrelated PRs.
     _Left behind:_ `npm run preview` now has no caller in the repo.
 
-29. **Add two drift-fence node specs: the four hand-mirrored invariants, and doc links** — `M`
-    One spec reading the real files with `node:fs` (the `server` project at vite.config.ts:35-43 is
-    the home; no spec anywhere reads a real file today — config-source.spec.ts _mocks_
-    `node:fs/promises`). Assert: (1) `messages/en.json` and `messages/de.json` have identical key sets
-    (22 each incl. `$schema`); (2) the `--spacing-*` names in tokens.css:46-86 (28) equal the spacing
-    array in style.ts:12-41 (28) — exporting that array out of the inline `extendTailwindMerge` call
-    is part of the work; (3) every `css` class of every one of the 27 `themes` entries has a palette
-    selector in themes.css (25) or base.css (`.solid-light`:19, `.dark`:183), and an
-    `@custom-variant` in tokens.css **except** `solid-light`. There is no assertion (4): app.html's
-    hardcoded class is already gone, replaced by the `%theme.default%` placeholders `handleTheme`
-    fills from the catalogue, so no hand-mirrored token is left there to fence. Second spec: extract
-    every
-    `](relative/path)` from AGENTS.md, README.md, roadmap.md, CLAUDE.md, strip any `#L…`, assert
-    `existsSync`, and assert every `#L<n>` is within the file's line count.
-    _Payoff:_ (1) is the highest-value and the reason this ranks here: AGENTS.md and README.md
-    claimed a missing translation fails the build, and it does not — verified by removing a `de` key
-    and running the compiler: it succeeds and emits `const de_theme_label = en_theme_label;`, so a
-    deleted `de` key ships German pages rendering English with no build and no svelte-check error.
-    (AGENTS.md and README.md now say the truth; this is the fence that keeps them true.) The others
-    are the failures AGENTS.md's Invariants section classifies as "break silently": a theme with no
-    palette renders the app unstyled, a drifted spacing entry makes `cn()` keep both conflicting
-    classes. style.spec.ts covers only `cn`/`spanStyle`/`normalizeSpan`; theme.spec.ts:11-27 checks
-    uniqueness and labels, never that any CSS exists. And the doc spec is worth having because
-    `npx prettier --check .` and `npx depcruise src` were both green while three AGENTS.md links
-    404'd — one refactor commit produced all three, and nothing noticed for two commits. Every doc
-    link resolves as of now, so the fence lands green.
-    _Nothing to port — verified:_ zenith has no drift fences at all. Its `cn` is plain
-    `twMerge(clsx(inputs))` with no `extendTailwindMerge` anywhere, so it has no spacing mirror and no
-    protection against a drifted spacing class either; one of its specs reads a real file, nothing
-    reads its `de.json`, and no doc-link check exists. Don't go looking upstream for this one.
-    _Files:_ src/lib/utils/style.ts:12-41, src/lib/utils/style.spec.ts,
-    src/lib/business/model/theme.spec.ts, src/lib/test/invariants.spec.ts +
-    src/lib/test/docs.spec.ts (new)
+29. _(**Add two drift-fence node specs: the four hand-mirrored invariants, and doc links** —
+    LANDED. [invariants.spec.ts](src/lib/test/invariants.spec.ts) and
+    [docs.spec.ts](src/lib/test/docs.spec.ts) live under `src/lib/test/`, run in the `server`
+    project, and read the shipped files with every path resolved off the spec's own location rather
+    than the process cwd. The export half of the work: SPACING_SCALE is out of the inline
+    `extendTailwindMerge` call ([style.ts](src/lib/utils/style.ts)), and the spec holds it against
+    the `--spacing-*` declarations tokens.css actually makes. All six fences verified to fail: a
+    deleted de key, a dropped spacing entry, a renamed palette class, a deleted `@custom-variant`,
+    a missing link target, an anchor past EOF. Three things the item's own text got wrong or left
+    out: 47 messages each, not 22, so the fence compares key SETS and pins no count; the palette
+    walk has to strip CSS comments first, because themes.css's header names theme.ts and a naive
+    scan reads `.ts` as a palette; and the doc fence strips markdown code spans and fenced blocks
+    before extracting `](…)` targets — roadmap.md's own prose contains the literal example — and
+    skips fragment-only and off-repo (`../zenith`) targets, since CI has not cloned the sibling.)_
 
 30. _(**Cover `business/model/appearance.ts`, and build the repo's first rune harness for
     `ThemeStore`** — landed, with one of its four store cases never written and one overtaken.
@@ -703,6 +696,174 @@ singular `presentation/util/` paths, with the controls matchers. Both of the ite
 overtaken: the storybook vitest project exists, so `a11y: { test: 'error' }` is consumed rather than
 dishonest, and it is set to `'error'` — see AGENTS.md's Conventions, which now treats that gate as
 the repo's only automated a11y check.)_
+
+## New work (2026-08-22)
+
+Its own section for the same reason Service integrations is one: prettier renumbers an ordered
+list from its first item, so nothing can be appended to a list above without pulling every later
+number up. These six came from reading the shipped app against what a start page is for rather
+than from a review pass; like every item here they name their edit points and their refusals,
+and each was checked against AGENTS.md so it proposes nothing a recorded decision forbids.
+
+37. **Cover `ThemeStore`'s cookie writes — the gap #30 named and did not fill** (`S`). Nothing
+    calls `switchTheme`, `rerollScenery` or `toggleSceneryMotion`, so no test fails if a setter
+    stops mirroring to its cookie — the write half, which is the half that catches a write
+    regression. The harness exists
+    ([theme-store-harness.svelte](src/lib/test/theme-store-harness.svelte)), so this is three
+    cases in [theme-store.svelte.spec.ts](src/lib/business/store/theme-store.svelte.spec.ts):
+    switching writes the theme cookie with the chosen name, rerolling writes `scenerySeed`,
+    toggling writes `scenery-paused`. Assert on the spied-jar pattern
+    [appearance.spec.ts](src/lib/business/model/appearance.spec.ts) uses, not `document.cookie`
+    — the browser half writes through business (`updateTheme` / `updateScenerySeed` /
+    `updateSceneryMotion` in [appearance.ts](src/lib/business/model/appearance.ts)) into the
+    repository's writers, and `writeCookie` reads `location.protocol` INSIDE itself for `secure`,
+    so a jar spy is the only stable seam. While there, settle #30's second leftover: the
+    deleted-theme guard in `readRequestAppearance` has no spec either — take it or record why
+    not. _Files:_ src/lib/business/store/theme-store.svelte.spec.ts,
+    src/lib/test/theme-store-harness.svelte
+
+38. **Stop a failed stats refresh from parking the tab on the error page** (`M`). The deliberate
+    gap #16 recorded: the 60s `invalidate('dashboard:stats')`
+    ([+page.svelte:90](src/routes/[...slug]/+page.svelte#L90)) re-runs the WHOLE load, so a tick
+    that hits `error(503)` (config caught mid-write) or `error(404)` (a page key renamed under an
+    open tab) swaps the dashboard for the error page — and the unmounted page takes its interval
+    with it, so the tab stays wrong until a manual reload. The recorded shape is a dedicated
+    endpoint the client polls, the shape `/api/ping` already has: POST body names instances,
+    allowlist-guarded, readings keyed `provider` + `href`, no credential ever returned — so the
+    refresh stops re-running the config half at all. Two decisions on the way: where the interval
+    lives (staying on the page keeps the gate that skips installs with no `BoxStats`; moving it
+    above the page is what survives the swap), and first paint stays SSR — the TTL cache already
+    bounds it. _Not built_, per the standing refusal: any client-side fetch of providers (SSRF
+    surface — `/api/ping`'s allowlist is the precedent). _Files:_ src/routes/api/stats/ (new),
+    src/routes/[...slug]/, src/lib/business/store/stats-store.svelte.ts
+
+39. **Web app manifest, theme-color and touch icons** (`S`). A dashboard people pin to tablets
+    and phones ships a favicon alone — no manifest, no `theme-color`, no apple-touch-icon (grep
+    of [app.html](src/app.html)). Small work, two traps: the CSP needs nothing new while
+    everything is same-origin (`manifest-src` falls back to `default-src: 'self'`, and
+    [svelte.config.js](svelte.config.js) already allows the icon hosts in `img-src`) — do not add
+    a directive nobody needs; and the manifest is a static file, so its strings are not
+    localized — name it after the product, never `m.app_title()`, or a German home screen reads
+    English. _Deliberately not built:_ per-theme `theme-color` — that is a JS mirror of the theme
+    catalogue into a meta tag, machinery for a title-bar tint nobody has asked for.
+    _Files:_ static/, src/app.html
+
+40. ~~**A weather provider through the existing seam — Open-Meteo**~~ — **LANDED**, and the
+    six-edit-point claim held exactly: repository file, registry entry, `providerNames` token,
+    `providerNameLabel`, five `StatKey`s with their messages in both catalogues,
+    `chrome`/`formats` — and nothing in the route, the store, the cache, the schema-generated
+    form or the container branch. What the item did not settle, decided on the way:
+    - **The labels carry NO unit, and so does no formatter.** The item's own rule — pin the
+      unit system in the href — means presentation cannot know which one was chosen, so a
+      hardcoded °C or km/h would lie about the number beside it. A one-decimal `decimal`
+      formatter renders the dimensionals, and README tells the operator to pin units into the
+      query (`temperature_unit=fahrenheit`) if they want anything but the defaults.
+    - **Humidity normalizes to a fraction anyway** (0–100 → 0..1, the blocked-share rule): it
+      is dimensionless, so there is no unit system in it to preserve.
+    - Five readings ship — temperature, feels-like, humidity, wind speed, precipitation.
+      `weather_code` stayed out on purpose: it is categorical, and ~28 WMO-label messages for
+      a box that renders numbers is a second catalogue nobody asked for. Geocoding, IP-based
+      location and forecast lists stay unbuilt as the item itself refused them.
+      Fenced in [open-meteo.spec.ts](src/lib/data/repository/open-meteo.spec.ts) (the href fetched
+      VERBATIM, undeclared fields dropped, a half-pasted href refused before fetching),
+      stats.spec.ts (the verbatim-vs-fraction line in the projection), and a box-stats story
+      asserting 18.7 renders as "18.7" rather than "19" or "18.7°C".
+
+41. **A quick-jump over the configured pages and services** (`M`). `/` puts the cursor in
+    BoxSearch, but there is no way to filter among the services on screen or jump between pages
+    except the nav rail — the one start-page interaction the box set does not cover yet. Shape:
+    a client-side filter listing page keys plus `BoxService` titles, Enter opens, arrows move.
+    Data obeys R1/R2: a collector beside `collectServiceProbes` (same traversal of the container
+    tree) runs in the load and crosses as data; presentation never imports the model. Decisions
+    to make: the trigger key (`/` is taken by BoxSearch — another key, or a header button), the
+    dialog semantics (focus trap, `aria-modal`, Escape) and what zero matches looks like.
+    _Deliberately not built:_ a fuzzy-match dependency (startsWith plus substring over a list the
+    size of one operator's config), a server search endpoint (every candidate is already on the
+    page). _Files:_ src/lib/business/model/config.ts, src/routes/[...slug]/+page.server.ts, a new
+    presentation component + its story
+
+42. **A Dockerfile** (`M`). README defers it and #27 measured why the artifact is not standalone:
+    `build/server/chunks/*.js` import `svelte` and `@sveltejs/kit` as bare specifiers and both are
+    devDependencies, so `npm ci --omit=dev` in a runtime stage breaks the image — it ships
+    `build/` PLUS the full `node_modules` out of the builder stage. Node 22 base (`engines` is
+    `>=22` with `engine-strict`), non-root user, `HOST` / `PORT` / `ORIGIN` / `DASHBOARD_CONFIG` /
+    `DASHBOARD_SECRET_*` passed through, and a `HEALTHCHECK` against `GET /api/health`, which
+    answers 200 or 503 since #23. Compose stays out until the image exists — #27's own
+    sequencing. _Deliberately not built:_ registry push in CI (nobody has said where images go).
+    _Files:_ Dockerfile (new), .dockerignore (new), README.md
+
+43. **Fence the CSP nonce** (`S`). AGENTS.md records it twice and both times as a hole: nothing
+    fences the nonce, so deleting `nonce="%sveltekit.nonce%"` from [app.html](src/app.html) lets
+    CSP silently kill the pre-paint script — a first visit on a dark-preferring OS gets a light
+    flash, and no test in the repo goes red. One assertion in
+    [invariants.spec.ts](src/lib/test/invariants.spec.ts) closes it: app.html carries the nonce
+    placeholder, and `script-src` is spelled out for kit to hang it on (the second half of the
+    same invariant). The same spec already reads shipped files off its own location, so this is
+    minutes. _Files:_ src/lib/test/invariants.spec.ts
+
+44. **Distinct accessible names for the editor's insertion buttons** (`S`). #35 records the wart:
+    two sibling containers of the same type both announce "Add container to Grid, position 1" —
+    position disambiguates within one list, not between lists sharing a parent type, so a page
+    with two Grids is unreadable by screen reader. Fix presentation-side in
+    [admin/+page.svelte](src/routes/admin/+page.svelte): compose `{target}` from what identifies
+    THIS list — the page path plus the container's `title`/`subTitle` when present, falling back
+    to the type — so the existing `admin_container_add_at({ target, position })` message needs no
+    new key. Fence: an assertion in can-edit-the-config.e2e.ts that two same-type siblings
+    produce two distinct role names; the move buttons already name correctly and stay.
+    _Files:_ src/routes/admin/+page.svelte, e2e/can-edit-the-config.e2e.ts
+
+45. **Rate-limit `/api/ping`** (`M`). The endpoint is unauthenticated by design, but nothing
+    bounds frequency: any LAN device can hammer TCP connects at every configured service — a DoS
+    on the operator's own boxes, run from their own dashboard. The pattern exists:
+    [admin-auth.ts](src/lib/business/model/admin-auth.ts)'s module-scope per-address map with
+    `clientAddress` passed in (R1) and pruned so it cannot grow without bound. Simpler here — a
+    fixed budget per address window (the app's own poll fires 4 probes an hour per service, so a
+    few dozen a minute is generous), answering a KIND plus a number like the login lockout does,
+    with the route picking every word. _Not built_, deliberately: auth on ping (its allowlist is
+    the design), anything global that could lock out the operator's own tab behind a shared
+    proxy address. _Files:_ src/lib/business/model/ (beside admin-auth.ts),
+    src/routes/api/ping/, a spec keyed on fake addresses like admin-auth.spec.ts
+
+46. **Enable `no-console`, with the four exemptions** (`S`). AGENTS.md says the rule is now
+    enableable — #23 took the model's prints out, and what remains is deliberate and permanent:
+    [+layout.server.ts](src/routes/+layout.server.ts), [...slug]/+page.server.ts,
+    [service-store.svelte.ts](src/lib/business/store/service-store.svelte.ts) and `scripts/`.
+    Two sequencing notes: `dps.js` still walks lint until #10 runs, so exempt it too or land
+    after; and flat-config block-wins semantics apply to `no-console` exactly as they do to
+    `no-restricted-imports`, so each layer block restating the rule must be checked, not just
+    added once. _Files:_ eslint.config.js
+
+47. **An optional `timezone` prop on `BoxDate`** (`S`) — the world clock. A dashboard mounted
+    where family lives in another timezone shows them THEIR time; `Intl.DateTimeFormat` takes
+    `timeZone`, and the schema-generated editor picks a string field up for free. Two decisions:
+    validate the zone at normalize time (`Intl.supportedValuesOf('timeZone')` — an unknown zone
+    throws `RangeError` at format time, and config degrades rather than breaks, so it warns and
+    drops like every bad prop); and thread it into the formatter that must stay instance-scope
+    because the locale is per request. Side effect worth having: a fixed timezone renders
+    identically on server and client, removing the one clock-shaped hydration variable.
+    _Files:_ src/lib/business/model/config.ts (schema + warning sentence),
+    src/lib/presentation/components/box-date.svelte + story, README.md's config section
+
+48. **A feed box — RSS/Atom through a list-shaped container** (`M`). What the research pass
+    found: Glance recentered the whole category around information feeds in 2024 (RSS, HN,
+    calendar) and Homepage and Dashy both ship RSS widgets; this app has six containers and not
+    one of them renders a LIST — BoxStats renders numbers only. So the work is two halves: the
+    container (`BoxFeed`: `href` required, maybe a `limit`; titles linking out, N rows) and the
+    plumbing it forces into existence — server-side fetch through the load (CORS kills a
+    client-side fetch of most feeds), a TTL cache beside readStats keyed by href, failures as
+    values crossing as data with the toast copy picked in the route (the failedStats seam), and
+    a real XML parser dependency (regex-extracting Atom is the kind of cleverness this repo
+    refuses; valibot validates AFTER parsing, never instead of). Adding the container is the
+    standard two edit points (`containerSchemas` +
+    [config-container.svelte](src/lib/presentation/components/config-container.svelte)'s chain);
+    the editor follows the schema automatically. The reusable half is the point: the *arr
+    release calendar (#33's Sonarr entry, `/api/v3/calendar`) becomes the SECOND consumer of
+    whatever list machinery lands here. _Deliberately not built:_ bodies and images (titles and
+    links only), multi-feed aggregation in one box (one href per box, cached separately — the
+    stats precedent). _Files:_ src/lib/data/repository/feed.ts (new),
+    src/lib/business/model/feed.ts (new, TTL cache), src/lib/business/model/config.ts,
+    src/lib/presentation/components/config-container.svelte, a new component + story,
+    messages/en.json, messages/de.json, README.md
 
 ## Sequencing
 

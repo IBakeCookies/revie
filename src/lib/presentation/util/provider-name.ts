@@ -17,4 +17,6 @@ export const providerNameLabel: Record<ProviderName, string> = {
 	'pihole-v5': 'Pi-hole v5',
 	'pihole-v6': 'Pi-hole v6',
 	'uptime-kuma': 'Uptime Kuma',
+	proxmox: 'Proxmox VE',
+	'open-meteo': 'Open-Meteo',
 };

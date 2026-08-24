@@ -188,6 +188,8 @@ variable per instance, so two boxes can have two logins.
 | `pihole-v5`   | Pi-hole 5: DNS queries, blocked, block rate, blocklist domains        | the API token, from Settings → Show API token |
 | `pihole-v6`   | Pi-hole 6: the same four readings                                     | the web password, or an application password  |
 | `uptime-kuma` | Uptime Kuma: monitors up, monitors down, 24-hour uptime               | nothing — leave `secret` out                  |
+| `proxmox`     | Proxmox VE: guests running, guests stopped, CPU and memory use        | an API token (`user@realm!tokenid=secret`)    |
+| `open-meteo`  | Open-Meteo: temperature, feels-like, humidity, wind speed, rain       | nothing — leave `secret` out                  |
 
 Three things about that table are worth saying out loud:
 
@@ -198,9 +200,22 @@ Three things about that table are worth saying out loud:
 - **`href` for `uptime-kuma` is the public STATUS PAGE**, `https://kuma.example/status/home`
   — not the Kuma dashboard. The slug is that url's last segment, which is also why the box
   needs no second prop. A status page needs no credential, so leave `secret` out entirely.
-- **These four are transcribed from vendor documentation, not from a live instance behind
-  this code.** Every other behaviour in this README has been reproduced; these endpoints
-  have not. If one reports nothing, the server log names the host and the status.
+- **`proxmox` reads `/api2/json/cluster/resources`, so a standalone node needs no extra
+  config — it is a cluster of one.** Create a privilege-separated token (Datacenter →
+  Permissions → API Tokens; a read-only role is enough) and paste the whole
+  `user@realm!tokenid=secret` string — with or without the `PVEAPIToken=` prefix the docs
+  show. Username/password login is deliberately not supported: an API token is revocable
+  and can be scoped to read-only, which a login ticket cannot.
+- **`href` for `open-meteo` is the whole REQUEST** — coordinates, the `current=` reading
+  list and the units, e.g.
+  `https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m`.
+  Pin the unit system in the query (`&temperature_unit=fahrenheit&wind_speed_unit=ms`):
+  nothing is converted afterwards, and the tiles render numbers without units, since the
+  server cannot know which ones you chose. No geocoding — you know your coordinates. A
+  self-hosted mirror works too; any URL answering the same shape does.
+- **These providers are transcribed from vendor documentation, not from a live instance
+  behind this code.** Every other behaviour in this README has been reproduced; these
+  endpoints have not. If one reports nothing, the server log names the host and the status.
 
 A `secret` may only contain letters, digits and underscores — a shell cannot export
 `DASHBOARD_SECRET_ADGUARD-MAIN`, so a name with a dash in it points at a variable that can
@@ -231,7 +246,8 @@ hatch, so a provider behind one cannot be read: install a real certificate, or t
 TLS at a reverse proxy and point `href` at that. `NODE_TLS_REJECT_UNAUTHORIZED=0` is not
 an option — it is process-global and silently unverifies every other request the server
 makes. This is the same wall the `tcp` status probe exists to get around, and it is why
-Proxmox, TrueNAS, Unifi and Portainer are not stats providers.
+TrueNAS, Unifi and Portainer are not stats providers — and why a Proxmox `href` has to
+point at a real certificate or a TLS-terminating proxy, exactly like every other provider.
 
 ### Layout, and why there are no class names in the config
 
@@ -263,6 +279,9 @@ DASHBOARD_ADMIN_TOKEN=$(openssl rand -hex 32)
   tradeoff is deliberate: once the token is set, that link tells anyone who can load the
   dashboard that an admin area exists — which is why it is gated on the token rather than
   always present, so switching the feature off still leaves nothing advertising it.
+- **Beside it, a pen opens the editor at the page you are on.** It shows only on a page
+  `config.json` actually declares, and it scrolls straight to that page's block — so editing
+  the box in front of you does not mean scrolling past every other page's containers first.
 - **A save is refused outright if the config would drop anything**, and the page names what:
   nothing is written unless every container in it is valid, so a typo cannot cost you a box
   silently. Edits are written atomically and take effect on the next request — no restart.

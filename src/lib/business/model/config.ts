@@ -56,7 +56,14 @@ export type ProbeMode = (typeof probeModes)[number];
  * `roadmap.md` #33: a round trip per cache miss, against a host that may be down, for a
  * version the operator already knows.
  */
-export const providerNames = ['adguard', 'pihole-v5', 'pihole-v6', 'uptime-kuma'] as const;
+export const providerNames = [
+	'adguard',
+	'pihole-v5',
+	'pihole-v6',
+	'uptime-kuma',
+	'proxmox',
+	'open-meteo',
+] as const;
 
 export type ProviderName = (typeof providerNames)[number];
 
