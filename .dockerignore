@@ -1,0 +1,31 @@
+# What the builder stage COPYs is spelled out in the Dockerfile; this keeps the rest
+# out of the context. Secrets first: neither the live config — the internal network
+# map — nor any env file may enter an image layer.
+.env*
+config.json*
+
+# Git and generated output. The builder runs its own npm ci and its own build, so a
+# host node_modules (other platforms' native binaries) or a stale build/ must not
+# leak in; the rest is what a vite run regenerates anyway.
+.git
+node_modules
+build
+.svelte-kit
+src/lib/paraglide
+project.inlang/cache
+test-result
+test-results
+coverage
+storybook-static
+
+# Repo tooling the image build never reads.
+.github
+.storybook
+.vscode
+deploy
+docs
+e2e
+scripts
+dps.js
+dependency-graph.svg
+*.md

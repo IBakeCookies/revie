@@ -17,11 +17,11 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 4 items are open — #10 from the review passes, the
-rest of #33's provider list above, and 38 and 42 under New work; **1, 2, 3, 4, 5,
+**Numbers are stable, so gaps mean landed.** 3 items are open — #10 from the review passes and
+the rest of #33's provider list above, and 38 under New work; **1, 2, 3, 4, 5,
 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 34,
-35, 36, 37, 39, 40, 41, 43, 44, 45, 46, 47 and 48 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+35, 36, 37, 39, 40, 41, 42, 43, 44, 45, 46, 47 and 48 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
 and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -823,15 +823,35 @@ through with`theme: undefined` and the default's class set.
       of restating the name fallback), src/lib/presentation/components/quick-jump.svelte +
       story, README.md
 
-42. **A Dockerfile** (`M`). README defers it and #27 measured why the artifact is not standalone:
+42. ~~**A Dockerfile**~~ (`M`) — **LANDED.** #27's measurement held exactly: the runtime stage
+    copies `build/` PLUS the full `node_modules` out of the builder, because
     `build/server/chunks/*.js` import `svelte` and `@sveltejs/kit` as bare specifiers and both are
-    devDependencies, so `npm ci --omit=dev` in a runtime stage breaks the image — it ships
-    `build/` PLUS the full `node_modules` out of the builder stage. Node 22 base (`engines` is
-    `>=22` with `engine-strict`), non-root user, `HOST` / `PORT` / `ORIGIN` / `DASHBOARD_CONFIG` /
-    `DASHBOARD_SECRET_*` passed through, and a `HEALTHCHECK` against `GET /api/health`, which
-    answers 200 or 503 since #23. Compose stays out until the image exists — #27's own
-    sequencing. _Deliberately not built:_ registry push in CI (nobody has said where images go).
-    _Files:_ Dockerfile (new), .dockerignore (new), README.md
+    devDependencies — `npm ci --omit=dev` there breaks the image rather than shrinking it. Node 22
+    bookworm-slim, the official image's built-in `node` user (`--chown=node:node` on the copies; no
+    new user invented), `EXPOSE 3000`, and a `HEALTHCHECK` against `GET /api/health`, which answers
+    200 or 503 since #23. Four decisions taken on the way:
+    - **The healthcheck is node's own `fetch`, not curl.** bookworm-slim ships neither curl nor wget
+      and installing one adds an apt package to every future base bump for one request. `r.ok` is
+      200–299 only, so the 503 branch exits 1; exec-form CMD so no shell quoting sits between the
+      check and the JS. It reads `process.env.PORT ?? 3000`, so an operator who moves the port does
+      not silently break the check.
+    - **`DASHBOARD_CONFIG` is baked to `/config/config.json`** — a container path convention, the
+      same decision as the unit's `Environment=` line ("deployment path, not a secret"). README says
+      mount the DIRECTORY there, not the lone file: the editor writes its `.tmp` beside the target
+      and renames it into place, which a bind-mounted single file cannot do.
+    - **Secrets cannot enter a layer.** `.env*` and `config.json*` lead
+      [.dockerignore](.dockerignore) (the config is the internal network map); `ORIGIN`,
+      `DASHBOARD_ADMIN_TOKEN` and the `DASHBOARD_SECRET_<NAME>` set pass through `-e` /
+      `--env-file` at run time, none baked.
+    - **Sources are COPYed before `npm ci`, not after**: `prepare` fires paraglide's compiler, so
+      `messages/` and `project.inlang/` must be on disk when it runs. Costs layer-cache precision on
+      source changes; `npm ci --ignore-scripts` was considered and refused — esbuild and rollup set
+      their native binaries up in install scripts.
+      _Still deliberately not built:_ compose — landing the image unlocked #27's sequencing but
+      nobody has asked for it — and registry push in CI (nobody has said where images go). This
+      environment has no Docker daemon, so the image has never been built; first `docker build` on
+      a machine with one is the verification.
+      _Files:_ Dockerfile (new), .dockerignore (new), README.md
 
 43. ~~**Fence the CSP nonce**~~ — **LANDED.** One `it` at the end of
     [invariants.spec.ts](src/lib/test/invariants.spec.ts), under its own `the CSP nonce` describe,

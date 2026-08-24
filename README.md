@@ -40,13 +40,34 @@ That `./config.json` is resolved against the process working directory, so `DASH
 [Configuration](#configuration)) has to be **absolute** as soon as something other than you starts
 the server: a service manager's working directory is not the repo.
 [`deploy/revie-dashboard.service`](deploy/revie-dashboard.service) is a unit that does both, using
-`EnvironmentFile=` rather than `--env-file` — one env mechanism per invocation, not two. There is
-no compose file to go with it: the build output is not standalone (it imports `svelte` and
-`@sveltejs/kit` from `node_modules` at runtime), so a container needs an image built from the repo
-and this project ships none.
+`EnvironmentFile=` rather than `--env-file` — one env mechanism per invocation, not two.
 
 Serving on anything but `localhost` / `127.0.0.1` also needs `ORIGIN` set to the address you serve
 on — see [the admin area](#the-admin-area) for both things that depend on it.
+
+### Docker
+
+A [Dockerfile](Dockerfile) builds an image from the repo — the build output alone is not
+standalone (it imports `svelte` and `@sveltejs/kit` from `node_modules` at runtime), so the image
+carries the build **plus the full `node_modules`**, devDependencies included:
+
+```sh
+docker build -t revie-dashboard .
+docker run -p 3000:3000 \
+	-v ./dashboard:/config \
+	-e ORIGIN=http://192.168.1.10:3000 \
+	revie-dashboard
+```
+
+It runs as the unprivileged `node` user, and a `HEALTHCHECK` asks `GET /api/health`, so an
+orchestrator can tell a live dashboard (200) from one whose config failed to load (503).
+`DASHBOARD_CONFIG` defaults to `/config/config.json`; mount your config **directory** there, not
+the lone file — the admin editor writes a `.tmp` beside the target and renames it into place,
+which a bind-mounted single file cannot do. Everything deployment-specific passes through the
+environment at run time (`-e` or `--env-file`): `ORIGIN`, `DASHBOARD_ADMIN_TOKEN`, and one
+`DASHBOARD_SECRET_<NAME>` per configured credential. None of it is baked into the image, and
+neither your `config.json` nor any `.env` can enter a layer — both are excluded in
+[.dockerignore](.dockerignore).
 
 ## Configuration
 
