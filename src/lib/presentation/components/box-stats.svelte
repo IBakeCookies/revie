@@ -75,6 +75,7 @@
 		humidity: percent,
 		'wind-speed': decimal,
 		precipitation: decimal,
+		'streams-active': counts,
 	};
 
 	// Which instance this box points at. A page may hold several, so without this two
@@ -164,6 +165,12 @@
 			},
 			precipitation: {
 				label: m.stat_precipitation(),
+				accent: 'border-l-info',
+			},
+			// Like the weather readings, a stream count is a fact rather than a state — an
+			// idle media server is not a broken one, so no good/bad axis for an accent.
+			'streams-active': {
+				label: m.stat_streams_active(),
 				accent: 'border-l-info',
 			},
 		};

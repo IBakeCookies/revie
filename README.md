@@ -269,6 +269,7 @@ variable per instance, so two boxes can have two logins.
 | `uptime-kuma` | Uptime Kuma: monitors up, monitors down, 24-hour uptime               | nothing — leave `secret` out                  |
 | `proxmox`     | Proxmox VE: guests running, guests stopped, CPU and memory use        | an API token (`user@realm!tokenid=secret`)    |
 | `open-meteo`  | Open-Meteo: temperature, feels-like, humidity, wind speed, rain       | nothing — leave `secret` out                  |
+| `jellyfin`    | Jellyfin: active streams                                              | an API key, from Dashboard → API Keys         |
 
 Three things about that table are worth saying out loud:
 
@@ -292,6 +293,11 @@ Three things about that table are worth saying out loud:
   nothing is converted afterwards, and the tiles render numbers without units, since the
   server cannot know which ones you chose. No geocoding — you know your coordinates. A
   self-hosted mirror works too; any URL answering the same shape does.
+- **`href` for `jellyfin` is the base URL** of the instance (`https://jellyfin.example`)
+  — `/Sessions` is appended. The count is sessions carrying a now-playing item, so
+  browsers parked on Jellyfin's own dashboard idle without counting. Create a key under
+  Dashboard → API Keys; without one the read goes out anonymously and most instances
+  answer `401`.
 - **These providers are transcribed from vendor documentation, not from a live instance
   behind this code.** Every other behaviour in this README has been reproduced; these
   endpoints have not. If one reports nothing, the server log names the host and the status.
@@ -303,7 +309,8 @@ never be set. The editor refuses to save one and says which prop is wrong.
 **Write `href` out in full — a redirect costs you the read.** Both Pi-hole providers refuse
 to follow one, because v5's token is in the query string and v6's session id is in a header
 and a followed redirect would hand either to a host you never configured; the box reports the
-`301` instead. AdGuard follows, but its credential is an `Authorization` header, which
+`301` instead. Jellyfin refuses for the same reason — its API key is a custom header too.
+AdGuard follows, but its credential is an `Authorization` header, which
 `fetch` deletes when a redirect crosses an origin — and `http:` → `https:` is a different
 origin — so the read arrives unauthenticated and the instance answers `401`. Either way,
 point `href` at the scheme, host and port the service actually answers on.

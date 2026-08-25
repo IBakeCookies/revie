@@ -480,7 +480,8 @@ config.json ─(provider + href + secret)→ business/model/config.ts   collectS
             ─(project)→ Stat[] ─→ StatsStore ─→ box-stats.svelte
 ```
 
-Six ship: `adguard`, `pihole-v5`, `pihole-v6`, `uptime-kuma`, `proxmox`, `open-meteo`. Adding another is
+Seven ship: `adguard`, `pihole-v5`, `pihole-v6`, `uptime-kuma`, `proxmox`, `open-meteo`,
+`jellyfin`. Adding another is
 **six** edit
 points, not the five this list used to name: a repository file, one entry in `providers`, one
 token in `providerNames`, one product name in `providerNameLabel`, and — per reading it adds

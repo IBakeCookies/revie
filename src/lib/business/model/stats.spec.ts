@@ -4,12 +4,14 @@ import type { PiholeV6Wire } from '$lib/data/repository/pihole-v6';
 import type { UptimeKumaWire } from '$lib/data/repository/uptime-kuma';
 import type { ProxmoxWire } from '$lib/data/repository/proxmox';
 import type { OpenMeteoWire } from '$lib/data/repository/open-meteo';
+import type { JellyfinWire } from '$lib/data/repository/jellyfin';
 import { $getAdguardStats } from '$lib/data/repository/adguard';
 import { $getPiholeV5Stats } from '$lib/data/repository/pihole-v5';
 import { $getPiholeV6Stats } from '$lib/data/repository/pihole-v6';
 import { $getUptimeKumaStats } from '$lib/data/repository/uptime-kuma';
 import { $getProxmoxStats } from '$lib/data/repository/proxmox';
 import { $getOpenMeteoStats } from '$lib/data/repository/open-meteo';
+import { $getJellyfinStats } from '$lib/data/repository/jellyfin';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { providerNames } from '$lib/business/model/config';
 import {
@@ -19,6 +21,7 @@ import {
 	projectProxmox,
 	projectUptimeKuma,
 	projectOpenMeteo,
+	projectJellyfin,
 	readStats,
 } from '$lib/business/model/stats';
 
@@ -46,6 +49,10 @@ vi.mock('$lib/data/repository/proxmox', () => ({
 
 vi.mock('$lib/data/repository/open-meteo', () => ({
 	$getOpenMeteoStats: vi.fn(),
+}));
+
+vi.mock('$lib/data/repository/jellyfin', () => ({
+	$getJellyfinStats: vi.fn(),
 }));
 
 /** Mirrors `STATS_TTL_MS`, which the module does not export — the same shape as `poll-services-state.spec.ts`. */
@@ -194,6 +201,30 @@ const openMeteo: OpenMeteoWire = {
 		wind_speed_10m: 11.4,
 	},
 };
+
+/**
+ * Three sessions: one playing, one idling without the key, one carrying it as null —
+ * both idle forms on one wire, because clients report "not playing" either way.
+ */
+const jellyfin: JellyfinWire = [
+	{
+		NowPlayingItem: {},
+	},
+	{
+		NowPlayingItem: null,
+	},
+	{
+		NowPlayingItem: null,
+	},
+];
+
+const jellyfinWatching: JellyfinWire = [
+	...jellyfin,
+	{
+		// Paused, but the session still holds its item: an active seat, not a closed one.
+		NowPlayingItem: {},
+	},
+];
 
 const failure = {
 	message: 'answered 200 with a body that is not stats',
@@ -387,6 +418,35 @@ describe('projectOpenMeteo', () => {
 	});
 });
 
+describe('projectJellyfin', () => {
+	it('counts the sessions carrying a NowPlayingItem, in both idle forms', () => {
+		expect(projectJellyfin(jellyfinWatching)).toEqual([
+			{
+				key: 'streams-active',
+				value: 2,
+			},
+		]);
+	});
+
+	it('answers zero for a server with nothing playing rather than NaN or an error', () => {
+		expect(
+			projectJellyfin([
+				{
+					NowPlayingItem: null,
+				},
+				{
+					NowPlayingItem: null,
+				},
+			]),
+		).toEqual([
+			{
+				key: 'streams-active',
+				value: 0,
+			},
+		]);
+	});
+});
+
 describe('readStats', () => {
 	beforeEach(() => {
 		vi.mocked($getAdguardStats).mockReset();
@@ -411,6 +471,7 @@ describe('readStats', () => {
 		vi.mocked($getUptimeKumaStats).mockResolvedValue([null, uptimeKuma]);
 		vi.mocked($getProxmoxStats).mockResolvedValue([null, proxmox]);
 		vi.mocked($getOpenMeteoStats).mockResolvedValue([null, openMeteo]);
+		vi.mocked($getJellyfinStats).mockResolvedValue([null, jellyfin]);
 
 		for (const provider of providerNames) {
 			const read = await readStats({

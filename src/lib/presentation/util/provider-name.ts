@@ -19,4 +19,5 @@ export const providerNameLabel: Record<ProviderName, string> = {
 	'uptime-kuma': 'Uptime Kuma',
 	proxmox: 'Proxmox VE',
 	'open-meteo': 'Open-Meteo',
+	jellyfin: 'Jellyfin',
 };

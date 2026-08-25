@@ -22,6 +22,7 @@ import { $getPiholeV6Stats, type PiholeV6Wire } from '$lib/data/repository/pihol
 import { $getUptimeKumaStats, type UptimeKumaWire } from '$lib/data/repository/uptime-kuma';
 import { $getProxmoxStats, type ProxmoxWire } from '$lib/data/repository/proxmox';
 import { $getOpenMeteoStats, type OpenMeteoWire } from '$lib/data/repository/open-meteo';
+import { $getJellyfinStats, type JellyfinWire } from '$lib/data/repository/jellyfin';
 
 /**
  * The page load awaits every read, so without a bound of our own an unreachable host
@@ -254,6 +255,20 @@ export function projectOpenMeteo(data: OpenMeteoWire): Stat[] {
 }
 
 /**
+ * The one reading `/Sessions` is good for: sessions are devices, and only the ones
+ * carrying a `NowPlayingItem` are actually watching. A paused stream still holds its
+ * session's item, so it counts — it is an active seat, not a closed one.
+ */
+export function projectJellyfin(data: JellyfinWire): Stat[] {
+	return [
+		{
+			key: 'streams-active',
+			value: data.filter((session) => session.NowPlayingItem).length,
+		},
+	];
+}
+
+/**
  * Every provider a config may name. A missing key is a compile error, which is the same
  * guarantee the container schema gives the renderer — adding a provider is a repository
  * file, a projection and one line here.
@@ -265,6 +280,7 @@ const providers: Record<ProviderName, ReadProvider> = {
 	'uptime-kuma': (input) => read($getUptimeKumaStats(input), projectUptimeKuma),
 	proxmox: (input) => read($getProxmoxStats(input), projectProxmox),
 	'open-meteo': (input) => read($getOpenMeteoStats(input), projectOpenMeteo),
+	jellyfin: (input) => read($getJellyfinStats(input), projectJellyfin),
 };
 
 export type ReadStatsInput = {

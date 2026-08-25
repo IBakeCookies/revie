@@ -83,6 +83,7 @@ export const providerNames = [
 	'uptime-kuma',
 	'proxmox',
 	'open-meteo',
+	'jellyfin',
 ] as const;
 
 export type ProviderName = (typeof providerNames)[number];

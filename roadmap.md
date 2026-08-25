@@ -465,9 +465,9 @@ the same applies to a future 34.
       `dispatcher` is passed, and `NODE_TLS_REJECT_UNAUTHORIZED` appears nowhere — it is
       process-global and silently unverifies every other fetch. That decision is what keeps
       **Proxmox VE, TrueNAS, Unifi and Portainer** off the list below rather than on it.
-      _Three providers landed on top of the core and the seam held_ — nothing in the route, the
+      _Four providers landed on top of the core and the seam held_ — nothing in the route, the
       store, the cache, the schema-generated form or the container branch. `uptime-kuma`,
-      `pihole-v5` and `pihole-v6` are in
+      `pihole-v5`, `pihole-v6` and `jellyfin` are in
       [src/lib/data/repository/](src/lib/data/repository/), one file per provider, each with a
       valibot wire schema and a projection in `stats.ts`; what they settled is in AGENTS.md with
       the rest. Two things about them are this item's own, and neither is written down there:
@@ -492,7 +492,6 @@ the same applies to a future 34.
     - **Sonarr / Radarr / Prowlarr** — `/api/v3/queue`, `X-Api-Key` header, for a queue count.
     - **Immich** (`/api/server/statistics`, `x-api-key`), **Paperless-ngx** (`/api/statistics/`,
       `Authorization: Token`), **Gitea / Forgejo** (`/api/v1/…`, `Authorization: token`).
-    - **Jellyfin** — `/Sessions` with `X-Emby-Token`, for the active-stream count.
     - **Glances** — `/api/4/cpu` and `/api/4/mem`, no auth by default: the generic "how is this
       host doing" box, and the one that earns its place on a single-node setup.
 

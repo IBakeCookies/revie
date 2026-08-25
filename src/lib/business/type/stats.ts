@@ -40,7 +40,8 @@ export type NumericStatKey =
 	| 'apparent-temperature'
 	| 'humidity'
 	| 'wind-speed'
-	| 'precipitation';
+	| 'precipitation'
+	| 'streams-active';
 
 export type TextStatKey = 'top-blocked-domain';
 
