@@ -149,7 +149,11 @@
 	name="Icon unavailable"
 	args={{
 		img: {
-			src: '/no-such-icon.svg',
+			// A valid data URI carrying no decodable image: the failure is local decode
+			// work, not a network answer. `/no-such-icon.svg` used to sit here, and its
+			// 404 queued behind the dev server's module transforms under the full parallel
+			// run — measured crossing this play's own 5s ceiling, taking the test with it.
+			src: 'data:text/plain,not-an-image',
 		},
 		isOnline: true,
 	}}
