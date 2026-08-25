@@ -490,6 +490,17 @@ describe('containers that would throw while rendering', () => {
 		expect(warnings).toEqual(['Skipping container "BoxDate", "timezone" is missing or not valid']);
 	});
 
+	// The cheapest container's cheapest failure: text is its only required prop, so an
+	// empty note is dropped with the standard warning rather than rendering a blank card.
+	it('drops a BoxNote with no text', () => {
+		const { page, warnings } = pageWith({
+			name: 'BoxNote',
+		});
+
+		expect(page.containers).toEqual([]);
+		expect(warnings).toEqual(['Skipping container "BoxNote", "text" is missing or not valid']);
+	});
+
 	it('drops a bad child without dropping its siblings or the grid', () => {
 		const { page } = pageWith({
 			name: 'Grid',

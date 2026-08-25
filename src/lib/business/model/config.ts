@@ -189,6 +189,16 @@ const containerSchemas = {
 		 */
 		limit: v.optional(v.number()),
 	}),
+	BoxNote: v.object({
+		span: spanProp,
+		/**
+		 * Shown as written: verbatim text, line breaks preserved, no markdown and no
+		 * localization. A renderer would be a dependency plus an HTML-sanitizing
+		 * surface for a feature nobody asked for, and a note whose `**bold**` shows
+		 * its asterisks is honest about what it is.
+		 */
+		text: v.string(),
+	}),
 	// Grid and SubGrid do not require `items`: it is defaulted below, so a grid
 	// written before its children still renders as empty.
 	Grid: v.object(gridProps),

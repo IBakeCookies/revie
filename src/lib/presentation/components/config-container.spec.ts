@@ -2,6 +2,7 @@ import type { ComponentProps } from 'svelte';
 import type { ConfigContainer, ContainerName } from '$lib/business/model/config';
 import type BoxDate from '$lib/presentation/components/box-date.svelte';
 import type BoxFeedWrapper from '$lib/presentation/components/box-feed-wrapper.svelte';
+import type BoxNote from '$lib/presentation/components/box-note.svelte';
 import type BoxSearch from '$lib/presentation/components/box-search.svelte';
 import type BoxServiceWrapper from '$lib/presentation/components/box-service-wrapper.svelte';
 import type BoxStatsWrapper from '$lib/presentation/components/box-stats-wrapper.svelte';
@@ -75,6 +76,10 @@ const seams: Record<ContainerName, true> = {
 	BoxFeed: true satisfies Fence<
 		ConfigContainer<'BoxFeed'>['props'],
 		ComponentProps<typeof BoxFeedWrapper>
+	>,
+	BoxNote: true satisfies Fence<
+		ConfigContainer<'BoxNote'>['props'],
+		ComponentProps<typeof BoxNote>
 	>,
 	Grid: true satisfies Fence<
 		ConfigContainer<'Grid'>['props'],

@@ -187,6 +187,35 @@ props:
   source that just came back can take that long to fill in. The cache lives in the
   server process, so a restart drops it.
 
+- **Feeds cover more than news.** Anything publishing RSS or Atom renders, and several
+  sources answer widgets other dashboards ship as dedicated boxes:
+
+  | Source                 | Feed URL                                                   |
+  | ---------------------- | ---------------------------------------------------------- |
+  | A project's releases   | `https://github.com/<owner>/<repo>/releases.atom`          |
+  | A repository's commits | `https://github.com/<owner>/<repo>/commits.atom`           |
+  | A YouTube channel      | `https://www.youtube.com/feeds/videos.xml?channel_id=<ID>` |
+  | A subreddit            | `https://www.reddit.com/r/selfhosted/.rss`                 |
+  | Hacker News            | `https://hnrss.org/frontpage`                              |
+
+  Most blogs publish one too — look for `/feed`, `/rss` or `/atom.xml`. A release feed
+  reads better with a small `"limit"` (3 or 5) than with the default ten rows.
+
+- `BoxNote` renders static text out of config — the one container with nothing to
+  read and nothing to fail. `text` is required and shown as written: line breaks
+  preserved, no markdown, no translation.
+
+  ```json
+  {
+  	"name": "BoxNote",
+  	"props": { "text": "Trash collection on Thursdays.\nWi-Fi: see the router sticker.", "span": 4 }
+  }
+  ```
+
+  What you type is what renders — a `**bold**` keeps its asterisks. There is no
+  `title`; if the note needs one, put it in the text or give the Grid above it a
+  heading.
+
 - A page key is a URL path and has to start with `/`. It may have more than one
   segment, so `"/media/plex"` works and is how pages are grouped. A key without the
   leading slash is dropped with a warning, because the navigation links straight to it
@@ -195,8 +224,8 @@ props:
 - A malformed container is dropped with a warning instead of breaking the page: an
   unknown container name, something that isn't an object, or a missing required prop
   (`BoxService` needs `title`, `href` and `img.src`; `BoxStats` needs `provider` and
-  `href`; `BoxSearch` needs `href`; `BoxFeed` needs `href`). Its siblings and its parent
-  grid still render.
+  `href`; `BoxSearch` needs `href`; `BoxFeed` needs `href`; `BoxNote` needs `text`).
+  Its siblings and its parent grid still render.
 - A `Grid` or `SubGrid` with no `items` renders as empty, so a grid written before its
   children is safe to save.
 - `DASHBOARD_CONFIG` overrides the config path. The file is re-read whenever its

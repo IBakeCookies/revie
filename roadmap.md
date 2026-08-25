@@ -17,8 +17,9 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 3 items are open — #10 from the review passes and
-the rest of #33's provider list above, and 38 under New work; **1, 2, 3, 4, 5,
+**Numbers are stable, so gaps mean landed.** 5 items are open — #10 from the review passes, the
+rest of #33's provider list above, 38 under New work, and 49–51 under New containers minus the
+landed #50; **1, 2, 3, 4, 5,
 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 34,
 35, 36, 37, 39, 40, 41, 42, 43, 44, 45, 46, 47 and 48 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
@@ -972,6 +973,101 @@ Intl.DateTimeFormat(undefined, { timeZone })` in a try/catch rather than the
       TTL cache), src/lib/business/model/config.ts,
       src/lib/presentation/components/config-container.svelte, box-feed.svelte +
       box-feed-wrapper.svelte + stories (new), messages/en.json, messages/de.json, README.md
+
+## New containers (2026-08-25)
+
+Its own section for the same reason the two above are: prettier renumbers an ordered list from
+its first item, so a new group needs a heading to break the list. These three came from asking
+what other start pages (Homepage, Homarr, Dashy, Glance) offer that this one does not; like
+every item here they name their edit points and refusals, and each was checked against AGENTS.md
+so it proposes nothing a recorded decision forbids. One finding needed no item at all: GitHub
+releases, YouTube uploads and subreddit feeds are already one `BoxFeed` entry away — README
+carries the recipes.
+
+49. **A `BoxCalendar` container: iCal subscriptions through the feed seam** (`M`). The
+    consumer #48 said the feed machinery was waiting for: Sonarr and Radarr publish an
+    iCal URL, and birthdays, trash collection and school holidays come out of any
+    calendar app as `.ics`. The plumbing is BoxFeed's run once more — server-side fetch,
+    a TTL cache in `business/model/calendar.ts` keyed by the BARE HREF (no provider
+    token, two boxes over one calendar share one read), per-event `safeParse` dropping
+    bad VEVENTs instead of failing the box, and `failedCalendars: string[]` riding
+    `reportedFailures` beside `failedFeeds`, the route picking the words from
+    `m.calendar_load_failed({ href })`. Rows sort SOONEST FIRST — the one way a
+    calendar is not a feed — and `limit` slices after the sort with the same
+    floor-and-clamp the feed box uses. Edit points mirror #48's list exactly: a
+    repository (fetch + parse), the model (cache), a collector beside
+    `collectFeedTargets` (bare hrefs, deduped), one `v.object` in `containerSchemas`
+    (`href` required, `limit` optional, `span` like every container), one branch before
+    [config-container.svelte](src/lib/presentation/components/config-container.svelte)'s
+    `never` assert, `box-calendar.svelte` + wrapper + stories, both message catalogues,
+    README. Decisions to take on the way, none of them open-ended: the parser is
+    HAND-ROLLED VEVENT reading (SUMMARY, DTSTART, DTEND, UID) — RFC 5545 line folding
+    and the `;VALUE=DATE` form are the whole of it, and a dependency is a second parser
+    to trust for a shape four fields wide; all-day vs timed comes off the value's own
+    form, and a TZID the runtime cannot resolve drops THAT EVENT, not the box.
+    **Deliberately NOT built:** RRULE expansion (the whole complexity of iCal lives
+    there; the *arr feeds emit one VEVENT per episode and expand nothing, so the primary
+    consumer never needs it — a recurring birthday shows once, and README says so); a
+    `webcal://` scheme rewrite in code (an operator can type `https://`, README notes
+    it); any write path (accepting or declining invitations is a different product);
+    client-side fetch (standing refusal).
+    _Files:_ src/lib/data/repository/calendar.ts (new), src/lib/business/model/calendar.ts
+    (new, TTL cache), src/lib/business/model/config.ts,
+    src/lib/presentation/components/config-container.svelte, box-calendar.svelte +
+    box-calendar-wrapper.svelte + stories (new), messages/en.json, messages/de.json,
+    README.md
+
+50. ~~**A `BoxNote` container: static text out of config** (`S`)~~ — **LANDED.** One
+    `v.object` in `containerSchemas` (`text` required, `span` like every container),
+    one branch before the `never` assert, and [box-note.svelte](src/lib/presentation/components/box-note.svelte)
+    — one text node in the standard surface card. Renders VERBATIM with line breaks
+    preserved (`whitespace-pre-line`), under the same "operator content, shown as
+    written" contract the page names already have — deliberately NOT localized, and
+    deliberately NOT markdown: a renderer is a dependency plus an HTML-sanitizing
+    surface for a feature nobody asked for, and a note whose `**bold**` shows its
+    asterisks is honest about what it is. No `title` prop either, so the heading-depth
+    machinery stays untouched — a note is a body, not a section; a heading belongs to
+    the Grid above it; the story asserts the absence of any heading element beside the
+    literal asterisks. Two things the item's own file list missed: **the editor came
+    free exactly as promised** (`containerFields` walked the new schema entry with no
+    edit, fenced by `config.spec.ts`'s form-fill cases over `containerNames`), but the
+    seam fence did not — `config-container.spec.ts`'s `seams` record is
+    `Record<ContainerName, true>` with a runtime key comparison, so a schema entry
+    without a fence line fails both svelte-check and that spec. And **no message keys
+    were needed anywhere**, the first container with none: nothing in the box is
+    interactive or labelled, so both catalogues stayed untouched.
+    _Files:_ src/lib/business/model/config.ts,
+    src/lib/presentation/components/config-container.svelte, box-note.svelte + story
+    (new), config-container.spec.ts (a fence line per the record above),
+    config.spec.ts (a dropped note missing `text`), README.md
+
+51. **A `BoxContainers` container: per-container status from Portainer** (`M`). The
+    third list consumer, and the one Homepage's docker dashboard answers: a row per
+    container — name, state dot, Docker's own status string — read off
+    `GET /api/endpoints/<id>/docker/containers/json` with an `X-API-Key` header. It is
+    a CONTAINER, not a stats provider, because the shape is a list and the stats seam
+    carries `{ key, value }[]` readings; but the credential half is BoxStats' exactly —
+    `secret` names a variable read from `DASHBOARD_SECRET_<NAME>` in the route, one per
+    instance, an unset one meaning absence-not-toast. One `v.object` in
+    `containerSchemas` (`href`, `endpointId`, optional `secret`, `span`) and one branch
+    before the `never` assert. The cache keys HREF AND ENDPOINT ID (the `statsKey`
+    lesson: two environments behind one Portainer is a real config), its TTL mirrors
+    stats' 30 seconds rather than feeds' 5 minutes because containers flip on deploy,
+    and validation degrades PER ENTRY like the feed's — one weird object costs itself,
+    only an unparseable response fails the box. State dots REUSE BoxService's
+    vocabulary (filled disc / hollow outline) so the silhouette rule and the stories'
+    a11y gate carry over. **Two walls inherited, not solved:** self-signed TLS excludes
+    Portainer from the stats providers for exactly this reason — README repeats the
+    real-certificate-or-proxy requirement, and no `NODE_TLS_REJECT_UNAUTHORIZED`
+    workaround exists; and **no actions** — start/stop/restart buttons are the first
+    write path outside `/admin`, and until something wants them badly enough to argue
+    for the allowlist-plus-rate-limit treatment `/api/ping` got, the box reads.
+    _Endpoint details transcribed from Portainer's docs, not measured_ — the standing
+    caveat every provider on #33's list carries.
+    _Files:_ src/lib/data/repository/portainer-containers.ts (new),
+    src/lib/business/model/containers.ts (new, TTL cache), src/lib/business/model/config.ts,
+    src/lib/presentation/components/config-container.svelte, box-containers.svelte +
+    wrapper + stories (new), messages/en.json, messages/de.json, README.md
 
 ## Sequencing
 
