@@ -76,6 +76,12 @@
 		'wind-speed': decimal,
 		precipitation: decimal,
 		'streams-active': counts,
+		'queue-length': counts,
+		photos: counts,
+		videos: counts,
+		'documents-total': counts,
+		'documents-inbox': counts,
+		'notifications-unread': counts,
 	};
 
 	// Which instance this box points at. A page may hold several, so without this two
@@ -172,6 +178,33 @@
 			'streams-active': {
 				label: m.stat_streams_active(),
 				accent: 'border-l-info',
+			},
+			// The *arr queue, Immich's library and Paperless' archive are all facts rather
+			// than states too; the two that measure WORK WAITING — an inbox to process,
+			// notifications to read — carry the warning edge the block rate does.
+			'queue-length': {
+				label: m.stat_queue_length(),
+				accent: 'border-l-info',
+			},
+			photos: {
+				label: m.stat_photos(),
+				accent: 'border-l-info',
+			},
+			videos: {
+				label: m.stat_videos(),
+				accent: 'border-l-info',
+			},
+			'documents-total': {
+				label: m.stat_documents_total(),
+				accent: 'border-l-info',
+			},
+			'documents-inbox': {
+				label: m.stat_documents_inbox(),
+				accent: 'border-l-warning',
+			},
+			'notifications-unread': {
+				label: m.stat_notifications_unread(),
+				accent: 'border-l-warning',
 			},
 		};
 

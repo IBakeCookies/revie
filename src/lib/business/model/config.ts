@@ -84,6 +84,14 @@ export const providerNames = [
 	'proxmox',
 	'open-meteo',
 	'jellyfin',
+	'sonarr',
+	'radarr',
+	'prowlarr',
+	'immich',
+	'paperless',
+	'gitea',
+	'forgejo',
+	'glances',
 ] as const;
 
 export type ProviderName = (typeof providerNames)[number];

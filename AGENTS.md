@@ -486,8 +486,16 @@ every 60s:  POST /api/stats ─(allowlist from ALL pages)→ readStatsFor (the s
 Both routes print their folds' log lines; the load owns first paint and the endpoint owns every
 tick after it — see "Already done" for why the refresh stopped invalidating the load.
 
-Seven ship: `adguard`, `pihole-v5`, `pihole-v6`, `uptime-kuma`, `proxmox`, `open-meteo`,
-`jellyfin`. Adding another is
+Fifteen ship: `adguard`, `pihole-v5`, `pihole-v6`, `uptime-kuma`, `proxmox`, `open-meteo`,
+`jellyfin`, `sonarr`, `radarr`, `prowlarr`, `immich`, `paperless`, `gitea`, `forgejo` and
+`glances` — the last eight being #33's cheap half, landed 2026-08-25. Two of them share a
+repository file on purpose: [arr.ts](src/lib/data/repository/arr.ts) is one wire envelope
+(`{ totalRecords }`) behind three tokens whose only differences are the API version in the
+path (Prowlarr is v1 where Sonarr and Radarr are v3) and the product name in the error —
+three copies of the same schema would be the duplication "One definition per concept"
+exists for; the same holds for Gitea/Forgejo in
+[forge.ts](src/lib/data/repository/forge.ts), which reads its unread count off
+`X-Total-Count` rather than off the paginated body. Adding another is
 **six** edit
 points, not the five this list used to name: a repository file, one entry in `providers`, one
 token in `providerNames`, one product name in `providerNameLabel`, and — per reading it adds

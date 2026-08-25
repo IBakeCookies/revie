@@ -436,9 +436,10 @@ list to run sequentially from its first item: put 33 under Features and `prettie
 it to 27, colliding with Ops. A heading breaks the list, which is what keeps the number stable —
 the same applies to a future 34.
 
-33. ~~**Generalize the AdGuard path into a keyed stats provider**~~ — **the CORE AND FOUR
-    PROVIDERS LANDED; what is left is the rest of the list.** Kept as a numbered item because
-    the notes below cross-reference it, and because the list at the bottom is still work.
+33. ~~**Generalize the AdGuard path into a keyed stats provider**~~ — **the CORE, THE FOUR
+    ORIGINALS AND THE CHEAP HALF LANDED; what is left is the handshake group.** Kept as a
+    numbered item because the notes below cross-reference it, and because the list at the
+    bottom is still work.
     `BoxAdguard` is **gone** and `BoxStats` with a `provider` token replaced it: one container,
     one component, one `Record<ProviderName, ReadProvider>` registry, `{ key, value }[]`
     readings through a presentation-side message map, and per-instance credentials through
@@ -480,47 +481,43 @@ the same applies to a future 34.
       minted a session every 30s until FTL's 16 seats were gone. Both are fixed and fenced in
       `pihole-v6.spec.ts`; treat every endpoint below the same way.
 
-      _What is left is the rest of the list, and the seam is the whole of the work._ Adding one
+      _What is left is the handshake group — the seam is the whole of the work._ Adding one
       is **six** edit points: a repository file, one entry in `providers`, one token in
       `providerNames`, one product name in `providerNameLabel`, and — per reading nothing else
       emits — a `StatKey` with its `stat_*` message in BOTH catalogues plus an entry in
       `box-stats.svelte`'s `chrome` (and `formats`, if the reading is a number). Those last two
       are `Record<StatKey, …>` / `Record<NumericStatKey, …>`, so a missed one is a compile error
-      in a file this list used to omit. Ordered by auth cost — cheap first, counters that fit the
-      box that already exists:
-
-    - **Sonarr / Radarr / Prowlarr** — `/api/v3/queue`, `X-Api-Key` header, for a queue count.
-    - **Immich** (`/api/server/statistics`, `x-api-key`), **Paperless-ngx** (`/api/statistics/`,
-      `Authorization: Token`), **Gitea / Forgejo** (`/api/v1/…`, `Authorization: token`).
-    - **Glances** — `/api/4/cpu` and `/api/4/mem`, no auth by default: the generic "how is this
-      host doing" box, and the one that earns its place on a single-node setup.
-
-    Then the ones needing a handshake or an aggregation: **Portainer**
-    (`/api/endpoints/<id>/docker/containers/json`, `X-API-Key`), **qBittorrent**
-    (`POST /api/v2/auth/login` for a cookie), **Transmission** (the 409 +
-    `X-Transmission-Session-Id` dance), **Nextcloud**
-    (`/ocs/v2.php/apps/serverinfo/api/v1/info?format=json`, basic auth plus
-    `OCS-APIRequest: true`, XML otherwise), **Plex** (`/status/sessions`, token in the query and
-    XML unless `Accept: application/json`), **Home Assistant** (bearer, but one entity per
-    number, so its config shape differs from every other provider here).
-    _Unverified on purpose:_ every endpoint and header above comes from the vendors' docs, not
-    from a live instance behind this code — unlike every other item here, so re-check each
-    before implementing it. **That applies to the three that shipped as much as to the ones that
-    have not**: their specs mock `fetch`, their repository comments say where the shape was
-    transcribed from, and so does README. Homepage's widget list is the working popularity
-    ranking if this needs extending.
-    _Deliberately NOT built, and each would be a regression:_ a `requiresSecret` capability
-    table on the registry (a 401 already says it, and the table is a second declaration of each
-    provider's auth that nothing forces to agree with the code); Pi-hole version auto-detection
-    (a round trip per cache miss inside the 3s budget, against a host that may be down, for a
-    version the operator must know anyway); a client-side fetch or an `/api/stats` endpoint (one
-    ships the credential, the other is an SSRF surface — `/api/ping`'s allowlist is the
-    precedent); a cap or an aggregate on the failure toasts; a `unit` field on `Stat` (the key
-    carries the unit, and a second field is a copy nothing keeps in step).
-    _Files:_ src/lib/data/repository/ (one file per provider, new),
-    src/lib/business/model/stats.ts, src/lib/business/model/config.ts (`providerNames`),
-    src/lib/business/type/stats.ts (a key per new reading),
-    src/lib/presentation/util/provider-name.ts, messages/en.json, messages/de.json, README.md
+      in a file this list used to omit. **The cheap group landed 2026-08-25**: Sonarr, Radarr,
+      Prowlarr (one shared envelope in `arr.ts`), Immich, Paperless-ngx, Gitea/Forgejo (one
+      reader in `forge.ts`, unread count off `X-Total-Count`) and Glances. Two things that pass
+      verified the roadmap's own warning about transcribed endpoints: Prowlarr's queue is
+      `/api/v1/queue`, NOT the `/api/v3` written here, and Gitea's count rides a response
+      header rather than any paginated body. Then the ones needing a handshake or an
+      aggregation: **Portainer** (`/api/endpoints/<id>/docker/containers/json`, `X-API-Key`),
+      **qBittorrent** (`POST /api/v2/auth/login` for a cookie), **Transmission** (the 409 +
+      `X-Transmission-Session-Id` dance), **Nextcloud**
+      (`/ocs/v2.php/apps/serverinfo/api/v1/info?format=json`, basic auth plus
+      `OCS-APIRequest: true`, XML otherwise), **Plex** (`/status/sessions`, token in the query and
+      XML unless `Accept: application/json`), **Home Assistant** (bearer, but one entity per
+      number, so its config shape differs from every other provider here).
+      _Unverified on purpose:_ every endpoint and header above comes from the vendors' docs, not
+      from a live instance behind this code — unlike every other item here, so re-check each
+      before implementing it. **That applies to the three that shipped as much as to the ones that
+      have not**: their specs mock `fetch`, their repository comments say where the shape was
+      transcribed from, and so does README. Homepage's widget list is the working popularity
+      ranking if this needs extending.
+      _Deliberately NOT built, and each would be a regression:_ a `requiresSecret` capability
+      table on the registry (a 401 already says it, and the table is a second declaration of each
+      provider's auth that nothing forces to agree with the code); Pi-hole version auto-detection
+      (a round trip per cache miss inside the 3s budget, against a host that may be down, for a
+      version the operator must know anyway); a client-side fetch or an `/api/stats` endpoint (one
+      ships the credential, the other is an SSRF surface — `/api/ping`'s allowlist is the
+      precedent); a cap or an aggregate on the failure toasts; a `unit` field on `Stat` (the key
+      carries the unit, and a second field is a copy nothing keeps in step).
+      _Files:_ src/lib/data/repository/ (one file per provider, new),
+      src/lib/business/model/stats.ts, src/lib/business/model/config.ts (`providerNames`),
+      src/lib/business/type/stats.ts (a key per new reading),
+      src/lib/presentation/util/provider-name.ts, messages/en.json, messages/de.json, README.md
 
 ## The admin area and the config editor
 

@@ -261,15 +261,23 @@ uppercasing and no punctuation folding, so `"secret": "ADGUARD_MAIN"` is read fr
 `DASHBOARD_SECRET_ADGUARD_MAIN` and a lowercase name reads a lowercase variable. One
 variable per instance, so two boxes can have two logins.
 
-| `provider`    | Reads                                                                 | `secret` holds                                |
-| ------------- | --------------------------------------------------------------------- | --------------------------------------------- |
-| `adguard`     | AdGuard Home: DNS queries, blocked, average delay, top blocked domain | `username:password`                           |
-| `pihole-v5`   | Pi-hole 5: DNS queries, blocked, block rate, blocklist domains        | the API token, from Settings → Show API token |
-| `pihole-v6`   | Pi-hole 6: the same four readings                                     | the web password, or an application password  |
-| `uptime-kuma` | Uptime Kuma: monitors up, monitors down, 24-hour uptime               | nothing — leave `secret` out                  |
-| `proxmox`     | Proxmox VE: guests running, guests stopped, CPU and memory use        | an API token (`user@realm!tokenid=secret`)    |
-| `open-meteo`  | Open-Meteo: temperature, feels-like, humidity, wind speed, rain       | nothing — leave `secret` out                  |
-| `jellyfin`    | Jellyfin: active streams                                              | an API key, from Dashboard → API Keys         |
+| `provider`    | Reads                                                                 | `secret` holds                                               |
+| ------------- | --------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `adguard`     | AdGuard Home: DNS queries, blocked, average delay, top blocked domain | `username:password`                                          |
+| `pihole-v5`   | Pi-hole 5: DNS queries, blocked, block rate, blocklist domains        | the API token, from Settings → Show API token                |
+| `pihole-v6`   | Pi-hole 6: the same four readings                                     | the web password, or an application password                 |
+| `uptime-kuma` | Uptime Kuma: monitors up, monitors down, 24-hour uptime               | nothing — leave `secret` out                                 |
+| `proxmox`     | Proxmox VE: guests running, guests stopped, CPU and memory use        | an API token (`user@realm!tokenid=secret`)                   |
+| `open-meteo`  | Open-Meteo: temperature, feels-like, humidity, wind speed, rain       | nothing — leave `secret` out                                 |
+| `jellyfin`    | Jellyfin: active streams                                              | an API key, from Dashboard → API Keys                        |
+| `sonarr`      | Sonarr: episodes in the download queue                                | an API key, from Settings → General → Security               |
+| `radarr`      | Radarr: movies in the download queue                                  | an API key, from Settings → General → Security               |
+| `prowlarr`    | Prowlarr: grabs in the download queue                                 | an API key, from Settings → General → Security               |
+| `immich`      | Immich: photos and videos stored                                      | an API key with the `server.statistics` permission (v1.137+) |
+| `paperless`   | Paperless-ngx: documents total, inbox waiting                         | an API token, from My Profile → Auth Tokens                  |
+| `gitea`       | Gitea: unread notifications                                           | an access token with the `notification` scope                |
+| `forgejo`     | Forgejo: unread notifications                                         | an access token with the `notification` scope                |
+| `glances`     | Glances: CPU and memory use                                           | nothing by default; `user:password` if started with auth on  |
 
 Three things about that table are worth saying out loud:
 
@@ -298,6 +306,15 @@ Three things about that table are worth saying out loud:
   browsers parked on Jellyfin's own dashboard idle without counting. Create a key under
   Dashboard → API Keys; without one the read goes out anonymously and most instances
   answer `401`.
+- **`href` for every provider added since is the base URL too** — Sonarr
+  (`https://sonarr.example:8989`), Radarr, Prowlarr, Immich (`:2283`), Paperless-ngx,
+  Gitea/Forgejo and Glances (`:61208`, the web-server port) all have their endpoint path
+  appended, so an instance behind a subpath cannot be addressed; point a reverse proxy
+  route at it instead. Two readings are worth calling out: Prowlarr's queue lives at
+  `/api/v1/queue`, not v3 like Sonarr's and Radarr's (handled for you — pick the right
+  token), and the Gitea/Forgejo unread count comes from the response's `X-Total-Count`
+  header rather than from the list itself, so it stays exact however many notifications
+  you have.
 - **These providers are transcribed from vendor documentation, not from a live instance
   behind this code.** Every other behaviour in this README has been reproduced; these
   endpoints have not. If one reports nothing, the server log names the host and the status.

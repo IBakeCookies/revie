@@ -23,6 +23,16 @@ import { $getUptimeKumaStats, type UptimeKumaWire } from '$lib/data/repository/u
 import { $getProxmoxStats, type ProxmoxWire } from '$lib/data/repository/proxmox';
 import { $getOpenMeteoStats, type OpenMeteoWire } from '$lib/data/repository/open-meteo';
 import { $getJellyfinStats, type JellyfinWire } from '$lib/data/repository/jellyfin';
+import {
+	$getProwlarrStats,
+	$getRadarrStats,
+	$getSonarrStats,
+	type ArrWire,
+} from '$lib/data/repository/arr';
+import { $getImmichStats, type ImmichWire } from '$lib/data/repository/immich';
+import { $getPaperlessStats, type PaperlessWire } from '$lib/data/repository/paperless';
+import { $getForgejoStats, $getGiteaStats, type ForgeWire } from '$lib/data/repository/forge';
+import { $getGlancesStats, type GlancesWire } from '$lib/data/repository/glances';
 
 /**
  * The page load awaits every read, so without a bound of our own an unreachable host
@@ -269,6 +279,79 @@ export function projectJellyfin(data: JellyfinWire): Stat[] {
 }
 
 /**
+ * One reading for all three *arr apps, because it is the same question — what is
+ * downloading right now. `totalRecords` is the queue's whole size whatever page size
+ * the server picked, so the count is exact without asking for a bigger page.
+ */
+export function projectArr(data: ArrWire): Stat[] {
+	return [
+		{
+			key: 'queue-length',
+			value: data.totalRecords,
+		},
+	];
+}
+
+export function projectImmich(data: ImmichWire): Stat[] {
+	return [
+		{
+			key: 'photos',
+			value: data.photos,
+		},
+		{
+			key: 'videos',
+			value: data.videos,
+		},
+	];
+}
+
+export function projectPaperless(data: PaperlessWire): Stat[] {
+	return [
+		{
+			key: 'documents-total',
+			value: data.documents_total,
+		},
+		{
+			key: 'documents-inbox',
+			value: data.documents_inbox,
+		},
+	];
+}
+
+/**
+ * The one number the notifications endpoint has that a start page wants, and the one
+ * the repository validated off the header rather than off the page — exact at any
+ * volume, because pagination never touched it.
+ */
+export function projectForge(data: ForgeWire): Stat[] {
+	return [
+		{
+			key: 'notifications-unread',
+			value: data.total,
+		},
+	];
+}
+
+/**
+ * Both readings are percentages on the wire (0–100); the shares the keys name are
+ * fractions, so both divide — the same rule Pi-hole's block rate follows. Reusing
+ * Proxmox's two keys is deliberate: they are the same questions about a different
+ * host, and one label each serves both.
+ */
+export function projectGlances(data: GlancesWire): Stat[] {
+	return [
+		{
+			key: 'cpu-share',
+			value: data.cpu.total / 100,
+		},
+		{
+			key: 'memory-share',
+			value: data.mem.percent / 100,
+		},
+	];
+}
+
+/**
  * Every provider a config may name. A missing key is a compile error, which is the same
  * guarantee the container schema gives the renderer — adding a provider is a repository
  * file, a projection and one line here.
@@ -281,6 +364,14 @@ const providers: Record<ProviderName, ReadProvider> = {
 	proxmox: (input) => read($getProxmoxStats(input), projectProxmox),
 	'open-meteo': (input) => read($getOpenMeteoStats(input), projectOpenMeteo),
 	jellyfin: (input) => read($getJellyfinStats(input), projectJellyfin),
+	sonarr: (input) => read($getSonarrStats(input), projectArr),
+	radarr: (input) => read($getRadarrStats(input), projectArr),
+	prowlarr: (input) => read($getProwlarrStats(input), projectArr),
+	immich: (input) => read($getImmichStats(input), projectImmich),
+	paperless: (input) => read($getPaperlessStats(input), projectPaperless),
+	gitea: (input) => read($getGiteaStats(input), projectForge),
+	forgejo: (input) => read($getForgejoStats(input), projectForge),
+	glances: (input) => read($getGlancesStats(input), projectGlances),
 };
 
 export type ReadStatsInput = {

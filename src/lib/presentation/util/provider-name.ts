@@ -20,4 +20,12 @@ export const providerNameLabel: Record<ProviderName, string> = {
 	proxmox: 'Proxmox VE',
 	'open-meteo': 'Open-Meteo',
 	jellyfin: 'Jellyfin',
+	sonarr: 'Sonarr',
+	radarr: 'Radarr',
+	prowlarr: 'Prowlarr',
+	immich: 'Immich',
+	paperless: 'Paperless-ngx',
+	gitea: 'Gitea',
+	forgejo: 'Forgejo',
+	glances: 'Glances',
 };

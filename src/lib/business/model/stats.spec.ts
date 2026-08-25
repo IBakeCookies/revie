@@ -5,6 +5,11 @@ import type { UptimeKumaWire } from '$lib/data/repository/uptime-kuma';
 import type { ProxmoxWire } from '$lib/data/repository/proxmox';
 import type { OpenMeteoWire } from '$lib/data/repository/open-meteo';
 import type { JellyfinWire } from '$lib/data/repository/jellyfin';
+import type { ArrWire } from '$lib/data/repository/arr';
+import type { ImmichWire } from '$lib/data/repository/immich';
+import type { PaperlessWire } from '$lib/data/repository/paperless';
+import type { ForgeWire } from '$lib/data/repository/forge';
+import type { GlancesWire } from '$lib/data/repository/glances';
 import { $getAdguardStats } from '$lib/data/repository/adguard';
 import { $getPiholeV5Stats } from '$lib/data/repository/pihole-v5';
 import { $getPiholeV6Stats } from '$lib/data/repository/pihole-v6';
@@ -12,6 +17,11 @@ import { $getUptimeKumaStats } from '$lib/data/repository/uptime-kuma';
 import { $getProxmoxStats } from '$lib/data/repository/proxmox';
 import { $getOpenMeteoStats } from '$lib/data/repository/open-meteo';
 import { $getJellyfinStats } from '$lib/data/repository/jellyfin';
+import { $getSonarrStats, $getRadarrStats, $getProwlarrStats } from '$lib/data/repository/arr';
+import { $getImmichStats } from '$lib/data/repository/immich';
+import { $getPaperlessStats } from '$lib/data/repository/paperless';
+import { $getGiteaStats, $getForgejoStats } from '$lib/data/repository/forge';
+import { $getGlancesStats } from '$lib/data/repository/glances';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { providerNames } from '$lib/business/model/config';
 import {
@@ -22,6 +32,11 @@ import {
 	projectUptimeKuma,
 	projectOpenMeteo,
 	projectJellyfin,
+	projectArr,
+	projectImmich,
+	projectPaperless,
+	projectForge,
+	projectGlances,
 	readStats,
 	readStatsFor,
 } from '$lib/business/model/stats';
@@ -55,6 +70,29 @@ vi.mock('$lib/data/repository/open-meteo', () => ({
 
 vi.mock('$lib/data/repository/jellyfin', () => ({
 	$getJellyfinStats: vi.fn(),
+}));
+
+vi.mock('$lib/data/repository/arr', () => ({
+	$getSonarrStats: vi.fn(),
+	$getRadarrStats: vi.fn(),
+	$getProwlarrStats: vi.fn(),
+}));
+
+vi.mock('$lib/data/repository/immich', () => ({
+	$getImmichStats: vi.fn(),
+}));
+
+vi.mock('$lib/data/repository/paperless', () => ({
+	$getPaperlessStats: vi.fn(),
+}));
+
+vi.mock('$lib/data/repository/forge', () => ({
+	$getGiteaStats: vi.fn(),
+	$getForgejoStats: vi.fn(),
+}));
+
+vi.mock('$lib/data/repository/glances', () => ({
+	$getGlancesStats: vi.fn(),
 }));
 
 /** Mirrors `STATS_TTL_MS`, which the module does not export — the same shape as `poll-services-state.spec.ts`. */
@@ -227,6 +265,36 @@ const jellyfinWatching: JellyfinWire = [
 		NowPlayingItem: {},
 	},
 ];
+
+const arr: ArrWire = {
+	totalRecords: 6,
+};
+
+const immich: ImmichWire = {
+	photos: 89_494,
+	videos: 1094,
+};
+
+const paperless: PaperlessWire = {
+	documents_total: 2349,
+	documents_inbox: 18,
+};
+
+const forge: ForgeWire = {
+	total: 200,
+};
+
+const glances: GlancesWire = {
+	// Both divide by 100 in the projection, so the fixtures are halves-and-quarters:
+	// `6.2 / 100` is not bit-equal to any literal, and an approximation would make this
+	// spec about float rounding instead of about the divide.
+	cpu: {
+		total: 6.25,
+	},
+	mem: {
+		percent: 53.125,
+	},
+};
 
 const failure = {
 	message: 'answered 200 with a body that is not stats',
@@ -449,6 +517,95 @@ describe('projectJellyfin', () => {
 	});
 });
 
+/**
+ * One projection for all three *arr apps: the same question — what is downloading — off
+ * the same envelope, with only the host differing.
+ */
+describe('projectArr', () => {
+	it('maps the queue size off the paging envelope, not off the page records', () => {
+		expect(projectArr(arr)).toEqual([
+			{
+				key: 'queue-length',
+				value: 6,
+			},
+		]);
+	});
+
+	it('reports an empty queue as zero rather than NaN', () => {
+		expect(
+			projectArr({
+				totalRecords: 0,
+			}),
+		).toEqual([
+			{
+				key: 'queue-length',
+				value: 0,
+			},
+		]);
+	});
+});
+
+describe('projectImmich', () => {
+	it('maps both counts through untouched', () => {
+		expect(projectImmich(immich)).toEqual([
+			{
+				key: 'photos',
+				value: 89_494,
+			},
+			{
+				key: 'videos',
+				value: 1094,
+			},
+		]);
+	});
+});
+
+describe('projectPaperless', () => {
+	it('maps the archive total and the inbox waiting to be processed', () => {
+		expect(projectPaperless(paperless)).toEqual([
+			{
+				key: 'documents-total',
+				value: 2349,
+			},
+			{
+				key: 'documents-inbox',
+				value: 18,
+			},
+		]);
+	});
+});
+
+describe('projectForge', () => {
+	it('carries the header total through as the unread count', () => {
+		expect(projectForge(forge)).toEqual([
+			{
+				key: 'notifications-unread',
+				value: 200,
+			},
+		]);
+	});
+});
+
+/**
+ * Both readings are percentages on the wire; the shares the keys name are fractions, so
+ * both divide — the same rule Pi-hole's block rate follows. A value passed through
+ * unchanged would render as `533%`.
+ */
+describe('projectGlances', () => {
+	it('turns both percentages into the fractions their keys name', () => {
+		expect(projectGlances(glances)).toEqual([
+			{
+				key: 'cpu-share',
+				value: 0.0625,
+			},
+			{
+				key: 'memory-share',
+				value: 0.53125,
+			},
+		]);
+	});
+});
+
 describe('readStats', () => {
 	beforeEach(() => {
 		vi.mocked($getAdguardStats).mockReset();
@@ -474,6 +631,14 @@ describe('readStats', () => {
 		vi.mocked($getProxmoxStats).mockResolvedValue([null, proxmox]);
 		vi.mocked($getOpenMeteoStats).mockResolvedValue([null, openMeteo]);
 		vi.mocked($getJellyfinStats).mockResolvedValue([null, jellyfin]);
+		vi.mocked($getSonarrStats).mockResolvedValue([null, arr]);
+		vi.mocked($getRadarrStats).mockResolvedValue([null, arr]);
+		vi.mocked($getProwlarrStats).mockResolvedValue([null, arr]);
+		vi.mocked($getImmichStats).mockResolvedValue([null, immich]);
+		vi.mocked($getPaperlessStats).mockResolvedValue([null, paperless]);
+		vi.mocked($getGiteaStats).mockResolvedValue([null, forge]);
+		vi.mocked($getForgejoStats).mockResolvedValue([null, forge]);
+		vi.mocked($getGlancesStats).mockResolvedValue([null, glances]);
 
 		for (const provider of providerNames) {
 			const read = await readStats({

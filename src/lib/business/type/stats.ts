@@ -41,7 +41,13 @@ export type NumericStatKey =
 	| 'humidity'
 	| 'wind-speed'
 	| 'precipitation'
-	| 'streams-active';
+	| 'streams-active'
+	| 'queue-length'
+	| 'photos'
+	| 'videos'
+	| 'documents-total'
+	| 'documents-inbox'
+	| 'notifications-unread';
 
 export type TextStatKey = 'top-blocked-domain';
 
