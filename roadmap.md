@@ -17,12 +17,12 @@ over effort. Effort is `S` / `M` / `L`.
 integrations, so it is the one item no review pass produced, and the one whose external API details
 are not verified against this repo. It says so in place.
 
-**Numbers are stable, so gaps mean landed.** 5 items are open — #10 from the review passes, the
-rest of #33's provider list above, 38 under New work, and 49–51 under New containers minus the
-landed #50; **1, 2, 3, 4, 5,
+**Numbers are stable, so gaps mean landed.** 4 items are open — #10 from the review passes, the
+rest of #33's provider list above, and 49–51 under New containers minus the landed #50;
+**1, 2, 3, 4, 5,
 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 34,
-35, 36, 37, 39, 40, 41, 42, 43, 44, 45, 46, 47 and 48 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
+35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47 and 48 are done** — the decisions worth not reverting moved into AGENTS.md's "Already done" and Invariants,
 and the rest of the numbering stays put so the cross-references below keep resolving. A landed item
 _inside_ a numbered list has to stay a numbered item, as #11 does: **prettier renumbers ordered
 lists**, so deleting one and leaving a hole silently pulls every later item up by one on the next
@@ -729,20 +729,48 @@ through with`theme: undefined` and the default's class set.
       _Files:_ src/lib/business/store/theme-store.svelte.spec.ts,
       src/lib/test/theme-store-harness.svelte
 
-38. **Stop a failed stats refresh from parking the tab on the error page** (`M`). The deliberate
-    gap #16 recorded: the 60s `invalidate('dashboard:stats')`
-    ([+page.svelte:90](src/routes/[...slug]/+page.svelte#L90)) re-runs the WHOLE load, so a tick
-    that hits `error(503)` (config caught mid-write) or `error(404)` (a page key renamed under an
-    open tab) swaps the dashboard for the error page — and the unmounted page takes its interval
-    with it, so the tab stays wrong until a manual reload. The recorded shape is a dedicated
-    endpoint the client polls, the shape `/api/ping` already has: POST body names instances,
-    allowlist-guarded, readings keyed `provider` + `href`, no credential ever returned — so the
-    refresh stops re-running the config half at all. Two decisions on the way: where the interval
-    lives (staying on the page keeps the gate that skips installs with no `BoxStats`; moving it
-    above the page is what survives the swap), and first paint stays SSR — the TTL cache already
-    bounds it. _Not built_, per the standing refusal: any client-side fetch of providers (SSRF
-    surface — `/api/ping`'s allowlist is the precedent). _Files:_ src/routes/api/stats/ (new),
-    src/routes/[...slug]/, src/lib/business/store/stats-store.svelte.ts
+38. ~~**Stop a failed stats refresh from parking the tab on the error page**~~ (`M`) —
+    **LANDED.** POST `/api/stats` ([src/routes/api/stats/+server.ts](src/routes/api/stats/+server.ts),
+    new) is `/api/ping`'s shape: the body NAMES instances (`{ stats: string[], feeds: string[] }`
+    — stat keys and feed hrefs), checked against an allowlist built from ALL pages'
+    collectors; which provider reads which URL and with what credential stays the server's
+    decision, and no credential ever crosses back. The client tick in
+    [[...slug]/+page.svelte](src/routes/[...slug]/+page.svelte) fetches it and merges each
+    answer as an overlay over `data` instead of invalidating the load, whose re-run was the
+    whole defect: nothing on the endpoint's path throws on config drift, so the worst a tick can
+    do is change nothing. `depends('dashboard:stats')` is gone with the swap it enabled. What
+    the item left open or got wrong:
+    - **The interval stays ON the page** — the item offered this as one of two decisions and the
+      other one died with the defect: moving above the page existed to survive the error-page
+      swap, which no longer happens, while staying keeps the `refreshable` gate that skips
+      installs with no live boxes. A response that outlives the `data` it was asked for is
+      discarded, and navigation drops the overlay outright.
+    - **Feeds ride the same endpoint**, though the item said stats: they already counted in
+      `refreshable`, so a stats-only endpoint would have silently stopped refreshing every feed
+      box. One round trip per tick for both beats two endpoints.
+    - **The fold moved into business, not duplicated.** The load's private `planReads` +
+      folding became `readStatsFor(targets, env)` / `readFeedsFor(hrefList)` beside their read
+      functions — credential resolution included, env handed IN as a parameter (R1). The
+      endpoint was the second real caller, which is what sanctioned the extraction; both routes
+      print the folds' finished log lines.
+    - **A skipped instance, not ping's loud 403**: one stale key (a box deleted under an open
+      tab) must not take the tick's other answers down with it, and silence does not confirm
+      unconfigured keys to a probing caller.
+    - **The fourth `console` home.** After first paint the endpoint owns every stats and feed
+      read reaching the network, so its failures print there or nowhere — the standing "don't
+      add a fourth home" note in AGENTS.md was written when three covered every read, and is
+      amended, not broken.
+    - **No rate limit** (TTL cache bounds what any number of calls can spend; #45's budget is
+      the precedent if that stops being true) and **no wake listeners** (parity with the
+      invalidate behaviour replaced, per the recorded refusal to share one helper with #18).
+    - One recurrence of the #34 lesson: `[]` is valid JSON that `typeof` calls an object, so
+      the body guard names arrays — an array would otherwise be answered with a silent empty
+      success. Fenced by [stats.spec.ts](src/routes/api/stats/stats.spec.ts), beside the
+      allowlist cases; the folds are fenced in `stats.spec.ts` / `feed.spec.ts`, and the load's
+      slimmed contract in `page.server.spec.ts`.
+      _Files:_ src/routes/api/stats/ (new), src/routes/[...slug]/,
+      src/lib/business/model/stats.ts, src/lib/business/model/feed.ts,
+      eslint.config.js (fourth console home)
 
 39. ~~**Web app manifest, theme-color and touch icons**~~ — **LANDED.**
     [manifest.webmanifest](static/manifest.webmanifest) names the product ("Revie Dashboard"),

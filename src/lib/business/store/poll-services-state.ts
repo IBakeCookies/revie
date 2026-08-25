@@ -6,11 +6,11 @@ const POLL_INTERVAL_MS = 1000 * 60 * 15;
 
 /**
  * What a poll would measure, as a SCALAR an `$effect` can depend on. `containers` is a
- * freshly deserialized array after every load re-run, and the stats refresh re-runs the
- * load every 60s — so an effect tracking the array tore the 15-minute poll down and
+ * freshly deserialized array after every navigation — the stats refresh used to re-run
+ * the load every 60s too, which is what originally tore the 15-minute poll down and
  * started a new one, with its eager first tick, once a minute. A list would carry the
  * same defect: a new array is a new identity even when the hrefs are the same. Only a
- * navigation changes what this returns.
+ * navigation that actually changes the boxes changes what this returns.
  *
  * Already deduped by `collectServiceProbes`, which is where that rule lives — and which
  * also drops `probe: 'none'`, so a bookmark is never measured.

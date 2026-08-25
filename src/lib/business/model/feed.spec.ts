@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { $getFeed, type FeedWire } from '$lib/data/repository/feed';
-import { projectFeed, readFeed } from '$lib/business/model/feed';
+import { projectFeed, readFeed, readFeedsFor } from '$lib/business/model/feed';
 
 vi.mock('$lib/data/repository/feed', () => ({
 	$getFeed: vi.fn(),
@@ -165,5 +165,73 @@ describe('readFeed', () => {
 		expect($getFeed).toHaveBeenCalledTimes(2);
 		expect(live.isFresh).toBe(false);
 		expect(live.result).toEqual([null, wire]);
+	});
+});
+
+/**
+ * The fold both callers share — the page load for first paint, `/api/stats` for every
+ * refresh tick. The repository is mocked whole (`readFeed` above covers the read), so
+ * this pins the folding: keyed per href, failures as data, log lines only for reads
+ * that went to the network.
+ */
+describe('readFeedsFor', () => {
+	beforeEach(() => {
+		vi.mocked($getFeed).mockReset();
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('folds successful reads into feeds, keyed per href', async () => {
+		vi.mocked($getFeed).mockResolvedValue([null, wire]);
+
+		const fold = await readFeedsFor(['https://folded.local']);
+
+		expect(fold.feeds).toEqual({
+			'https://folded.local': wire,
+		});
+
+		expect(fold.failed).toEqual([]);
+		expect(fold.errors).toEqual([]);
+	});
+
+	// One feed down does not blank the one that answered, and the failed href is ABSENT
+	// from feeds, not present and empty — the box renders its unavailable line.
+	it('keeps the feeds that answered when another one did not', async () => {
+		vi.mocked($getFeed).mockImplementation(async ({ href }) =>
+			href === 'https://live-fold.local' ? [null, wire] : [failure, null],
+		);
+
+		const fold = await readFeedsFor(['https://live-fold.local', 'https://dead-fold.local']);
+
+		expect(fold.feeds).toEqual({
+			'https://live-fold.local': wire,
+		});
+
+		expect(fold.failed).toEqual(['https://dead-fold.local']);
+		expect(fold.errors).toEqual([failure.message]);
+	});
+
+	// Same gate as the stats fold: a failure served from the TTL cache still fails its
+	// box but must not be re-printed once per request by a refreshing tab.
+	it('logs a fresh failure but not a cached one', async () => {
+		vi.mocked($getFeed).mockResolvedValue([failure, null]);
+
+		const href = 'https://logged-once.local';
+		const first = await readFeedsFor([href]);
+		expect(first.errors).toEqual([failure.message]);
+
+		vi.advanceTimersByTime(FEED_TTL_MS - 1);
+
+		const second = await readFeedsFor([href]);
+		expect(second.errors).toEqual([]);
+		expect(second.failed).toEqual([href]);
+
+		vi.advanceTimersByTime(1);
+
+		const third = await readFeedsFor([href]);
+		expect(third.errors).toEqual([failure.message]);
 	});
 });

@@ -23,7 +23,9 @@ import {
 	projectOpenMeteo,
 	projectJellyfin,
 	readStats,
+	readStatsFor,
 } from '$lib/business/model/stats';
+import { statsKey } from '$lib/business/model/config';
 
 vi.mock('$lib/data/repository/adguard', () => ({
 	$getAdguardStats: vi.fn(),
@@ -624,5 +626,171 @@ describe('readStats', () => {
 		// for it.
 		expect($getAdguardStats).toHaveBeenCalledTimes(2);
 		expect(other.isFresh).toBe(true);
+	});
+});
+
+/**
+ * The fold both callers share — the page load for first paint, `/api/stats` for every
+ * refresh tick. The repositories are mocked whole (the describes above cover the reads),
+ * so what this one pins is the PLANNING: credential resolution against the environment
+ * record handed in, the skip-not-fail rule for an unset variable, and which failures
+ * earn a log line.
+ */
+describe('readStatsFor', () => {
+	beforeEach(() => {
+		vi.mocked($getAdguardStats).mockReset();
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function target(href: string) {
+		return {
+			key: statsKey('adguard', href),
+			provider: 'adguard' as const,
+			href,
+		};
+	}
+
+	it('folds successful reads into stats, keyed per target', async () => {
+		vi.mocked($getAdguardStats).mockResolvedValue([null, raw]);
+
+		const href = 'http://folded.local';
+		const fold = await readStatsFor([target(href)], {});
+
+		expect(fold.stats).toEqual({
+			[statsKey('adguard', href)]: projected,
+		});
+
+		expect(fold.failed).toEqual([]);
+		expect(fold.errors).toEqual([]);
+		expect(fold.warnings).toEqual([]);
+	});
+
+	// The secret scheme's mangling rule, tested where it now lives: `DASHBOARD_SECRET_`
+	// plus the target's value VERBATIM. Folding case or punctuation would invent
+	// collisions whose failure mode is the wrong credential, silently.
+	it('resolves the credential from the variable the target names, verbatim', async () => {
+		vi.mocked($getAdguardStats).mockResolvedValue([null, raw]);
+
+		const href = 'http://credentialed-fold.local';
+
+		await readStatsFor(
+			[
+				{
+					...target(href),
+					secret: 'Folded_Main',
+				},
+			],
+			{
+				DASHBOARD_SECRET_Folded_Main: 'admin:secret',
+			},
+		);
+
+		expect($getAdguardStats).toHaveBeenCalledWith(
+			expect.objectContaining({
+				href,
+				credential: 'admin:secret',
+			}),
+		);
+	});
+
+	/**
+	 * An absence, not a failure: a variable the config names and nobody set is the
+	 * operator's own setup decision, so the target is skipped — not read, not reported —
+	 * and costs exactly one warning line, once per variable per process.
+	 */
+	it('skips a target whose variable is unset, warning once per process', async () => {
+		vi.mocked($getAdguardStats).mockResolvedValue([null, raw]);
+
+		const href = 'http://unset-secret.local';
+
+		const targets = [
+			{
+				...target(href),
+				secret: 'UNSET_ONCE',
+			},
+		];
+
+		const first = await readStatsFor(targets, {});
+
+		expect($getAdguardStats).not.toHaveBeenCalled();
+		expect(first.stats).toEqual({});
+		expect(first.failed).toEqual([]);
+
+		expect(first.warnings).toEqual([
+			'DASHBOARD_SECRET_UNSET_ONCE is not set, skipping http://unset-secret.local',
+		]);
+
+		const second = await readStatsFor(targets, {});
+
+		expect(second.warnings).toEqual([]);
+	});
+
+	it('reads a target that names no secret at all, anonymously', async () => {
+		vi.mocked($getAdguardStats).mockResolvedValue([null, raw]);
+
+		const fold = await readStatsFor([target('http://anonymous.local')], {});
+
+		expect($getAdguardStats).toHaveBeenCalledWith(
+			expect.objectContaining({
+				credential: undefined,
+			}),
+		);
+
+		expect(Object.keys(fold.stats)).toHaveLength(1);
+	});
+
+	// One box down does not blank the one that answered, and the failure crosses as
+	// data — key, provider, href — with the failed key ABSENT from stats, so its box
+	// renders its unavailable line rather than blanks.
+	it('keeps the instances that answered when another one did not', async () => {
+		vi.mocked($getAdguardStats).mockImplementation(async ({ href }) =>
+			href === 'http://live-fold.local' ? [null, raw] : [failure, null],
+		);
+
+		const fold = await readStatsFor(
+			[target('http://live-fold.local'), target('http://dead-fold.local')],
+			{},
+		);
+
+		expect(fold.stats).toEqual({
+			[statsKey('adguard', 'http://live-fold.local')]: projected,
+		});
+
+		expect(fold.failed).toEqual([
+			{
+				key: statsKey('adguard', 'http://dead-fold.local'),
+				provider: 'adguard',
+				href: 'http://dead-fold.local',
+			},
+		]);
+	});
+
+	/**
+	 * Only what actually went to the network earns a log line: a failure served again
+	 * from the TTL cache still fails its box, but a refreshing tab must not re-print it
+	 * once per request. The window is walked with fake timers, as in `readStats` above.
+	 */
+	it('logs a fresh failure but not a cached one', async () => {
+		vi.mocked($getAdguardStats).mockResolvedValue([failure, null]);
+
+		const href = 'http://logged-once.local';
+		const targets = [target(href)];
+		const first = await readStatsFor(targets, {});
+		expect(first.errors).toEqual([failure.message]);
+
+		vi.advanceTimersByTime(STATS_TTL_MS - 1);
+
+		const second = await readStatsFor(targets, {});
+		expect(second.errors).toEqual([]);
+		expect(second.failed).toHaveLength(1);
+
+		vi.advanceTimersByTime(1);
+
+		const third = await readStatsFor(targets, {});
+		expect(third.errors).toEqual([failure.message]);
 	});
 });

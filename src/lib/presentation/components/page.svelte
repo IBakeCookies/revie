@@ -34,10 +34,11 @@
 	setStatsStore(() => stats);
 	setFeedStore(() => feeds);
 
-	// The key, not `containers`: the stats refresh in `[...slug]/+page.svelte` re-runs the
-	// load every 60s and hands this component a rebuilt array each time, so an effect
-	// tracking the array restarted the 15-minute poll every minute — re-probing every
-	// service on the way, and re-toasting one that keeps failing.
+	// The key, not `containers`: a client-side navigation hands this component a freshly
+	// deserialized array for the new page while the old one's service poll may still be
+	// mid-flight, so an effect tracking the array restarted the 15-minute poll on every
+	// navigation — re-probing every service on the way, and re-toasting one that keeps
+	// failing. Only a navigation changes what this returns.
 	const probeKey = $derived(serviceProbeKey(containers));
 
 	$effect(() => pollServicesState(servicesStore, probeKey));

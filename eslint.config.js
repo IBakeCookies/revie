@@ -312,12 +312,12 @@ export default defineConfig(
 		// The log half of the errors-as-values rule, and its only sinks: the
 		// `AppError.message` a toast must never render prints here, unconditionally,
 		// because a diagnostic has a fixed sink. AGENTS.md's console paragraph owns the
-		// list; don't add a fourth home. `scripts/` is a CLI telling a terminal where it
-		// wrote a file.
+		// list. `scripts/` is a CLI telling a terminal where it wrote a file.
 		files: [
 			'src/routes/+layout.server.ts',
 			// Minimatch reads `[...slug]` as a character class, so the brackets are escaped.
 			'src/routes/\\[...slug\\]/+page.server.ts',
+			'src/routes/api/stats/+server.ts',
 			'src/lib/business/store/service-store.svelte.ts',
 			'scripts/**',
 		],

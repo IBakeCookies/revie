@@ -93,3 +93,61 @@ export async function readFeed({ href }: ReadFeedInput): Promise<FeedRead> {
 		isFresh: true,
 	};
 }
+
+/**
+ * A set of feed reads folded into the shape a route hands on — the same seam
+ * `StatsFold` uses, minus the credential half: a feed read has no secret to resolve.
+ */
+export type FeedFold = {
+	/** Keyed by the bare href; a feed that failed is ABSENT, not empty. */
+	feeds: Record<string, FeedItem[]>;
+	/** The bare href of every feed that was asked and did not answer. */
+	failed: string[];
+	/** One line per failure that went to the network for THIS call, in config order. */
+	errors: string[];
+};
+
+/**
+ * Every read for a set of feeds, folded. The href is the whole identity a read has,
+ * so it is both the key and what a failure reports.
+ */
+export async function readFeedsFor(hrefs: string[]): Promise<FeedFold> {
+	// Concurrent, so the 3s bound stays the cost of the whole read rather than of each
+	// feed in turn — same reasoning as `readStatsFor`. Collected first and folded
+	// after, so the keys come out in config order.
+	const reads = await Promise.all(
+		hrefs.map(async (href) => ({
+			href,
+			read: await readFeed({
+				href,
+			}),
+		})),
+	);
+
+	const fold: FeedFold = {
+		feeds: {},
+		failed: [],
+		errors: [],
+	};
+
+	for (const { href, read } of reads) {
+		const [err, items] = read.result;
+
+		// Split like the stats fold: the log line names the host and what was wrong
+		// with its answer and is gated on actually having gone to the network; what
+		// crosses in `failed` is the bare href, which the route turns into copy.
+		if (err) {
+			if (read.isFresh) {
+				fold.errors.push(err.message);
+			}
+
+			fold.failed.push(href);
+
+			continue;
+		}
+
+		fold.feeds[href] = items;
+	}
+
+	return fold;
+}

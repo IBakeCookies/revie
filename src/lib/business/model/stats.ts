@@ -13,7 +13,7 @@
  * Compile-time completeness is identical either way: `Record<ProviderName, ReadProvider>`.
  */
 
-import type { ProviderName } from '$lib/business/model/config';
+import type { ProviderName, StatsTarget } from '$lib/business/model/config';
 import type { Result } from '$lib/utils/useAsyncErrorAsValue';
 import type { Stat } from '$lib/business/type/stats';
 import { $getAdguardStats, type AdguardWire } from '$lib/data/repository/adguard';
@@ -338,4 +338,144 @@ export async function readStats({
 		result,
 		isFresh: true,
 	};
+}
+
+/** Which box could not be read, named the way a page has to name it. */
+export type StatsFailure = {
+	/** The same key the readings are recorded under, so the page can dedupe on it. */
+	key: string;
+	provider: ProviderName;
+	href: string;
+};
+
+/**
+ * A set of reads folded into the shape a route hands on: readings keyed per instance,
+ * one entry per instance that was asked and did not answer, and finished log lines for
+ * the operator channel. Minting the sentences here is the same seam
+ * `normalizeConfig`'s warnings use — this layer has no sink, so it returns them and
+ * the route prints.
+ */
+export type StatsFold = {
+	/** Keyed by `statsKey(provider, href)`; an instance that failed is ABSENT, not empty. */
+	stats: Record<string, Stat[]>;
+	failed: StatsFailure[];
+	/** One line per failure that went to the network for THIS call, in config order. */
+	errors: string[];
+	/** One line per secret variable named and unset, each once per process. */
+	warnings: string[];
+};
+
+const SECRET_PREFIX = 'DASHBOARD_SECRET_';
+/**
+ * Which secret variables have already been reported missing. `$env/dynamic/private`
+ * cannot change without a restart, so each variable has exactly one thing to say per
+ * process — ungated it printed once per request, which the client's refresh turns into
+ * once a minute per open tab. Bounded by `config.json`, like the cache above, so it is
+ * not pruned. Process state beside the cache, on the same precedent.
+ */
+const warnedSecrets = new Set<string>();
+
+/**
+ * Every read for a set of targets, planned and folded. The environment record comes in
+ * as a parameter because a model imports nothing to get at it (R1) — the route owns
+ * `$env/dynamic/private`.
+ *
+ * A target that names a variable which is not set is SKIPPED — not read, not flagged,
+ * not toasted — because that is an operator's own setup decision and toasting it would
+ * put it in front of every visitor on every page load; it costs one warning line, once
+ * per variable per process. A target that names no variable at all is read
+ * anonymously: right for a provider that needs no credential, and a provider that does
+ * answers 401, which is an ordinary failure and says so.
+ *
+ * The config's value is appended VERBATIM: folding case or punctuation would invent
+ * collisions whose failure mode is the wrong credential, silently, while verbatim lets
+ * the warning name the literal key it looked up.
+ */
+export async function readStatsFor(
+	targets: StatsTarget[],
+	env: Record<string, string | undefined>,
+): Promise<StatsFold> {
+	const jobs: { target: StatsTarget; credential?: string }[] = [];
+	const warnings: string[] = [];
+
+	for (const target of targets) {
+		if (!target.secret) {
+			jobs.push({
+				target,
+			});
+
+			continue;
+		}
+
+		const name = `${SECRET_PREFIX}${target.secret}`;
+		const credential = env[name];
+
+		if (!credential) {
+			if (!warnedSecrets.has(name)) {
+				warnedSecrets.add(name);
+
+				warnings.push(`${name} is not set, skipping ${target.href}`);
+			}
+
+			continue;
+		}
+
+		jobs.push({
+			target,
+			credential,
+		});
+	}
+
+	// Concurrent, so the 3s bound stays the cost of the whole read rather than of each
+	// instance in turn — three dead boxes must not gate first byte for 9s. Collected
+	// first and folded after, so the log lines and the keys come out in config order
+	// rather than in whatever order the hosts happened to answer.
+	const reads = await Promise.all(
+		jobs.map(async ({ target, credential }) => ({
+			target,
+			read: await readStats({
+				key: target.key,
+				provider: target.provider,
+				href: target.href,
+				credential,
+			}),
+		})),
+	);
+
+	const fold: StatsFold = {
+		stats: {},
+		failed: [],
+		errors: [],
+		warnings,
+	};
+
+	for (const { target, read } of reads) {
+		const [err, result] = read.result;
+
+		// The log line and the report carry different things, and only the log is gated:
+		// the message already names the host and the status (the repository passes the
+		// href as the context `useAsyncErrorAsValue` prefixes), and a dead box under a
+		// refreshing tab must print once per TTL window rather than once per request.
+		// What crosses in `failed` is the provider and the href — data, never copy. Not
+		// `err.cause` in either: a bounded fetch's timeout arrives as a DOMException
+		// whose stack is ten frames of undici internals naming neither the service nor
+		// the host.
+		if (err) {
+			if (read.isFresh) {
+				fold.errors.push(err.message);
+			}
+
+			fold.failed.push({
+				key: target.key,
+				provider: target.provider,
+				href: target.href,
+			});
+
+			continue;
+		}
+
+		fold.stats[target.key] = result;
+	}
+
+	return fold;
 }

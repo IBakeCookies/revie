@@ -240,10 +240,10 @@ mtimeMs, isFresh }`. Neither prints. `isFresh` is true only on the call that act
   never will, so rendering one puts an English line on a German page with nothing short of this
   rule to fix it. What crosses a layer is **data or a kind**, never a sentence:
 
-  | Producer        | Hands over                                   | Words chosen by                                              |
-  | --------------- | -------------------------------------------- | ------------------------------------------------------------ |
-  | `ServicesStore` | `NotifyProbeFailed = (href: string) => void` | `[...slug]/+page.svelte`: `m.service_probe_failed({ href })` |
-  | the stats load  | `failedStats: { key, provider, href }[]`     | the same route: `m.stats_load_failed({ provider, href })`    |
+  | Producer                           | Hands over                                   | Words chosen by                                              |
+  | ---------------------------------- | -------------------------------------------- | ------------------------------------------------------------ |
+  | `ServicesStore`                    | `NotifyProbeFailed = (href: string) => void` | `[...slug]/+page.svelte`: `m.service_probe_failed({ href })` |
+  | the stats load and POST /api/stats | `failedStats: { key, provider, href }[]`     | the same route: `m.stats_load_failed({ provider, href })`    |
 
   So `ServicesStore` keeps its own `console.error(err.message, …)` **unconditionally** — that
   is a diagnostic, and a diagnostic has a fixed sink — while the injected half carries the href
@@ -478,7 +478,13 @@ config.json ─(provider + href + secret)→ business/model/config.ts   collectS
             ─(TTL cache + one AbortSignal)→ business/model/stats.ts  readStats
             ─(fetch + wire schema)→ data/repository/<vendor>.ts
             ─(project)→ Stat[] ─→ StatsStore ─→ box-stats.svelte
+
+every 60s:  POST /api/stats ─(allowlist from ALL pages)→ readStatsFor (the same fold)
+            ─→ JSON, no credential in it ─→ overlay over `data` in [+page.svelte](src/routes/[...slug]/+page.svelte)
 ```
+
+Both routes print their folds' log lines; the load owns first paint and the endpoint owns every
+tick after it — see "Already done" for why the refresh stopped invalidating the load.
 
 Seven ship: `adguard`, `pihole-v5`, `pihole-v6`, `uptime-kuma`, `proxmox`, `open-meteo`,
 `jellyfin`. Adding another is
@@ -1268,10 +1274,15 @@ file doesn't start the drift.
 ([vite.config.ts](vite.config.ts)). A spec that builds a fixture and forgets to assert is a
 green test that proves nothing, which is worse than no test.
 
-**`console` has exactly three homes, all of them routes or stores, and `no-console: 'error'`
+**`console` has exactly four homes, all of them routes or stores, and `no-console: 'error'`
 guards everywhere else.** `business/store/service-store.svelte.ts` (1 — the probe diagnostic),
-`+layout.server.ts` (2 — config diagnostics) and `[...slug]/+page.server.ts` (5 — config
-diagnostics plus the stats and feed operator channels). Measured: a global `no-console` reports 9, the
+`+layout.server.ts` (2 — config diagnostics), `[...slug]/+page.server.ts` (5 — config
+diagnostics plus the stats and feed operator channels) and `api/stats/+server.ts` (3 — the same
+operator channels for the refresh ticks, whose reads reach the network after first paint, so
+their failures print here or nowhere). The fourth is #38's doing and the one deliberate widening
+of this list: an earlier version of it said "don't add a fourth home", written when the three
+covered every read; the endpoint became a reader of the same folds and inherited the same duty.
+Measured: a global `no-console` reports 10, the
 other two being outside `src` and neither a home — `dps.js`, which [roadmap.md](roadmap.md) #10
 deletes, and `scripts/screenshot.js`, a CLI whose whole job is to tell a terminal where it wrote
 a file. **#23 has landed, and this is what it bought:** `business/model/config.ts` and
@@ -1279,9 +1290,9 @@ a file. **#23 has landed, and this is what it bought:** `business/model/config.t
 returns its diagnostics instead. What is left is **deliberate and permanent** — the log half of
 the no-copy-crosses-a-layer rule, carrying the `AppError.message` that must never reach a toast.
 They are unconditional rather than injected precisely because a diagnostic has a fixed sink, and
-that is the one thing zenith uses its `logger.ts` for. Don't add a fourth home, and don't reach
+that is the one thing zenith uses its `logger.ts` for. Don't add a fifth home, and don't reach
 for zenith's `no-console: 'error'` + a `logger.ts` to force the issue: a logger module would be a
-second seam competing with the injected notify. **`no-console: 'error'` is on**, with those four
+second seam competing with the injected notify. **`no-console: 'error'` is on**, with those five
 homes exempted in [eslint.config.js](eslint.config.js) — plus `dps.js`, until #10 deletes the
 file and its block with it. The exemption block sits after every layer block, where nothing can
 override it, and the `[...slug]` path is escaped there because minimatch reads unescaped
@@ -1368,7 +1379,7 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
      above it, and `page.stories.svelte` mounts exactly that — while setting the store from a
      stories file gives every story on the autodocs page one shared context. Left out, the
      failure is still logged by the store; only the toast is missing.
-  3. **The stats load returns `{ stats, failed }`, and the load passes `failedStats`.** Data,
+  3. **The stats fold returns `{ stats, failed }`, and the load passes `failedStats`.** Data,
      not a message — see the no-copy rule above. An empty `failed` is reserved for an _absence_
      — no box configured, or a `secret` naming a variable nobody set — because toasting an
      operator's own setup decision would put it in front of every visitor on every page load.
@@ -1456,57 +1467,72 @@ Not roadmap items — recorded so nobody re-derives them or "fixes" them back.
      one paying the repository's 3s bound, so a success-only cache would have left the measured
      `ttfb=2.996s` / `2.954s` exactly where it was. Same reasoning as `config-source.ts` caching a
      read failure against its stamp; here the window expiring is what retries.
-  2. **`isFresh` gates the route's `console.error`, not the report.** The entry still reaches
-     `failedStats` on a cached failure — the box is empty either way — while the operator log
-     prints once per window. Unconditional, a refreshing tab would put back the per-request spam
-     #23 removed.
+  2. **`isFresh` gates the LOG line, not the report.** The failure still crosses in `failed` on a
+     cached read — the box is empty either way — while the operator log prints once per window.
+     The fold composes its `errors` only for reads that went to the network; unconditional, a
+     refreshing tab would put back the per-request spam #23 removed.
   3. **Keyed per instance, not one blob**, so two pages naming different hosts do not evict each other
      and a dead instance does not cost a live sibling its freshness.
   4. **Not pruned, deliberately.** `admin-auth.ts` prunes because a stranger picks its keys; these
      come out of `config.json`, so the set is bounded by a file one operator writes.
   5. **The refresh interval is 60s and must stay `>=` the TTL.** Shorter, and a tick only re-reads
-     the cache and the box never moves. It is `depends('dashboard:stats')` in the load plus a
-     `setInterval` in [+page.svelte](src/routes/[...slug]/+page.svelte) gated on
-     `document.visibilityState === 'visible'` and cleared by its effect's teardown. **Nothing was
-     extracted out of `poll-services-state.ts`, and #18 landing is what settled that** rather
+     the cache and the box never moves. It is a `setInterval` in [+page.svelte](src/routes/[...slug]/+page.svelte)
+     gated on `document.visibilityState === 'visible'` and cleared by its effect's teardown.
+     **Nothing was extracted out of `poll-services-state.ts`, and #18 landing is what settled that** rather
      than making it a duplication: this gate exists to SUPPRESS a tick nobody is reading, while
      #18's wake listeners exist to CREATE the tick the interval never delivered, so one helper
      serving both would carry a flag telling the two apart. Two callers were the argument for
-     extracting; the two wanting opposite things is the reason against.
-  6. **`invalidate` re-runs the WHOLE load, and everything that re-runs with it needs a gate.**
-     Four of them, each a named failure rather than caution:
-     - `readConfig` runs again per tick — accepted, it is mtime-cached, so a tick that changes
-       nothing costs one `stat`.
-     - The load also rebuilds `containers`, a fresh array every tick, so
-       [page.svelte](src/lib/presentation/components/page.svelte)'s `$effect` restarted the
-       15-minute service poll every minute — re-probing every configured service and, because
-       `ToastStore` only dedupes what is on screen, re-toasting a probe that keeps failing.
-       That effect depends on `serviceProbeKey(containers)`, a joined href list, so it re-runs
-       when the SET changes and not when the array carrying it does.
-     - The interval itself is gated on the page having something to refresh (a reading that
-       arrived, or a read that failed). `[...slug]` matches every config page, so ungated it
-       costs an install with no `BoxStats` a load round trip a minute, forever, for a record
-       that is always empty.
-     - The unset-secret `console.warn` is the one branch no cache gates — it skips the target
-       before `readStats` — so it warns once per VARIABLE per process behind a module-scope
-       `Set`. `$env/dynamic/private` cannot change without a restart, so each name has exactly
-       one thing to say.
-
-     One gap is left and is a trade, not an oversight: a tick whose load hits `error(503)`
-     (config caught mid-write by a non-atomic editor) or `error(404)` (a page key renamed under
-     an open tab) swaps the dashboard for the error page, and the unmounted page takes its
-     interval with it, so the tab stays there until a manual reload. Closing it means keeping
-     the interval above the page — in the layout, which survives the swap — and the layout
-     cannot know whether the page it is showing has a `BoxStats`, so that trades a rare
-     operator-caused park for the certain, continuous waste the gate above removes. Take the
-     gate. Closing it properly means the refresh not re-running the config half at all — a
-     dedicated endpoint the store polls, the shape `/api/ping` already has — which is a
-     different item, not a patch to this one.
+     extracting; the two wanting opposite things is the reason against. (The stats tick has no
+     wake listeners on purpose — parity with what it replaced, not an oversight.)
+  6. **The tick polls POST `/api/stats`, and the load only paints first render — #38, closing the
+     gap #16 recorded.** The refresh used to be `depends('dashboard:stats')` plus `invalidate`,
+     which re-ran the WHOLE load every minute, so a bad tick — config caught mid-write answering
+     503, or a page key renamed under an open tab answering 404 — swapped the dashboard for the
+     error page, and the unmounted page took its interval with it: the tab stayed wrong until a
+     manual reload. Nothing on the endpoint's path throws on config drift, so the worst a tick
+     can do is change nothing. Six things about it are decisions:
+     - **The body NAMES instances and never gets to define them**, `/api/ping`'s shape:
+       `{ stats: string[], feeds: string[] }` carries stat keys (`statsKey(provider, href)`
+       strings) and feed hrefs, checked against an allowlist built from ALL pages'
+       `collectStatsTargets` / `collectFeedTargets` — all pages, like ping's map, because the
+       endpoint cannot know which page the caller sits on. Which provider reads which URL and
+       with what credential stays the server's decision, and **no credential ever crosses back**.
+     - **An unconfigured requested instance is SKIPPED, not refused** — deliberately quieter than
+       ping's 403. One stale key (a box deleted under an open tab) must not take the tick's other
+       answers down with it, or config drift would freeze every live box until reload: a small
+       version of the park this endpoint exists to close. The silence also keeps the endpoint
+       from confirming unconfigured keys to a probing caller.
+     - **No rate limit, unlike `/api/ping`.** There the cost per call was an unconditional connect
+       to a host; here the TTL cache bounds what ANY number of calls can spend — each configured
+       instance reaches the network at most once per window however hard the endpoint is hit. If
+       that stops being true, #45's budget is the precedent to reach for.
+     - **Both callers share one fold.** `readStatsFor(targets, env)` in
+       [business/model/stats.ts](src/lib/business/model/stats.ts) plans the reads, resolves each
+       credential VERBATIM off the environment record handed in (R1 — the model imports nothing),
+       skips a named-but-unset variable once-per-process-per-variable, and returns
+       `{ stats, failed, errors, warnings }` with finished log lines minted like
+       `normalizeConfig`'s warnings. Printing stays in the routes. `readFeedsFor(hrefList)` is
+       the same seam minus credentials. The endpoint was the SECOND caller of what had been the
+       load's private `planReads`/folding — extraction on the second real duplication.
+     - **First paint stays SSR, and the client merges answers as an overlay over `data`.**
+       Until the first tick lands the payload IS the picture; once one lands, it owns it — an
+       answered instance replaces its entry, a failed one is DELETED outright, so its box falls
+       back to its unavailable line instead of quietly showing yesterday's numbers beside a toast
+       saying they are gone. A client-side navigation reuses the component with someone else's
+       payload, so the overlay drops on every new `data` and a response that outlives the data it
+       was asked for is discarded.
+     - **The interval stays ON the page, not above it.** Moving it into the layout was the other
+       recorded option, surviving the error-page swap — but the swap is gone, and staying keeps
+       the `refreshable` gate that skips installs with no live boxes. Feeds ride the same
+       endpoint and the same gate: they already counted in `refreshable`, and one round trip per
+       tick for both beats two endpoints. The operator log survives because the ENDPOINT prints
+       its folds' fresh failures — after first paint those are the only reads reaching the
+       network — which is what made `console`'s homes FOUR (Conventions).
 - **A stats toast is raised once per failure EPISODE, through a plain `let` in the route.**
   `ToastStore` dedupes against what is currently on screen, so it cannot cover a periodic
-  `invalidate`: a re-run load hands `[...slug]/+page.svelte` a new `data` object every minute, the
-  `$effect` re-runs, and a toast the user dismissed — or that timed itself out after `TOAST_MS` —
-  came straight back, unattended, forever. `reportedFailures` is a `string[]` keyed the same way
+  refresh: every tick hands `[...slug]/+page.svelte` a new failure list, the `$effect` re-runs on
+  it, and a toast the user dismissed — or that timed itself out after `TOAST_MS` — came straight
+  back, unattended, forever. `reportedFailures` is a `string[]` keyed the same way
   the readings are, and an entry is dropped as its instance recovers, so a box that fails again is
   reported again — the boolean's behaviour, one per instance. It is a list and **not a `Set`**
   because `svelte/prefer-svelte-reactivity` rejects a mutable built-in `Set` in a component, and a
