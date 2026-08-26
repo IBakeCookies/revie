@@ -65,6 +65,7 @@ function getForgeNotifications(product: string) {
 			}
 
 			const parsed = v.safeParse(threadsSchema, await raw.json());
+
 			// A MISSING header must not become a zero: `Number(null)` is 0 and
 			// `Number.isInteger(0)` is true, so the absent-header case goes through the NaN
 			// door rather than being folded into a legitimate empty inbox.
