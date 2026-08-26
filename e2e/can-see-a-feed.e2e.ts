@@ -25,9 +25,11 @@ test('is reachable from the navigation under its configured name', async ({ page
 
 test('says the feed is unavailable instead of failing the page', async ({ page }) => {
 	// One paragraph in the box, no list of rows: an empty rectangle would read as a
-	// layout bug rather than as a source that did not answer.
+	// layout bug rather than as a source that did not answer. By ROLE, not `main ul`:
+	// the quick-jump's closed <dialog> also sits in main and keeps its own <ul> in the
+	// DOM, so a CSS count matches a list no reader can see.
 	await expect(page.getByText('The feed is unavailable')).toBeVisible();
-	await expect(page.locator('main ul')).toHaveCount(0);
+	await expect(page.locator('main').getByRole('list')).toHaveCount(0);
 
 	// The rest of the page is unaffected.
 	await expect(
